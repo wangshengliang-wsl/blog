@@ -12,6 +12,8 @@ import rehypeCallouts from 'rehype-callouts'
 import rehypeKatex from 'rehype-katex'
 import rehypeExternalLinks from 'rehype-external-links'
 import rehypeAutolinkHeadings from 'rehype-autolink-headings'
+// @ts-expect-error(rehype-wrap-all is not typed)
+import rehypeWrapAll from 'rehype-wrap-all'
 
 import { UI, FEATURES } from '../src/config'
 
@@ -152,13 +154,22 @@ export const rehypePlugins: RehypePlugins = [
           'tab-index': 0,
           'aria-hidden': 'false',
           'aria-label': content ? `Link to ${content}` : undefined,
-          'data-pagefind-ignore': true,
+          // avoid `#` being indexed and show in search results
+          'data-pagefind-ignore': '',
         }
       },
       content: {
         type: 'text',
         value: '#',
       },
+    },
+  ],
+  // https://github.com/florentb/rehype-wrap-all
+  [
+    rehypeWrapAll,
+    {
+      selector: 'table',
+      wrapper: 'div',
     },
   ],
 ]
