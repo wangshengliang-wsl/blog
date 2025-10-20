@@ -14,6 +14,8 @@ import type { CollectionEntry, CollectionKey } from 'astro:content'
 import type { CardItemData } from '~/components/views/CardItem.astro'
 import type { GitHubView } from '~/types'
 
+const defaultCategory = '杂谈'
+
 type CollectionEntryList<K extends CollectionKey = CollectionKey> =
   CollectionEntry<K>[]
 
@@ -81,7 +83,7 @@ export function getPostsByCategory(
 
   // Group posts by category
   posts.forEach((post) => {
-    const category = post.data.category || '随笔'
+    const category = post.data.category || defaultCategory
     if (!categoriesMap.has(category)) {
       categoriesMap.set(category, [])
     }
@@ -99,9 +101,9 @@ export function getPostsByCategory(
 
   // Convert to array and sort categories
   return Array.from(categoriesMap.entries()).sort(([a], [b]) => {
-    // Put "随笔" category last, sort others alphabetically
-    if (a === '随笔' && b !== '随笔') return 1
-    if (b === '随笔' && a !== '随笔') return -1
+    // Put "杂谈" category last, sort others alphabetically
+    if (a === defaultCategory && b !== defaultCategory) return 1
+    if (b === defaultCategory && a !== defaultCategory) return -1
     return a.localeCompare(b, 'zh-CN')
   })
 }
@@ -113,8 +115,8 @@ export function isSameCategory(
   previousPost: CollectionEntry<'blog' | 'changelog'> | undefined
 ): boolean {
   if (!currentPost || !previousPost) return false
-  const currentCategory = currentPost.data.category || '随笔'
-  const previousCategory = previousPost.data.category || '随笔'
+  const currentCategory = currentPost.data.category || defaultCategory
+  const previousCategory = previousPost.data.category || defaultCategory
   return currentCategory === previousCategory
 }
 
