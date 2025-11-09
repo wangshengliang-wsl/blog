@@ -7,7 +7,7 @@
   "scripts": {
     "astro": "astro",
     "sync": "astro sync",
-    "dev": "astro dev",
+    "dev": "astro dev --open",
     "check": "astro check",
     "build": "astro build",
     "preview": "astro preview",
