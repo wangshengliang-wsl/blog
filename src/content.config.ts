@@ -71,7 +71,6 @@ const highlights = defineCollection({
       'at://did:plc:6kf6jxl44h34mprhykvqljcx/app.bsky.feed.post/3lbkb6hizhk2f',
       'at://did:plc:oky5czdrnfjpqslsw2a5iclo/app.bsky.feed.post/3lbd2eaura22r',
       'at://did:plc:oky5czdrnfjpqslsw2a5iclo/app.bsky.feed.post/3lbayyemhzs2v',
-      'at://did:plc:z72i7hdynmk6r22z27h6tvur/app.bsky.feed.post/3larljiyi7s2v',
     ],
     newlineHandling: 'paragraph',
     fetchThread: true,
