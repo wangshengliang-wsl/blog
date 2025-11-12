@@ -4,7 +4,6 @@ import { defineCollection } from 'astro:content'
 import { feedLoader } from '@ascorbic/feed-loader'
 import { githubReleasesLoader } from 'astro-loader-github-releases'
 import { githubPrsLoader } from 'astro-loader-github-prs'
-import { blueskyPostsLoader } from 'astro-loader-bluesky-posts'
 
 import {
   pageSchema,
@@ -57,28 +56,6 @@ const prs = defineCollection({
   }),
 })
 
-const highlights = defineCollection({
-  loader: blueskyPostsLoader({
-    uris: [
-      'at://did:plc:6kf6jxl44h34mprhykvqljcx/app.bsky.feed.post/3lifesehhok27',
-      'at://did:plc:iwhvwluesbbqtslwwdzgiize/app.bsky.feed.post/3lh3aonbqes2y',
-      'at://did:plc:6kf6jxl44h34mprhykvqljcx/app.bsky.feed.post/3lfwu3pka2c2j',
-      'at://did:plc:6kf6jxl44h34mprhykvqljcx/app.bsky.feed.post/3lfsayyhu4c2j',
-      'at://did:plc:6kf6jxl44h34mprhykvqljcx/app.bsky.feed.post/3lf3iyptedc2e',
-      'at://did:plc:6kf6jxl44h34mprhykvqljcx/app.bsky.feed.post/3lcv2yftszs2z',
-      'at://did:plc:6kf6jxl44h34mprhykvqljcx/app.bsky.feed.post/3lcl5ndm52c2s',
-      'at://did:plc:6kf6jxl44h34mprhykvqljcx/app.bsky.feed.post/3lcdimk36e226',
-      'at://did:plc:6kf6jxl44h34mprhykvqljcx/app.bsky.feed.post/3lbkb6hizhk2f',
-      'at://did:plc:oky5czdrnfjpqslsw2a5iclo/app.bsky.feed.post/3lbd2eaura22r',
-      'at://did:plc:oky5czdrnfjpqslsw2a5iclo/app.bsky.feed.post/3lbayyemhzs2v',
-    ],
-    newlineHandling: 'paragraph',
-    fetchThread: true,
-    threadDepth: 4,
-    fetchOnlyAuthorReplies: true,
-  }),
-})
-
 const photos = defineCollection({
   loader: file('src/content/photos/data.json'),
   schema: photoSchema,
@@ -110,7 +87,6 @@ export const collections = {
   projects,
   releases,
   prs,
-  highlights,
   photos,
   changelog,
   streams,
