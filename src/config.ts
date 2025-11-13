@@ -31,13 +31,13 @@ export const UI: Ui = {
       displayMode: 'alwaysText',
       text: 'Projects',
     },
-    {
-      path: '/highlights',
-      title: 'Highlights',
-      displayMode: 'iconToTextOnMobile',
-      text: 'Highlights',
-      icon: 'i-ri-screenshot-line',
-    },
+    // {
+    //   path: '/highlights',
+    //   title: 'Highlights',
+    //   displayMode: 'iconToTextOnMobile',
+    //   text: 'Highlights',
+    //   icon: 'i-ri-screenshot-line',
+    // },
     {
       path: '/photos',
       title: 'Photos',
