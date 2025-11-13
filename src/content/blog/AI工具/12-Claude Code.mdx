@@ -1,8 +1,182 @@
 ---
-title: Claude Code 完整教程合集
-description: Claude Code 使用教程、实用技巧、最佳实践全收录
+title: Claude Code 最佳实践
+description: Claude Code 最佳实践
 pubDate: 2025-11-09
 toc: true
 ogImage: true
 category: AI工具
 ---
+
+Claude Code 是 Claude 3.7 Sonnet 模型的一个插件，它可以让 Claude 在代码编辑器中直接编辑代码。
+
+## 安装 Claude Code
+
+1. 安装 Claude Code 插件
+
+```bash
+npm install @anthropic/claude-code
+```
+
+2. 检查插件是否安装成功
+
+```bash
+claude --version
+```
+
+3. 配置 Claude Code
+
+```bash
+# 配置 token
+export ANTHROPIC_AUTH_TOKEN='xxx' >> ~/.zshrc
+# 配置 url（不同中转服务商 url 会和官方的不同，比如 anyrouter.top 的 url 是 https://anyrouter.top）
+export ANTHROPIC_BASE_URL='xxx' >> ~/.zshrc
+# 让上面新增的配置生效
+source ~/.zshrc
+```
+
+如果是`bash`的话，把上面的`.zshrc`改成`bash_profile`和`.bashrc`即可
+
+```bash
+export ANTHROPIC_AUTH_TOKEN='xxx' >> ~/.bash_profile
+export ANTHROPIC_BASE_URL='xxx' >> ~/.bash_profile
+export ANTHROPIC_AUTH_TOKEN='xxx' >> ~/.bashrc
+export ANTHROPIC_BASE_URL='xxx' >> ~/.bashrc
+source ~/.bash_profile
+source ~/.bashrc
+```
+
+4. 启动 Claude Code
+
+```bash
+cd your-project-folder
+claude
+```
+
+最终的界面如下：
+![](https://raw.githubusercontent.com/wangshengliang-wsl/blog/main/img/20251113112858888.png)
+
+## 接下来介绍一些 cc 的一些常见指令
+
+### 启动交互式对话模式，输入/exit或 /quit可以退出
+
+```bash
+claude
+```
+
+### 一次性对话，Claude回答完成后立即退出
+
+```bash
+claude -p "你是什么模型？"
+```
+
+### 输入一个对话，并进入到交互式对话中
+
+```bash
+claude "你是什么模型？"
+```
+
+### 获取命令帮助
+
+```bash
+claude --help
+```
+
+### MCP
+
+```bash
+# 安装 context7 mcp server
+claude mcp add --transport http context7 https://mcp.context7.com/mcp
+```
+
+```bash
+# 获取已安装的MCP列表
+claude mcp list
+```
+
+### 对话历史
+
+```bash
+# 恢复上一次的对话历史
+claude -c
+```
+
+```bash
+# 展示一个对话历史列表，从中选择要恢复的对话历史
+claude -r
+```
+
+### YOLO模式
+
+不需要工具授权确认，完全由Claude Code执行（非Max用户不建议，因为非常消耗 token，富哥随意～）
+
+```bash
+claude --dangerously-skip-permissions
+```
+
+## 和 Claude Code 对话
+
+Claude Code的对话，可以理解成和Cursor的Chat的对话类似，每一个对话就对应的是一个Cursor的Chat，接下来，聊一聊交互式对话的一些技巧。
+
+### 1. 使用plan mode
+
+使用`shifit + tab`可以切换对应的模式。在开始编写一个需求之前特别是比较大的需求，非常的建议使用计划模式，让Claude Code做出接下来的开发计划。之后再进入到一个实际的开发阶段，这样的话会确保开发的和自己的预期一致，并且会节省很多的token避免反工。
+
+![](https://raw.githubusercontent.com/wangshengliang-wsl/blog/main/img/20251113115149099.png)
+
+### 2. 使用/唤起命令
+
+通过`/help`可以查看可用的命令
+
+![](https://raw.githubusercontent.com/wangshengliang-wsl/blog/main/img/20251113123937430.png)
+
+#### **general 通用命令**
+
+常见的快捷键如下：
+
+```text
+ ! for bash mode   double tap esc to clear input     ctrl + _ to undo
+ / for commands    shift + tab to auto-accept edits  ctrl + z to suspend
+ @ for file paths  ctrl + o for verbose output       ctrl + v to paste images
+ # to memorize     ctrl + t to show todos
+                   tab to toggle thinking
+                   option + ⏎ for newline
+```
+
+- **`!`**：在 Claude Code 中执行 bash 命令
+- **`/`**：在 Claude Code 中执行它自带的所有命令
+- **`@`**：在 Claude Code 中引用文件，可以直接输入文字检索，也可以将文件拖进来
+- **`#`**：在 Claude Code 中添加记录，如果有 `CLAUDE.md` 文件（通过 `/init` 命令初始化此文件），则会在其中添加一条记录
+- **`tab`**：在 Claude Code 中循环切换思考模式/非思考模式
+- **`option + ⏎`**：在 Claude Code 中换行
+- **`shift + tab`**：在 Claude Code 中循环切换三种模式，自动接受编辑｜计划模式｜普通模式
+- **`ctrl + o`**：在 Claude Code 中显示详细输出
+- **`ctrl + v`**：在 Claude Code 中粘贴图片，也可以直接将图片拖动进来。
+- **`ctrl + t`**：在 Claude Code 中显示TODO
+
+#### **commands 常见命令**
+
+- **`/help`**: 获取常见的命令帮助
+
+- **`/mcp`**：管理和查看你的MCP
+
+- **`/init`**：初始化`CLAUDE.md`文件
+
+- **`/clear`**：清空你的上下文
+
+- **`/compact`**：清除对话历史，但在上下文中保留摘要
+
+- **`/resume`**：切换对话
+
+当然也可以自定义一些指令，这里就过多展开介绍了
+
+### 3.CLAUDE.md（重要）
+
+- 使用 `/init` 就可以初始化 `CLAUDE.md` 这个文件，这个文件会作为你每次和 `claude code` 交互的一个上下文。
+
+- 默认是项目级别的，也可以在子文件夹中创建，在处理子目录中的文件时，Claude 会按需拉取 `CLAUDE.md` 文件
+
+- 这个文件放一些什么：核心的项目结构、代码风格、重要规则、重要的文档参考规范
+
+- 随着项目的迭代，需要花时间调整 `CLAUDE.md` ，可以使用 `#` 去添加，也可以直接修改文件。
+
+- `CLAUDE.md` 文件没有固定的格式要求，只要保持简洁可以阅读就好
