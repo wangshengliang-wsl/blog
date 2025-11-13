@@ -1,8 +1,86 @@
 ---
-title: n8n
-description: n8n
+title: n8n - 开源工作流自动化神器
+description: n8n 是一个强大的开源工作流自动化平台,让你通过可视化界面连接各种服务和 AI,实现自动化任务处理
 pubDate: 2025-11-13
 toc: true
 ogImage: true
 category: AI工具
 ---
+
+n8n 是一个**开源的工作流自动化平台**，可以让你通过可视化的方式把各种服务、API 和 AI 模型连接起来,实现自动化任务处理。说白了就是让不同的工具和服务能自动协同工作,省去大量重复劳动。
+
+比起 Zapier、Make 这些商业化平台，n8n 最大的优势就是:**完全开源、可自部署、无限制使用**。你可以在自己服务器上跑,数据完全掌控在自己手里。
+
+## 核心特点
+
+n8n 具备以下特点：
+
+1. **可视化编排**：拖拽式界面,不用写代码就能搭建复杂工作流
+2. **开源免费**：MIT 协议,可自由部署和定制
+3. **节点丰富**：内置 400+ 个服务节点(GitHub、Slack、Notion、OpenAI 等)
+4. **AI 集成**：原生支持 OpenAI、Claude、Gemini 等 AI 模型
+5. **高度灵活**：支持自定义代码节点(JavaScript/Python)
+6. **数据安全**：自部署模式,数据不经过第三方
+7. **活跃社区**：持续更新,社区提供大量模板
+
+## 快速上手
+
+### 本地快速体验
+
+最简单的方式是用 Docker 一键启动，以下是命令行的启动方式：
+
+```bash
+# 拉取并运行 n8n
+docker run -it --rm \
+  --name n8n \
+  -p 5678:5678 \
+  -v ~/.n8n:/home/node/.n8n \
+  docker.n8n.io/n8nio/n8n
+
+# 或者用 docker-compose
+# 创建 docker-compose.yml 后执行
+docker-compose up -d
+```
+
+`docker-compose.yml` 配置：
+
+```yaml
+version: '3.8'
+
+services:
+  n8n:
+    image: docker.n8n.io/n8nio/n8n
+    restart: always
+    ports:
+      - '5678:5678'
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=admin
+      - N8N_BASIC_AUTH_PASSWORD=your_password
+      - N8N_HOST=localhost
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - NODE_ENV=production
+      - WEBHOOK_URL=http://localhost:5678/
+    volumes:
+      - ~/.n8n:/home/node/.n8n
+```
+
+启动后访问 `http://localhost:5678`，就能看到 n8n 的界面了。
+
+也可以通过`Docker Desktop`，在`GUI`界面操作：
+
+先点击上方的搜索框，然后输入`n8n`，点击`pull`按钮，等待下载完成（图中是因为我已经下载了，才会有`run`按钮）：
+![](https://raw.githubusercontent.com/wangshengliang-wsl/blog/main/img/20251113152106162.png)
+
+下载完成之后，点击`Run`按钮：
+![](https://raw.githubusercontent.com/wangshengliang-wsl/blog/main/img/20251113150624046.png)
+
+这个时候会弹起一个弹窗，需要填入一些信息（照抄就好），环境变量暂时不需要填写，填完后点击`Run`按钮：
+![](https://raw.githubusercontent.com/wangshengliang-wsl/blog/main/img/20251113150833943.png)
+
+然后点击左侧的`Contains`，点击`Start`按钮，即可启动刚刚创建的容器：
+![](https://raw.githubusercontent.com/wangshengliang-wsl/blog/main/img/20251113151235363.png)
+
+启动后，点击末尾的链接，就能看到 n8n 的界面了：
+![](https://raw.githubusercontent.com/wangshengliang-wsl/blog/main/img/20251113151149709.png)

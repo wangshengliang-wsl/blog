@@ -7,176 +7,307 @@ ogImage: true
 category: AI工具
 ---
 
-Claude Code 是 Claude 3.7 Sonnet 模型的一个插件，它可以让 Claude 在代码编辑器中直接编辑代码。
+Claude Code 是 Anthropic 官方出品的 AI 编程助手，直接在终端里就能用。它不只是回答问题，还能帮你改代码、跑命令，说白了就是给你配了个懂代码的 AI 搭档。
 
-## 安装 Claude Code
+## 快速上手
 
-1. 安装 Claude Code 插件
+### 安装配置
 
 ```bash
+# 安装
 npm install @anthropic/claude-code
-```
 
-2. 检查插件是否安装成功
-
-```bash
+# 检查是否安装成功
 claude --version
 ```
 
-3. 配置 Claude Code
+配置环境变量（用 zsh 的话）：
 
 ```bash
-# 配置 token
-export ANTHROPIC_AUTH_TOKEN='xxx' >> ~/.zshrc
-# 配置 url（不同中转服务商 url 会和官方的不同，比如 anyrouter.top 的 url 是 https://anyrouter.top）
-export ANTHROPIC_BASE_URL='xxx' >> ~/.zshrc
-# 让上面新增的配置生效
+export ANTHROPIC_AUTH_TOKEN='你的token' >> ~/.zshrc
+export ANTHROPIC_BASE_URL='API地址' >> ~/.zshrc  # 用中转的话填中转地址
 source ~/.zshrc
 ```
 
-如果是`bash`的话，把上面的`.zshrc`改成`bash_profile`和`.bashrc`即可
+如果用的是 bash，把 `.zshrc` 换成 `.bash_profile` 和 `.bashrc` 就行。
 
-```bash
-export ANTHROPIC_AUTH_TOKEN='xxx' >> ~/.bash_profile
-export ANTHROPIC_BASE_URL='xxx' >> ~/.bash_profile
-export ANTHROPIC_AUTH_TOKEN='xxx' >> ~/.bashrc
-export ANTHROPIC_BASE_URL='xxx' >> ~/.bashrc
-source ~/.bash_profile
-source ~/.bashrc
-```
-
-4. 启动 Claude Code
+启动：
 
 ```bash
 cd your-project-folder
 claude
 ```
 
-最终的界面如下：
+界面长这样：
 ![](https://raw.githubusercontent.com/wangshengliang-wsl/blog/main/img/20251113112858888.png)
 
-## 接下来介绍一些 cc 的一些常见指令
-
-### 启动交互式对话模式，输入/exit或 /quit可以退出
+### 基础用法
 
 ```bash
+# 进入交互模式（输入 /exit 或 /quit 退出）
 claude
-```
 
-### 一次性对话，Claude回答完成后立即退出
-
-```bash
+# 问完就退出
 claude -p "你是什么模型？"
-```
 
-### 输入一个对话，并进入到交互式对话中
-
-```bash
+# 带着问题进入交互模式
 claude "你是什么模型？"
-```
 
-### 获取命令帮助
-
-```bash
+# 查看帮助
 claude --help
-```
 
-### MCP
-
-```bash
-# 安装 context7 mcp server
-claude mcp add --transport http context7 https://mcp.context7.com/mcp
-```
-
-```bash
-# 获取已安装的MCP列表
-claude mcp list
-```
-
-### 对话历史
-
-```bash
-# 恢复上一次的对话历史
+# 恢复上次对话
 claude -c
-```
 
-```bash
-# 展示一个对话历史列表，从中选择要恢复的对话历史
+# 从历史中选一个对话恢复
 claude -r
-```
 
-### YOLO模式
-
-不需要工具授权确认，完全由Claude Code执行（非Max用户不建议，因为非常消耗 token，富哥随意～）
-
-```bash
+# YOLO 模式：不需要确认，直接执行（费 token，慎用）
 claude --dangerously-skip-permissions
 ```
 
-## 和 Claude Code 对话
+## 核心功能详解
 
-Claude Code的对话，可以理解成和Cursor的Chat的对话类似，每一个对话就对应的是一个Cursor的Chat，接下来，聊一聊交互式对话的一些技巧。
+### CLAUDE.md - 让 AI 懂你的项目
 
-### 1. 使用plan mode
+这是 Claude Code 的灵魂功能。用 `/init` 初始化后，会在项目根目录生成一个 `CLAUDE.md` 文件。
 
-使用`shifit + tab`可以切换对应的模式。在开始编写一个需求之前特别是比较大的需求，非常的建议使用计划模式，让Claude Code做出接下来的开发计划。之后再进入到一个实际的开发阶段，这样的话会确保开发的和自己的预期一致，并且会节省很多的token避免反工。
+**这个文件能干啥？**
 
-![](https://raw.githubusercontent.com/wangshengliang-wsl/blog/main/img/20251113115149099.png)
+- 告诉 AI 你的项目是干什么的
+- 记录代码风格和规范（比如用 tab 还是空格）
+- 保存重要的架构决策
+- 作为每次对话的上下文
 
-### 2. 使用/唤起命令
+**怎么用？**
 
-通过`/help`可以查看可用的命令
+```bash
+# 初始化
+/init
+
+# 或者用 # 快速添加记录
+# 我们统一用 axios，别用 fetch
+```
+
+子目录也能建 `CLAUDE.md`，AI 会自动识别。文件格式随意，能看懂就行。
+
+### 快捷键速查
+
+聊天输入框里这些快捷键超好用：
+
+- **`!`**：直接跑 bash 命令，比如 `! npm test`
+- **`/`**：唤起内置命令，比如 `/help`、`/clear`
+- **`@`**：引用文件，支持 `@src/**/*.tsx` 这种通配符，也能直接拖文件进来
+- **`#`**：快速添加记录到 CLAUDE.md
+- **`tab`**：切换思考模式（能看到 AI 的思考过程，挺有意思）
+- **`shift + tab`**：循环切换三种模式
+  - 普通模式：你确认每个改动
+  - 自动接受：AI 自动应用修改
+  - 计划模式：先做计划再执行
+- **`ctrl + t`**：查看 TODO 列表
+- **`option + ⏎`**：换行
 
 ![](https://raw.githubusercontent.com/wangshengliang-wsl/blog/main/img/20251113123937430.png)
 
-#### **general 通用命令**
+### Plan Mode - 大需求必备
 
-常见的快捷键如下：
+按 `shift + tab` 切换到计划模式，让 AI 先制定开发计划，你看完没问题再让它执行。这样能：
+
+- 避免走弯路
+- 省 token
+- 确保开发方向对路
+
+![](https://raw.githubusercontent.com/wangshengliang-wsl/blog/main/img/20251113115149099.png)
+
+比如开发一个用户管理系统：
 
 ```text
- ! for bash mode   double tap esc to clear input     ctrl + _ to undo
- / for commands    shift + tab to auto-accept edits  ctrl + z to suspend
- @ for file paths  ctrl + o for verbose output       ctrl + v to paste images
- # to memorize     ctrl + t to show todos
-                   tab to toggle thinking
-                   option + ⏎ for newline
+[Plan Mode]
+"我要做个用户管理系统：
+- 用户列表（分页、搜索、筛选）
+- 用户详情页
+- 新增/编辑用户
+- 权限管理"
 ```
 
-- **`!`**：在 Claude Code 中执行 bash 命令
-- **`/`**：在 Claude Code 中执行它自带的所有命令
-- **`@`**：在 Claude Code 中引用文件，可以直接输入文字检索，也可以将文件拖进来
-- **`#`**：在 Claude Code 中添加记录，如果有 `CLAUDE.md` 文件（通过 `/init` 命令初始化此文件），则会在其中添加一条记录
-- **`tab`**：在 Claude Code 中循环切换思考模式/非思考模式
-- **`option + ⏎`**：在 Claude Code 中换行
-- **`shift + tab`**：在 Claude Code 中循环切换三种模式，自动接受编辑｜计划模式｜普通模式
-- **`ctrl + o`**：在 Claude Code 中显示详细输出
-- **`ctrl + v`**：在 Claude Code 中粘贴图片，也可以直接将图片拖动进来。
-- **`ctrl + t`**：在 Claude Code 中显示TODO
+AI 会列出详细步骤，你觉得 OK 再继续。
 
-#### **commands 常见命令**
+### 常用命令
 
-- **`/help`**: 获取常见的命令帮助
+- `/help` - 查看所有命令
+- `/init` - 初始化 CLAUDE.md
+- `/clear` - 清空当前对话
+- `/compact` - 压缩对话历史（保留摘要）
+- `/resume` - 切换对话
+- `/mcp` - 管理 MCP 插件
 
-- **`/mcp`**：管理和查看你的MCP
+### MCP - 给 AI 开外挂
 
-- **`/init`**：初始化`CLAUDE.md`文件
+MCP (Model Context Protocol) 能让 Claude Code 连接外部数据源：
 
-- **`/clear`**：清空你的上下文
+```bash
+# 装个 context7 mcp server
+claude mcp add --transport http context7 https://mcp.context7.com/mcp
 
-- **`/compact`**：清除对话历史，但在上下文中保留摘要
+# 查看已安装的 MCP
+claude mcp list
+```
 
-- **`/resume`**：切换对话
+装上 GitHub MCP，AI 就能查你的 repo；装上数据库 MCP，AI 就能查数据库。
 
-当然也可以自定义一些指令，这里就过多展开介绍了
+## 实战案例
 
-### 3.CLAUDE.md（重要）
+### 添加暗黑模式
 
-- 使用 `/init` 就可以初始化 `CLAUDE.md` 这个文件，这个文件会作为你每次和 `claude code` 交互的一个上下文。
+```bash
+claude "帮我加个暗黑模式：
+1. 加个切换按钮
+2. 跟随系统主题
+3. 用户偏好存 localStorage
+4. 所有组件都适配"
+```
 
-- 默认是项目级别的，也可以在子文件夹中创建，在处理子目录中的文件时，Claude 会按需拉取 `CLAUDE.md` 文件
+AI 会自动帮你：
 
-- 这个文件放一些什么：核心的项目结构、代码风格、重要规则、重要的文档参考规范
+- 找到相关文件
+- 改配置和样式
+- 加切换逻辑
+- 测试功能
 
-- 随着项目的迭代，需要花时间调整 `CLAUDE.md` ，可以使用 `#` 去添加，也可以直接修改文件。
+### 代码重构
 
-- `CLAUDE.md` 文件没有固定的格式要求，只要保持简洁可以阅读就好
+```bash
+claude "重构一下 src/utils/api.js：
+1. Promise 改成 async/await
+2. 加上错误处理
+3. 统一返回格式
+4. 加个请求拦截器"
+```
+
+### Bug 修复
+
+```bash
+claude "@src/components/UserList.tsx 加载数据时闪烁，帮我看看"
+```
+
+AI 会读文件、找问题（可能是缺 loading 状态）、自动修。
+
+### 批量处理
+
+```bash
+claude "把 src/pages 下所有 .js 转成 TypeScript，加上类型"
+```
+
+一次搞定多个文件，代码风格还能保持一致。
+
+## 进阶技巧
+
+### 思考模式
+
+按 `tab` 开启，能看到 AI 的思考过程：
+
+- 学习 AI 怎么分析问题
+- 理解复杂问题的解法
+- 调试 AI 的决策
+
+挺有意思的，特别是遇到复杂问题时。
+
+### 结合 bash 命令
+
+```bash
+! npm test       # 跑测试
+! git status     # 看 git 状态
+! npm run build  # 构建
+```
+
+AI 会根据命令输出继续工作，比如测试挂了就自动修。
+
+### 快速上手小技巧
+
+```bash
+# 项目间快速切换
+cd project-a && claude
+cd project-b && claude -c  # 恢复 project-b 的对话历史
+
+# 代码审查
+claude "看看最近的 commit 有没有问题"
+
+# 生成文档
+claude "给 @src/utils 生成 API 文档"
+
+# 生成测试
+claude "给 @src/components/Button.tsx 写测试用例"
+
+# 性能分析
+claude "看看 @src/App.tsx 有啥性能问题"
+```
+
+## 常见问题
+
+### 和 Cursor 比有啥区别？
+
+| 特性     | Claude Code              | Cursor                   |
+| -------- | ------------------------ | ------------------------ |
+| 运行方式 | 命令行工具               | 完整的 IDE               |
+| 使用场景 | 快速任务、脚本、终端操作 | 大型项目开发             |
+| 学习成本 | 低（会用终端就行）       | 中（要适应新 IDE）       |
+| 灵活性   | 高（哪都能用）           | 中（得在 Cursor 里工作） |
+| 价格     | API 按量付费             | 订阅制                   |
+
+其实可以一起用，Cursor 日常开发，Claude Code 处理快速任务和自动化脚本。
+
+### Token 消耗太快咋办？
+
+几个省 token 的办法：
+
+- 用 `/compact` 压缩对话历史
+- CLAUDE.md 写简洁点
+- 大需求别上来就用 YOLO 模式
+- 先用 Plan Mode 确认方案
+- 简单任务用 `claude -p` 一次搞定
+
+### 会不会把代码改坏？
+
+放心，有这些保护：
+
+- 改之前会显示 diff，你确认了才改
+- 每个修改都能选择接受或拒绝
+- 用 git 的话随时能回退
+- 重要项目建议先在分支上试
+
+刚开始用别开 YOLO 模式，慢慢熟悉再说。
+
+### 怎么让 AI 更懂我的项目？
+
+几个建议：
+
+- 认真写 `CLAUDE.md`：项目简介、技术栈、代码规范、架构决策
+- 用 `#` 记录重要决策
+- 别动不动就 `/clear`，保留对话历史
+- 子目录也可以建特定的 `CLAUDE.md`
+
+## 写在最后
+
+Claude Code 核心价值：
+
+- ⚡ 提效神器：自动化重复工作，快速实现需求
+- 📚 学习助手：帮你理解陌生代码和技术
+- 🔍 代码质量：自动发现问题，给最佳实践建议
+- 🛠️ 超级灵活：命令行工具，哪都能用
+
+**适合这些人：**
+
+- 熟悉终端的开发者
+- 需要快速出原型的团队
+- 想提效的个人开发者
+- 学新技术栈的初学者
+
+**上手建议：**
+
+1. 先拿小项目练手
+2. 好好写 CLAUDE.md
+3. 多用 Plan Mode，少用 YOLO Mode
+4. 记得用 git 做版本控制
+5. 慢慢探索高级功能（MCP、自定义命令等）
+
+装上就能用，试试就知道有多香了～ 🚀
