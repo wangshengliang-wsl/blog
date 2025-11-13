@@ -7,6 +7,8 @@ import {
   transformerDirectives,
   transformerVariantGroup,
 } from 'unocss'
+import { readFileSync, readdirSync, statSync } from 'node:fs'
+import { join } from 'node:path'
 
 import { UI } from './src/config'
 import projecstData from './src/content/projects/data.json'
@@ -35,6 +37,49 @@ const socialIcons = socialLinks
   .map((item) => (item as IconSocialItem | ResponsiveSocialItem).icon)
 
 const projectIcons = projecstData.map((item) => item.icon)
+
+// Get blog post icons by reading files directly
+function getBlogIcons(): string[] {
+  const icons: string[] = []
+  const blogDir = './src/content/blog'
+
+  function readDir(dir: string) {
+    try {
+      const files = readdirSync(dir)
+      for (const file of files) {
+        const fullPath = join(dir, file)
+        const stat = statSync(fullPath)
+
+        if (stat.isDirectory()) {
+          readDir(fullPath)
+        } else if (file.endsWith('.mdx') || file.endsWith('.md')) {
+          try {
+            const content = readFileSync(fullPath, 'utf-8')
+            const frontmatterMatch = content.match(/^---\n([\s\S]*?)\n---/)
+            if (frontmatterMatch) {
+              const frontmatter = frontmatterMatch[1]
+              const iconMatch = frontmatter.match(/titleIcon:\s*(.+)/)
+              if (iconMatch) {
+                const icon = iconMatch[1].trim()
+                const finalIcon = icon.startsWith('i-') ? icon : `i-${icon}`
+                icons.push(finalIcon)
+              }
+            }
+          } catch (_e) {
+            // Ignore file read errors
+          }
+        }
+      }
+    } catch (_e) {
+      // Ignore directory read errors
+    }
+  }
+
+  readDir(blogDir)
+  return icons
+}
+
+const blogIcons = getBlogIcons()
 
 const githubVersionColor: Record<string, string> = {
   major: 'bg-rose/15 text-rose-7 dark:text-rose-3',
@@ -124,6 +169,7 @@ export default defineConfig({
     ...navIcons,
     ...socialIcons,
     ...projectIcons,
+    ...blogIcons,
 
     /* BaseLayout */
     'focus:not-sr-only',

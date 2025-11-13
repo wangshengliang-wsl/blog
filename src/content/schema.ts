@@ -50,6 +50,16 @@ export const postSchema = z.object({
     .describe(
       "**Required**. Sets the post title, limited to **60 characters**. This follows Moz's recommendation, ensuring approximately 90% of titles display correctly in SERPs and preventing truncation on smaller screens or social platforms. [Learn more](https://moz.com/learn/seo/title-tag)."
     ),
+  titleIcon: z
+    .string()
+    .regex(
+      /^(i-)?[\w-]+(:[\w-]+)?$/,
+      'Icon must be in the format `<collection>-<icon>`, `<collection>:<icon>`, or with `i-` prefix as per [UnoCSS](https://unocss.dev/presets/icons) specs.'
+    )
+    .optional()
+    .describe(
+      'Optional icon to display before the post title. It can be in the format `<collection>-<icon>`, `<collection>:<icon>`, or with `i-` prefix (e.g., `carbon-airplane`, `material-symbols:airplane-ticket`, or `i-carbon-airplane`) as per [UnoCSS](https://unocss.dev/presets/icons) specs. [Check all available icons here](https://icones.js.org/).'
+    ),
   subtitle: z
     .string()
     .default('')

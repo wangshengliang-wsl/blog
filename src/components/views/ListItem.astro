@@ -10,6 +10,7 @@ interface Props {
   redirect?: string
   postSlug?: string
   title: string
+  titleIcon?: string
   video?: boolean
   radio?: boolean
   date: string | Date
@@ -23,12 +24,20 @@ const {
   collectionType,
   postSlug,
   title,
+  titleIcon,
   video,
   radio,
   date,
   minutesRead,
   platform,
 } = Astro.props
+
+// Ensure icon has i- prefix
+const iconClass = titleIcon
+  ? titleIcon.startsWith('i-')
+    ? titleIcon
+    : `i-${titleIcon}`
+  : undefined
 ---
 
 <div class="slide-enter" style={{ '--enter-stage': idx }}>
@@ -39,7 +48,10 @@ const {
     external={redirect ? true : false}
     enableNewTabWarning={redirect ? true : false}
   >
-    <Fragment slot="title">{title}</Fragment>
+    <Fragment slot="title">
+      {iconClass && <span class={`${iconClass} mr-1.5`} aria-hidden="true" />}
+      {title}
+    </Fragment>
     <span slot="end" u-flex="~ gap-2 items-center">
       {
         video && (

@@ -1,6 +1,7 @@
 ---
 interface Props {
   title?: string
+  titleIcon?: string
   subtitle?: string
   isCentered?: boolean
   isSearchable?: boolean
@@ -10,12 +11,20 @@ interface Props {
 
 const {
   title,
+  titleIcon,
   subtitle,
   isCentered = false,
   isSearchable,
   searchFilter,
   class: className,
 } = Astro.props
+
+// Ensure icon has i- prefix
+const iconClass = titleIcon
+  ? titleIcon.startsWith('i-')
+    ? titleIcon
+    : `i-${titleIcon}`
+  : undefined
 ---
 
 <header
@@ -24,7 +33,14 @@ const {
     'text-center': isCentered,
   }}
 >
-  {title && <h1>{title}</h1>}
+  {
+    title && (
+      <h1>
+        {iconClass && <span class={`${iconClass} mr-2`} aria-hidden="true" />}
+        {title}
+      </h1>
+    )
+  }
   {subtitle && <p class="mt--4! op-50 italic">{subtitle}</p>}
   <slot name="head" />
 </header>
