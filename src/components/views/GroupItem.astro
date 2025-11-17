@@ -40,12 +40,12 @@ const isImageUrl = (icon: string) => /^https?:\/\//.test(icon)
           <img
             src={item.icon}
             alt={item.id}
-            class="group-hover:data-[show-color]:saturate-100 op-50 saturate-0 w-20 h-20 object-contain mr-2"
+            class="group-hover:data-[show-color]:saturate-100 op-50 saturate-0 w-15 h-15 object-contain mr-5"
             data-show-color={showGroupItemColorOnHover ? '' : undefined}
           />
         ) : (
           <div
-            class={`group-hover:data-[show-color]:saturate-100 op-50 saturate-0 leading-9 text-7.5 ${item.icon}`}
+            class={`group-hover:data-[show-color]:saturate-100 op-50 saturate-0 leading-9 text-7.5 ${item.icon} w-15 h-15 mr-5`}
             data-show-color={showGroupItemColorOnHover ? '' : undefined}
           />
         )}

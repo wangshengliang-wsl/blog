@@ -5,5 +5,33 @@
     "desc": "OutfitAI - AI-Powered Virtual Try-On Experience",
     "icon": "https://www.outfit-mksaas.site/logo.png",
     "category": "AI SaaS"
+  },
+  {
+    "id": "TypeCN",
+    "link": "https://type-cn-supabase.vercel.app/",
+    "desc": "TypeCN - Master Chinese typing through interactive practice and gamified learning",
+    "icon": "https://type-cn-supabase.vercel.app/favicon.ico",
+    "category": "AI SaaS"
+  },
+  {
+    "id": "Travel China Guide",
+    "link": "https://www.wangshengliang.site/",
+    "desc": "Travel China Guide - A guide to travel in China",
+    "icon": "https://www.wangshengliang.site/favicon.ico",
+    "category": "AI SaaS"
+  },
+  {
+    "id": "VoiceAccountClient",
+    "link": "https://github.com/wangshengliang-wsl/VoiceAccountClient",
+    "desc": "VoiceAccountClient - A voice account client",
+    "icon": "i-skill-icons:github-dark",
+    "category": "iOS 应用"
+  },
+  {
+    "id": "VoiceAccountServer",
+    "link": "https://github.com/wangshengliang-wsl/VoiceAccountServer",
+    "desc": "VoiceAccountServer - A voice account server",
+    "icon": "i-skill-icons:github-dark",
+    "category": "iOS 应用"
   }
 ]
