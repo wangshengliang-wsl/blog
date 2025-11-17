@@ -61,8 +61,11 @@ function getBlogIcons(): string[] {
               const iconMatch = frontmatter.match(/titleIcon:\s*(.+)/)
               if (iconMatch) {
                 const icon = iconMatch[1].trim()
-                const finalIcon = icon.startsWith('i-') ? icon : `i-${icon}`
-                icons.push(finalIcon)
+                // Skip URL format icons (only process UnoCSS icon format)
+                if (!/^https?:\/\//.test(icon)) {
+                  const finalIcon = icon.startsWith('i-') ? icon : `i-${icon}`
+                  icons.push(finalIcon)
+                }
               }
             }
           } catch (_e) {

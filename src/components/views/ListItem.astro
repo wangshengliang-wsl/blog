@@ -32,12 +32,14 @@ const {
   platform,
 } = Astro.props
 
-// Ensure icon has i- prefix
-const iconClass = titleIcon
-  ? titleIcon.startsWith('i-')
-    ? titleIcon
-    : `i-${titleIcon}`
-  : undefined
+// Check if titleIcon is a URL or an icon class
+const isImageUrl = titleIcon ? /^https?:\/\//.test(titleIcon) : false
+const iconClass =
+  titleIcon && !isImageUrl
+    ? titleIcon.startsWith('i-')
+      ? titleIcon
+      : `i-${titleIcon}`
+    : undefined
 ---
 
 <div class="slide-enter" style={{ '--enter-stage': idx }}>
@@ -49,8 +51,20 @@ const iconClass = titleIcon
     enableNewTabWarning={redirect ? true : false}
   >
     <Fragment slot="title">
-      {iconClass && <span class={`${iconClass} mr-1.5`} aria-hidden="true" />}
-      {title}
+      {
+        titleIcon &&
+          (isImageUrl ? (
+            <img
+              src={titleIcon}
+              alt=""
+              class="inline-block h-[1.2em] w-[1.2em] align-text-bottom"
+              aria-hidden="true"
+            />
+          ) : iconClass ? (
+            <span class={`${iconClass}`} aria-hidden="true" />
+          ) : null)
+      }
+      <span class="ml-2.5">{title}</span>
     </Fragment>
     <span slot="end" u-flex="~ gap-2 items-center">
       {

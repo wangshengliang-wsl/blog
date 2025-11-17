@@ -222,7 +222,7 @@
 }
 .prose img {
   border-radius: 0.5rem;
-  margin-block: 2em;
+  /* margin-block: 2em; */
   margin-inline: auto;
 }
 .prose figure img {

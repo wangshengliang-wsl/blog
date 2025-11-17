@@ -19,12 +19,14 @@ const {
   class: className,
 } = Astro.props
 
-// Ensure icon has i- prefix
-const iconClass = titleIcon
-  ? titleIcon.startsWith('i-')
-    ? titleIcon
-    : `i-${titleIcon}`
-  : undefined
+// Check if titleIcon is a URL or an icon class
+const isImageUrl = titleIcon ? /^https?:\/\//.test(titleIcon) : false
+const iconClass =
+  titleIcon && !isImageUrl
+    ? titleIcon.startsWith('i-')
+      ? titleIcon
+      : `i-${titleIcon}`
+    : undefined
 ---
 
 <header
@@ -36,7 +38,17 @@ const iconClass = titleIcon
   {
     title && (
       <h1>
-        {iconClass && <span class={`${iconClass} mr-2`} aria-hidden="true" />}
+        {titleIcon &&
+          (isImageUrl ? (
+            <img
+              src={titleIcon}
+              alt=""
+              class="mr-2 inline-block h-[1.2em] w-[1.2em] align-text-bottom"
+              aria-hidden="true"
+            />
+          ) : iconClass ? (
+            <span class={`${iconClass} mr-2`} aria-hidden="true" />
+          ) : null)}
         {title}
       </h1>
     )
