@@ -175,13 +175,23 @@ export const projectSchema = z.object({
     .string()
     .describe('**Required**. A brief description summarizing the project.'),
   icon: z
-    .string()
-    .regex(
-      /^i-[\w-]+(:[\w-]+)?$/,
-      'Icon must be in the format `i-<collection>-<icon>` or `i-<collection>:<icon>` as per [UnoCSS](https://unocss.dev/presets/icons) specs.'
-    )
+    .union([
+      z
+        .string()
+        .url('Invalid image URL.')
+        .describe('Image URL for the project icon.'),
+      z
+        .string()
+        .regex(
+          /^(i-)?[\w-]+(:[\w-]+)?$/,
+          'Icon must be in the format `<collection>-<icon>`, `<collection>:<icon>`, or with `i-` prefix as per [UnoCSS](https://unocss.dev/presets/icons) specs.'
+        )
+        .describe(
+          'UnoCSS icon in the format `<collection>-<icon>`, `<collection>:<icon>`, or with `i-` prefix (e.g., `carbon-airplane`, `material-symbols:airplane-ticket`, or `i-carbon-airplane`) as per [UnoCSS](https://unocss.dev/presets/icons) specs. [Check all available icons here](https://icones.js.org/).'
+        ),
+    ])
     .describe(
-      '**Required**. Icon representing the project. It must be in the format `i-<collection>-<icon>` or `i-<collection>:<icon>` as per [UnoCSS](https://unocss.dev/presets/icons) specs. [Check all available icons here](https://icones.js.org/).'
+      '**Required**. Icon representing the project. It can be either an image URL or a UnoCSS icon format.'
     ),
   category: z.string().describe('**Required**. Category of the project.'),
 })

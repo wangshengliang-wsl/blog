@@ -15,6 +15,9 @@ interface Props {
 
 const { items } = Astro.props
 const { maxGroupColumns, showGroupItemColorOnHover } = UI.groupView
+
+// Helper function to check if icon is a URL
+const isImageUrl = (icon: string) => /^https?:\/\//.test(icon)
 ---
 
 <div
@@ -33,12 +36,19 @@ const { maxGroupColumns, showGroupItemColorOnHover } = UI.groupView
         aria-hidden={true}
         external={true}
       >
-        <div class="pt-2 pr-5">
+        {isImageUrl(item.icon) ? (
+          <img
+            src={item.icon}
+            alt={item.id}
+            class="group-hover:data-[show-color]:saturate-100 op-50 saturate-0 w-20 h-20 object-contain mr-2"
+            data-show-color={showGroupItemColorOnHover ? '' : undefined}
+          />
+        ) : (
           <div
             class={`group-hover:data-[show-color]:saturate-100 op-50 saturate-0 leading-9 text-7.5 ${item.icon}`}
             data-show-color={showGroupItemColorOnHover ? '' : undefined}
           />
-        </div>
+        )}
         <div class="flex-auto">
           <div>{item.id}</div>
           <div class="op-50 text-sm font-normal">{item.desc}</div>
