@@ -3,7 +3,7 @@ import type { Site, Ui, Features } from './types'
 export const SITE: Site = {
   website: 'https://gudao.pages.dev/',
   base: '/',
-  title: 'gudao',
+  title: '孤岛的君',
   description: "gudao's blog",
   author: '孤岛',
   lang: 'zh-Hans',
