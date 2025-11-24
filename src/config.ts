@@ -5,7 +5,7 @@ export const SITE: Site = {
   base: '/',
   title: 'gudao',
   description: "gudao's blog",
-  author: 'yunshuyimeng',
+  author: '孤岛',
   lang: 'zh-Hans',
   ogLocale: 'zh_CN',
   imageDomains: ['cdn.jsdelivr.net', '*.unsplash.com', 'github.com'],
