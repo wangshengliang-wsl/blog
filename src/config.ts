@@ -1,11 +1,11 @@
 import type { Site, Ui, Features } from './types'
 
 export const SITE: Site = {
-  website: 'https://wangshengliang.cn/',
+  website: 'https://gudao.pages.dev/',
   base: '/',
-  title: 'wangshengliang',
-  description: "wangshengliang's blog",
-  author: 'wangshengliang',
+  title: 'gudao',
+  description: "gudao's blog",
+  author: 'yunshuyimeng',
   lang: 'zh-Hans',
   ogLocale: 'zh_CN',
   imageDomains: ['cdn.jsdelivr.net', '*.unsplash.com', 'github.com'],
