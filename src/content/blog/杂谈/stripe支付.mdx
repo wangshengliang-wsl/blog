@@ -7,3 +7,653 @@ toc: true
 ogImage: true
 category: 杂谈
 ---
+
+最近在做 SaaS 产品的支付功能，选择了 Stripe 作为支付服务商。Stripe 算是全球最流行的支付网关之一，API 设计得挺优雅，文档也写得清楚，但第一次对接的时候还是踩了不少坑。趁着记忆还新鲜，把完整的支付流程和代码实现整理出来，给同样在折腾 Stripe 支付的朋友参考。
+
+![Stripe 支付流程示意图](https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?auto=format&fit=crop&w=1200&q=80)
+
+## Stripe 是什么
+
+简单说，Stripe 是一个支付处理平台，帮你处理信用卡、借记卡、Apple Pay、Google Pay 等各种支付方式。你不用自己去对接银行、处理 PCI 合规、做风控，Stripe 把这些都包了，你只需要调用 API 就行。
+
+Stripe 的核心优势：
+
+1. **开发者友好**：API 设计清晰，文档详细，SDK 支持多种语言
+2. **全球覆盖**：支持 40+ 个国家/地区，100+ 种货币
+3. **PCI 合规**：你不用处理敏感卡号信息，PCI 责任在 Stripe 那边
+4. **Webhook 机制**：支付状态变化会主动通知你，不用轮询
+5. **测试环境完善**：沙箱环境跟生产环境一致，测试卡号齐全
+
+## Stripe 支付完整流程
+
+Stripe 的支付流程主要分两种：**一次性支付**和**订阅支付**。这里先讲一次性支付，订阅支付流程类似，只是多了定期扣款的逻辑。
+
+### 第一步：在 Stripe Dashboard 创建账户
+
+首先得去 [Stripe Dashboard](https://dashboard.stripe.com/) 注册账户：
+
+1. 注册账号并完成邮箱验证
+2. 填写业务信息（公司名称、地址、税号等）
+3. 完成 KYC/KYB 验证（根据地区要求）
+4. 获取 API Keys：
+   - **Publishable Key**（公开密钥，前端用）：`pk_test_xxx` 或 `pk_live_xxx`
+   - **Secret Key**（密钥，后端用）：`sk_test_xxx` 或 `sk_live_xxx`
+
+**注意**：测试环境和生产环境的 Key 不一样，开发时用 `test` 开头的，上线前记得换成 `live` 开头的。
+
+![Stripe Dashboard](https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=1200&q=80)
+
+### 第二步：前端创建 Payment Intent
+
+用户点击"支付"按钮时，前端需要先调用后端 API 创建一个 Payment Intent。Payment Intent 是 Stripe 的核心概念，代表一次支付意图，包含金额、货币、支付方式等信息。
+
+```tsx
+// 前端：创建支付意图
+// components/checkout-button.tsx
+'use client'
+
+import { useState } from 'react'
+import { loadStripe } from '@stripe/stripe-js'
+
+const stripePromise = loadStripe(
+  process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!
+)
+
+export function CheckoutButton({
+  amount,
+  currency = 'usd',
+}: {
+  amount: number
+  currency?: string
+}) {
+  const [loading, setLoading] = useState(false)
+
+  const handleCheckout = async () => {
+    setLoading(true)
+    try {
+      // 1. 调用后端 API 创建 Payment Intent
+      const response = await fetch('/api/create-payment-intent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount, // 金额（单位：分，比如 1000 表示 $10.00）
+          currency,
+          metadata: {
+            orderId: 'order_123', // 订单 ID，用于后续关联
+            userId: 'user_456',
+          },
+        }),
+      })
+
+      const { clientSecret } = await response.json()
+
+      // 2. 使用 Stripe.js 确认支付
+      const stripe = await stripePromise
+      const { error } = await stripe!.confirmCardPayment(clientSecret, {
+        payment_method: {
+          card: cardElement, // Stripe Elements 创建的卡片元素
+          billing_details: {
+            name: 'John Doe',
+            email: 'john@example.com',
+          },
+        },
+      })
+
+      if (error) {
+        console.error('Payment failed:', error)
+        alert(`支付失败: ${error.message}`)
+      } else {
+        // 支付成功，跳转到成功页面
+        window.location.href = '/checkout/success'
+      }
+    } catch (error) {
+      console.error('Checkout error:', error)
+      alert('支付过程中出现错误')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <button
+      onClick={handleCheckout}
+      disabled={loading}
+      className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+    >
+      {loading ? '处理中...' : `支付 $${(amount / 100).toFixed(2)}`}
+    </button>
+  )
+}
+```
+
+### 第三步：后端创建 Payment Intent
+
+后端收到请求后，调用 Stripe API 创建 Payment Intent：
+
+```ts
+// app/api/create-payment-intent/route.ts
+import { NextRequest, NextResponse } from 'next/server'
+import Stripe from 'stripe'
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: '2024-11-20.acacia', // 使用最新的 API 版本
+})
+
+export async function POST(request: NextRequest) {
+  try {
+    const { amount, currency, metadata } = await request.json()
+
+    // 验证金额
+    if (!amount || amount < 50) {
+      return NextResponse.json(
+        { error: '金额无效，最小金额为 $0.50' },
+        { status: 400 }
+      )
+    }
+
+    // 创建 Payment Intent
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount, // 金额（单位：分）
+      currency: currency || 'usd',
+      metadata: {
+        ...metadata,
+        createdAt: new Date().toISOString(),
+      },
+      // 自动确认：如果支付方式支持，自动确认支付
+      // 如果不设置，需要手动调用 confirm API
+      automatic_payment_methods: {
+        enabled: true,
+      },
+    })
+
+    return NextResponse.json({
+      clientSecret: paymentIntent.client_secret,
+      paymentIntentId: paymentIntent.id,
+    })
+  } catch (error) {
+    console.error('Create payment intent error:', error)
+    return NextResponse.json({ error: '创建支付失败' }, { status: 500 })
+  }
+}
+```
+
+### 第四步：使用 Stripe Elements 收集卡号信息
+
+Stripe Elements 是 Stripe 提供的 UI 组件库，帮你安全地收集卡号信息，不用自己处理 PCI 合规。
+
+```tsx
+// components/stripe-card-element.tsx
+'use client'
+
+import { useState, useEffect } from 'react'
+import { PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js'
+
+export function StripeCardElement() {
+  const stripe = useStripe()
+  const elements = useElements()
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!stripe || !elements) return
+
+    setLoading(true)
+    setError(null)
+
+    try {
+      // 确认支付
+      const { error: submitError } = await stripe.confirmPayment({
+        elements,
+        confirmParams: {
+          return_url: `${window.location.origin}/checkout/success`,
+        },
+      })
+
+      if (submitError) {
+        setError(submitError.message || '支付失败')
+      }
+    } catch (err) {
+      setError('支付过程中出现错误')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <PaymentElement />
+      {error && <div className="text-red-600">{error}</div>}
+      <button
+        type="submit"
+        disabled={!stripe || loading}
+        className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+      >
+        {loading ? '处理中...' : '支付'}
+      </button>
+    </form>
+  )
+}
+```
+
+```tsx
+// app/checkout/page.tsx
+'use client'
+
+import { Elements } from '@stripe/react-stripe-js'
+import { loadStripe } from '@stripe/stripe-js'
+import { StripeCardElement } from '@/components/stripe-card-element'
+
+const stripePromise = loadStripe(
+  process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!
+)
+
+export default function CheckoutPage() {
+  const [clientSecret, setClientSecret] = useState<string | null>(null)
+
+  useEffect(() => {
+    // 创建 Payment Intent
+    fetch('/api/create-payment-intent', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        amount: 10000, // $100.00
+        currency: 'usd',
+      }),
+    })
+      .then((res) => res.json())
+      .then((data) => setClientSecret(data.clientSecret))
+  }, [])
+
+  if (!clientSecret) {
+    return <div>加载中...</div>
+  }
+
+  return (
+    <Elements
+      stripe={stripePromise}
+      options={{
+        clientSecret,
+        appearance: {
+          theme: 'stripe',
+        },
+      }}
+    >
+      <StripeCardElement />
+    </Elements>
+  )
+}
+```
+
+### 第五步：处理 Webhook 事件
+
+支付完成后，Stripe 会通过 Webhook 通知你的服务器。这是最可靠的方式，因为用户可能关闭页面，或者网络问题导致前端回调失败。
+
+```ts
+// app/api/webhooks/stripe/route.ts
+import { NextRequest, NextResponse } from 'next/server'
+import Stripe from 'stripe'
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: '2024-11-20.acacia',
+})
+
+// 禁用 body 解析，因为需要原始 body 来验证签名
+export const runtime = 'nodejs'
+
+export async function POST(request: NextRequest) {
+  const body = await request.text()
+  const signature = request.headers.get('stripe-signature')
+
+  if (!signature) {
+    return NextResponse.json(
+      { error: 'Missing stripe-signature header' },
+      { status: 400 }
+    )
+  }
+
+  let event: Stripe.Event
+
+  try {
+    // 验证 Webhook 签名，确保请求来自 Stripe
+    event = stripe.webhooks.constructEvent(
+      body,
+      signature,
+      process.env.STRIPE_WEBHOOK_SECRET!
+    )
+  } catch (err) {
+    console.error('Webhook signature verification failed:', err)
+    return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
+  }
+
+  // 处理不同类型的事件
+  switch (event.type) {
+    case 'payment_intent.succeeded':
+      const paymentIntent = event.data.object as Stripe.PaymentIntent
+      console.log('Payment succeeded:', paymentIntent.id)
+
+      // 更新订单状态为已支付
+      await updateOrderStatus(paymentIntent.metadata.orderId, 'paid')
+
+      // 发送确认邮件
+      await sendConfirmationEmail(paymentIntent.metadata.userId)
+      break
+
+    case 'payment_intent.payment_failed':
+      const failedPayment = event.data.object as Stripe.PaymentIntent
+      console.log('Payment failed:', failedPayment.id)
+
+      // 更新订单状态为支付失败
+      await updateOrderStatus(failedPayment.metadata.orderId, 'failed')
+
+      // 通知用户支付失败
+      await notifyPaymentFailed(failedPayment.metadata.userId)
+      break
+
+    case 'charge.refunded':
+      const refund = event.data.object as Stripe.Charge
+      console.log('Refund processed:', refund.id)
+
+      // 处理退款逻辑
+      await processRefund(refund.metadata.orderId)
+      break
+
+    default:
+      console.log(`Unhandled event type: ${event.type}`)
+  }
+
+  return NextResponse.json({ received: true })
+}
+
+// 辅助函数（需要根据你的业务实现）
+async function updateOrderStatus(orderId: string, status: string) {
+  // 更新数据库中的订单状态
+}
+
+async function sendConfirmationEmail(userId: string) {
+  // 发送确认邮件
+}
+
+async function notifyPaymentFailed(userId: string) {
+  // 通知用户支付失败
+}
+
+async function processRefund(orderId: string) {
+  // 处理退款逻辑
+}
+```
+
+### 第六步：配置 Webhook 端点
+
+在 Stripe Dashboard 配置 Webhook：
+
+1. 进入 **Developers** → **Webhooks**
+2. 点击 **Add endpoint**
+3. 填写端点 URL：`https://yourdomain.com/api/webhooks/stripe`
+4. 选择要监听的事件：
+   - `payment_intent.succeeded`
+   - `payment_intent.payment_failed`
+   - `charge.refunded`
+   - `customer.subscription.created`
+   - `customer.subscription.deleted`
+   - 等等...
+5. 复制 **Signing secret**，添加到环境变量 `STRIPE_WEBHOOK_SECRET`
+
+**本地开发**：可以用 Stripe CLI 转发 Webhook 到本地：
+
+```bash
+# 安装 Stripe CLI
+brew install stripe/stripe-cli/stripe
+
+# 登录
+stripe login
+
+# 转发 Webhook 到本地
+stripe listen --forward-to localhost:3000/api/webhooks/stripe
+```
+
+## 完整代码示例
+
+这里给一个 Next.js 的完整实现：
+
+```ts
+// lib/stripe.ts - Stripe 客户端初始化
+import Stripe from 'stripe'
+
+export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: '2024-11-20.acacia',
+})
+```
+
+```tsx
+// app/checkout/page.tsx - 完整的支付页面
+'use client'
+
+import { useState, useEffect } from 'react'
+import { Elements } from '@stripe/react-stripe-js'
+import { loadStripe } from '@stripe/stripe-js'
+import { PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js'
+
+const stripePromise = loadStripe(
+  process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!
+)
+
+function CheckoutForm({ amount }: { amount: number }) {
+  const stripe = useStripe()
+  const elements = useElements()
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!stripe || !elements) return
+
+    setLoading(true)
+    setError(null)
+
+    const { error: submitError } = await stripe.confirmPayment({
+      elements,
+      confirmParams: {
+        return_url: `${window.location.origin}/checkout/success`,
+      },
+    })
+
+    if (submitError) {
+      setError(submitError.message || '支付失败')
+      setLoading(false)
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="max-w-md mx-auto space-y-6">
+      <PaymentElement />
+      {error && (
+        <div className="p-4 bg-red-50 text-red-600 rounded-lg">{error}</div>
+      )}
+      <button
+        type="submit"
+        disabled={!stripe || loading}
+        className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+      >
+        {loading ? '处理中...' : `支付 $${(amount / 100).toFixed(2)}`}
+      </button>
+    </form>
+  )
+}
+
+export default function CheckoutPage() {
+  const [clientSecret, setClientSecret] = useState<string | null>(null)
+  const [amount] = useState(10000) // $100.00
+
+  useEffect(() => {
+    fetch('/api/create-payment-intent', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ amount, currency: 'usd' }),
+    })
+      .then((res) => res.json())
+      .then((data) => setClientSecret(data.clientSecret))
+      .catch((err) => console.error('Failed to create payment intent:', err))
+  }, [amount])
+
+  if (!clientSecret) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div>加载中...</div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="container mx-auto px-4 py-8">
+      <h1 className="text-2xl font-bold mb-6">支付</h1>
+      <Elements
+        stripe={stripePromise}
+        options={{
+          clientSecret,
+          appearance: {
+            theme: 'stripe',
+            variables: {
+              colorPrimary: '#2563eb',
+            },
+          },
+        }}
+      >
+        <CheckoutForm amount={amount} />
+      </Elements>
+    </div>
+  )
+}
+```
+
+```ts
+// app/api/create-payment-intent/route.ts - 创建支付意图
+import { NextRequest, NextResponse } from 'next/server'
+import { stripe } from '@/lib/stripe'
+
+export async function POST(request: NextRequest) {
+  try {
+    const { amount, currency = 'usd', metadata } = await request.json()
+
+    if (!amount || amount < 50) {
+      return NextResponse.json(
+        { error: '金额无效，最小金额为 $0.50' },
+        { status: 400 }
+      )
+    }
+
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount,
+      currency,
+      metadata: metadata || {},
+      automatic_payment_methods: {
+        enabled: true,
+      },
+    })
+
+    return NextResponse.json({
+      clientSecret: paymentIntent.client_secret,
+      paymentIntentId: paymentIntent.id,
+    })
+  } catch (error: any) {
+    console.error('Create payment intent error:', error)
+    return NextResponse.json(
+      { error: error.message || '创建支付失败' },
+      { status: 500 }
+    )
+  }
+}
+```
+
+## 订阅支付流程
+
+订阅支付跟一次性支付类似，但需要创建 Customer 和 Subscription：
+
+```ts
+// 创建订阅
+const customer = await stripe.customers.create({
+  email: 'customer@example.com',
+  metadata: {
+    userId: 'user_123',
+  },
+})
+
+const subscription = await stripe.subscriptions.create({
+  customer: customer.id,
+  items: [
+    {
+      price: 'price_xxx', // 在 Stripe Dashboard 创建的价格 ID
+    },
+  ],
+  metadata: {
+    planId: 'pro_monthly',
+  },
+})
+```
+
+## 环境变量配置
+
+记得在 `.env.local` 里配置这些变量：
+
+```bash
+# Stripe Keys
+STRIPE_SECRET_KEY=sk_test_xxx
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_xxx
+STRIPE_WEBHOOK_SECRET=whsec_xxx
+
+# App URL
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+```
+
+生产环境记得把 `test` 开头的 Key 换成 `live` 开头的。
+
+## 常见问题和踩坑
+
+**金额单位问题**：Stripe 的金额单位是**分**（cents），不是元。比如 $10.00 要传 `1000`，不是 `10`。这个坑我踩过好几次，金额对不上才发现。
+
+**Webhook 签名验证**：生产环境一定要验证 Webhook 签名，否则可能被恶意请求伪造支付成功事件。本地开发可以用 Stripe CLI 转发，但生产环境必须验证。
+
+**Payment Intent 状态**：Payment Intent 有多种状态：`requires_payment_method`、`requires_confirmation`、`processing`、`succeeded`、`canceled`。前端要根据状态显示不同的 UI，不要只依赖 Webhook。
+
+**3D Secure 验证**：某些卡需要 3D Secure 验证，Stripe 会自动处理，但前端需要监听 `requires_action` 状态，引导用户完成验证。
+
+**幂等性处理**：Webhook 可能重复发送，记得用 `event.id` 做幂等处理，避免重复处理同一个事件。
+
+**测试卡号**：Stripe 提供了测试卡号，比如 `4242 4242 4242 4242`（Visa，成功）、`4000 0000 0000 0002`（Visa，需要 3D Secure）。测试时用这些卡号，不要用真实卡号。
+
+**货币转换**：Stripe 支持多币种，但不同币种的最小金额不一样。比如 USD 最小是 $0.50（50 cents），JPY 最小是 ¥50。创建 Payment Intent 时要检查金额是否满足最小要求。
+
+**退款处理**：退款可以用 `stripe.refunds.create()`，但要注意部分退款、全额退款、退款到原卡还是其他卡这些细节。
+
+## 安全建议
+
+1. **永远不要把 Secret Key 暴露到前端**：Secret Key 只能放在服务端，前端只用 Publishable Key。
+2. **验证 Webhook 签名**：生产环境必须验证签名，防止伪造请求。
+3. **HTTPS 必须**：生产环境一定要用 HTTPS，否则支付信息可能被中间人攻击。
+4. **金额验证**：后端要验证金额，防止前端篡改。
+5. **幂等性处理**：Webhook 事件要幂等处理，避免重复处理。
+6. **日志记录**：记录所有支付相关的操作，方便排查问题。
+7. **PCI 合规**：不要在前端或后端存储完整卡号，用 Stripe Elements 收集，PCI 责任在 Stripe。
+
+## Stripe vs 其他支付服务商
+
+对比一下 Stripe 和其他服务商：
+
+| 特性         | Stripe       | PayPal       | Square       |
+| ------------ | ------------ | ------------ | ------------ |
+| API 设计     | ⭐⭐⭐⭐⭐   | ⭐⭐⭐       | ⭐⭐⭐⭐     |
+| 文档质量     | ⭐⭐⭐⭐⭐   | ⭐⭐⭐       | ⭐⭐⭐⭐     |
+| 全球覆盖     | ⭐⭐⭐⭐⭐   | ⭐⭐⭐⭐     | ⭐⭐⭐       |
+| 订阅支持     | ⭐⭐⭐⭐⭐   | ⭐⭐⭐⭐     | ⭐⭐⭐       |
+| 费用         | 2.9% + $0.30 | 2.9% + $0.30 | 2.6% + $0.10 |
+| 开发者友好度 | ⭐⭐⭐⭐⭐   | ⭐⭐⭐       | ⭐⭐⭐⭐     |
+
+总的来说，Stripe 在开发者体验和 API 设计上做得最好，适合技术驱动的团队。PayPal 用户基数大，但 API 用起来比较别扭。Square 在美国本土很强，但国际化不如 Stripe。
+
+## 总结
+
+Stripe 支付流程虽然不复杂，但细节很多，第一次对接容易在金额单位、Webhook 签名验证、状态处理这些地方踩坑。核心流程就是：创建 Payment Intent → 前端收集卡号 → 确认支付 → Webhook 通知 → 更新订单状态。
+
+如果你们也在做支付功能，Stripe 算是个不错的选择，特别是需要支持订阅、多币种、全球支付的场景。API 用起来顺手，文档也写得清楚，踩完一次坑就顺了。
+
+如果你也在对接 Stripe，或者有其他支付服务商的踩坑经验，欢迎在评论区分享，大家一起避坑。

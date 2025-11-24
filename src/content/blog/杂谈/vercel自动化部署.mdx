@@ -240,3 +240,5 @@ Workflow 文件位于：`.github/workflows/deploy-vercel.yml`
 - [GitHub Actions 文档](https://docs.github.com/en/actions)
 - [Vercel CLI 文档](https://vercel.com/docs/cli)
 - [Vercel GitHub Integration](https://vercel.com/docs/concepts/git/vercel-for-github)
+
+其实在vercel主页通过项目导入的方式，push代码后也会自动部署，但是可能会部署失败（缺乏前置校验逻辑），配置 GitHub Actions 能够前置捕获错误，提前发现问题，确保部署成功。

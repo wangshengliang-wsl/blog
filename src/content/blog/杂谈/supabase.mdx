@@ -7,3 +7,901 @@ toc: true
 ogImage: true
 category: 杂谈
 ---
+
+最近在重构用户系统，从自建 PostgreSQL + JWT 方案切换到了 Supabase。一开始还担心迁移成本，用下来发现这玩意儿确实省事，认证、数据库、存储、实时订阅这些功能都打包好了，开箱即用。趁着刚踩完坑，把核心概念和完整的使用流程整理出来，给同样在考虑 BaaS 方案的朋友参考。
+
+![Supabase 架构示意图](https://images.unsplash.com/photo-1558494949-ef010cbdcc31?auto=format&fit=crop&w=1200&q=80)
+
+## Supabase 到底是个啥
+
+简单说，Supabase 就是 Firebase 的开源替代品，但底层用的是 PostgreSQL 而不是 NoSQL。它把后端开发中最常见的功能都打包好了：用户认证、数据库、文件存储、实时订阅、边缘函数，还有一套完整的权限系统（Row Level Security）。
+
+跟传统方案比起来，Supabase 最大的优势是**开发速度快**。你不用再自己写注册登录、JWT 刷新、密码重置这些破事，也不用折腾数据库连接池、读写分离，更不用自己搭 WebSocket 服务器做实时推送。这些功能它都帮你做好了，你只需要在前端调 API 就行。
+
+当然，它也不是万能的。如果你的业务逻辑特别复杂，或者需要深度定制数据库性能，可能还是得自己搭后端。但对于大部分中小型项目，Supabase 确实能让你少写很多代码。
+
+## 核心概念
+
+### 1. 项目（Project）
+
+一个 Supabase 项目就是一个独立的 PostgreSQL 数据库实例，包含：
+
+- **数据库**：PostgreSQL 14+，支持所有标准 SQL 功能
+- **认证服务**：邮箱密码、OAuth、Magic Link 等
+- **存储服务**：文件上传下载，类似 AWS S3
+- **实时订阅**：基于 PostgreSQL 的 LISTEN/NOTIFY，支持 WebSocket
+- **边缘函数**：Deno 运行时，可以写服务端逻辑
+
+每个项目都有独立的 URL 和 API Key，互不干扰。
+
+### 2. API Keys
+
+Supabase 提供两种 API Key：
+
+- **anon key**：公开的，可以在前端代码里用。配合 Row Level Security（RLS）策略，控制用户能访问哪些数据。
+- **service_role key**：私密的，只能在服务端用。拥有完整权限，可以绕过 RLS。**千万别把这个 key 暴露到前端！**
+
+### 3. Row Level Security (RLS)
+
+这是 Supabase 最核心的安全机制。简单说，就是给数据库表加策略（Policy），控制不同用户能看到和操作哪些数据。
+
+比如用户表，你可以设置：
+
+- 用户只能看到和修改自己的数据
+- 管理员可以看到所有数据
+- 未登录用户只能看到公开字段
+
+这些策略直接写在数据库里，即使有人绕过前端直接调 API，也拿不到不该拿的数据。
+
+### 4. 认证（Auth）
+
+Supabase Auth 支持多种登录方式：
+
+- **邮箱密码**：最基础的，支持注册、登录、密码重置
+- **Magic Link**：无密码登录，发邮件给用户一个链接，点开就登录
+- **OAuth**：GitHub、Google、Apple 等第三方登录
+- **手机号**：短信验证码登录（需要配置 SMS 服务商）
+
+所有认证状态都通过 JWT Token 管理，自动处理刷新逻辑。
+
+## 完整使用流程
+
+### 第一步：创建 Supabase 项目
+
+1. 打开 [Supabase 官网](https://supabase.com/)
+2. 注册账号（可以用 GitHub 登录）
+3. 点击 **New Project**
+4. 填写项目信息：
+   - **Name**：项目名称
+   - **Database Password**：数据库密码（记得保存好，后面改不了）
+   - **Region**：选择离你最近的区域（影响延迟）
+   - **Pricing Plan**：免费版够用，付费版有更多资源
+5. 等待项目创建完成（大概 2-3 分钟）
+
+创建完成后，你会看到项目的 Dashboard，里面有：
+
+- **Project URL**：类似 `https://xxxxx.supabase.co`
+- **anon key**：前端用的 API Key
+- **service_role key**：服务端用的 API Key（点击眼睛图标才能看到）
+
+![Supabase Dashboard](https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=1200&q=80)
+
+### 第二步：配置环境变量
+
+在项目根目录创建 `.env.local` 文件：
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://xxxxx.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+**注意**：
+
+- `NEXT_PUBLIC_` 前缀的变量会被暴露到前端，只能放 `anon key`
+- `SUPABASE_SERVICE_ROLE_KEY` 不要加 `NEXT_PUBLIC_` 前缀，只在服务端用
+
+### 第三步：安装依赖
+
+```bash
+# Next.js 项目推荐用 @supabase/ssr，支持 App Router
+pnpm add @supabase/ssr @supabase/supabase-js
+
+# 或者用 npm
+npm install @supabase/ssr @supabase/supabase-js
+```
+
+### 第四步：创建 Supabase 客户端
+
+Supabase 在 Next.js 中有三种使用场景，需要创建不同的客户端：
+
+#### 1. 浏览器客户端（Client Component）
+
+```ts
+// lib/supabase/client.ts
+import { createBrowserClient } from '@supabase/ssr'
+
+export function createClient() {
+  return createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
+}
+```
+
+使用示例：
+
+```tsx
+'use client'
+
+import { createClient } from '@/lib/supabase/client'
+import { useEffect, useState } from 'react'
+
+export function UserProfile() {
+  const [user, setUser] = useState(null)
+  const supabase = createClient()
+
+  useEffect(() => {
+    // 获取当前用户
+    supabase.auth.getUser().then(({ data }) => {
+      setUser(data.user)
+    })
+
+    // 监听认证状态变化
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      setUser(session?.user ?? null)
+    })
+
+    return () => subscription.unsubscribe()
+  }, [])
+
+  return <div>{user?.email}</div>
+}
+```
+
+#### 2. 服务端客户端（Server Component / API Route）
+
+```ts
+// lib/supabase/server.ts
+import { createServerClient } from '@supabase/ssr'
+import { cookies } from 'next/headers'
+
+export async function createClient() {
+  const cookieStore = await cookies()
+
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll()
+        },
+        setAll(cookiesToSet) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options)
+            )
+          } catch {
+            // Server Component 中无法设置 cookie，忽略错误
+            // 如果有 middleware 刷新 session，这里可以忽略
+          }
+        },
+      },
+    }
+  )
+}
+```
+
+使用示例：
+
+```tsx
+// app/profile/page.tsx
+import { createClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
+
+export default async function ProfilePage() {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    redirect('/login')
+  }
+
+  return <div>Hello {user.email}</div>
+}
+```
+
+#### 3. 管理员客户端（需要绕过 RLS）
+
+```ts
+// lib/supabase/admin.ts
+import { createClient } from '@supabase/supabase-js'
+
+export function createAdminClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    }
+  )
+}
+```
+
+**注意**：管理员客户端只在特殊场景用，比如批量导入数据、后台管理。日常开发应该用普通客户端 + RLS 策略。
+
+### 第五步：配置 Middleware（刷新 Session）
+
+Next.js App Router 中，需要在 Middleware 里刷新用户 session，否则 Server Component 拿不到最新的认证状态：
+
+```ts
+// middleware.ts
+import { createServerClient } from '@supabase/ssr'
+import { NextResponse, type NextRequest } from 'next/server'
+
+export async function middleware(request: NextRequest) {
+  let response = NextResponse.next({
+    request: {
+      headers: request.headers,
+    },
+  })
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return request.cookies.get(name)?.value
+        },
+        set(name: string, value: string, options: any) {
+          request.cookies.set({
+            name,
+            value,
+            ...options,
+          })
+          response = NextResponse.next({
+            request: {
+              headers: request.headers,
+            },
+          })
+          response.cookies.set({
+            name,
+            value,
+            ...options,
+          })
+        },
+        remove(name: string, options: any) {
+          request.cookies.delete(name)
+          response = NextResponse.next({
+            request: {
+              headers: request.headers,
+            },
+          })
+          response.cookies.delete(name)
+        },
+      },
+    }
+  )
+
+  // 刷新 session，确保 Server Component 能拿到最新状态
+  await supabase.auth.getUser()
+
+  return response
+}
+
+export const config = {
+  matcher: [
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+  ],
+}
+```
+
+## 核心功能使用指南
+
+### 1. 用户认证
+
+#### 邮箱密码注册登录
+
+```tsx
+'use client'
+
+import { createClient } from '@/lib/supabase/client'
+import { useState } from 'react'
+
+export function SignUpForm() {
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const supabase = createClient()
+
+  const handleSignUp = async () => {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
+      },
+    })
+
+    if (error) {
+      console.error('注册失败:', error.message)
+      return
+    }
+
+    // 注册成功，Supabase 会自动发确认邮件
+    alert('请查收邮件确认账号')
+  }
+
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault()
+        handleSignUp()
+      }}
+    >
+      <input
+        type="email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        placeholder="邮箱"
+      />
+      <input
+        type="password"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        placeholder="密码"
+      />
+      <button type="submit">注册</button>
+    </form>
+  )
+}
+```
+
+#### Magic Link 登录（无密码）
+
+```tsx
+const handleMagicLink = async () => {
+  const { error } = await supabase.auth.signInWithOtp({
+    email,
+    options: {
+      emailRedirectTo: `${window.location.origin}/auth/callback`,
+    },
+  })
+
+  if (error) {
+    console.error('发送失败:', error.message)
+    return
+  }
+
+  alert('请查收邮件，点击链接登录')
+}
+```
+
+#### OAuth 登录（GitHub、Google 等）
+
+```tsx
+const handleGitHubLogin = async () => {
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: 'github',
+    options: {
+      redirectTo: `${window.location.origin}/auth/callback`,
+    },
+  })
+
+  if (error) {
+    console.error('登录失败:', error.message)
+  }
+}
+```
+
+#### 处理 OAuth 回调
+
+```ts
+// app/auth/callback/route.ts
+import { createClient } from '@/lib/supabase/server'
+import { NextResponse } from 'next/server'
+
+export async function GET(request: Request) {
+  const requestUrl = new URL(request.url)
+  const code = requestUrl.searchParams.get('code')
+
+  if (code) {
+    const supabase = await createClient()
+    await supabase.auth.exchangeCodeForSession(code)
+  }
+
+  // 重定向到首页或仪表盘
+  return NextResponse.redirect(new URL('/', requestUrl.origin))
+}
+```
+
+#### 登出
+
+```tsx
+const handleSignOut = async () => {
+  const { error } = await supabase.auth.signOut()
+  if (error) {
+    console.error('登出失败:', error.message)
+  } else {
+    // 重定向到登录页
+    window.location.href = '/login'
+  }
+}
+```
+
+### 2. 数据库操作
+
+#### 创建表
+
+在 Supabase Dashboard 的 SQL Editor 里执行：
+
+```sql
+-- 创建用户资料表
+create table profiles (
+  id uuid references auth.users primary key,
+  username text unique,
+  avatar_url text,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- 启用 RLS
+alter table profiles enable row level security;
+
+-- 创建策略：用户只能看到自己的资料
+create policy "Users can view own profile"
+  on profiles for select
+  using (auth.uid() = id);
+
+-- 创建策略：用户只能更新自己的资料
+create policy "Users can update own profile"
+  on profiles for update
+  using (auth.uid() = id);
+```
+
+#### 查询数据
+
+```tsx
+'use client'
+
+import { createClient } from '@/lib/supabase/client'
+import { useEffect, useState } from 'react'
+
+export function PostsList() {
+  const [posts, setPosts] = useState([])
+  const supabase = createClient()
+
+  useEffect(() => {
+    async function fetchPosts() {
+      const { data, error } = await supabase
+        .from('posts')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(10)
+
+      if (error) {
+        console.error('查询失败:', error.message)
+        return
+      }
+
+      setPosts(data)
+    }
+
+    fetchPosts()
+  }, [])
+
+  return (
+    <div>
+      {posts.map((post) => (
+        <div key={post.id}>{post.title}</div>
+      ))}
+    </div>
+  )
+}
+```
+
+#### 插入数据
+
+```tsx
+const handleCreatePost = async () => {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  const { data, error } = await supabase
+    .from('posts')
+    .insert({
+      title: '新文章',
+      content: '内容...',
+      user_id: user.id,
+    })
+    .select()
+    .single()
+
+  if (error) {
+    console.error('创建失败:', error.message)
+    return
+  }
+
+  console.log('创建成功:', data)
+}
+```
+
+#### 更新数据
+
+```tsx
+const handleUpdatePost = async (postId: string) => {
+  const { data, error } = await supabase
+    .from('posts')
+    .update({ title: '更新后的标题' })
+    .eq('id', postId)
+    .select()
+    .single()
+
+  if (error) {
+    console.error('更新失败:', error.message)
+    return
+  }
+
+  console.log('更新成功:', data)
+}
+```
+
+#### 删除数据
+
+```tsx
+const handleDeletePost = async (postId: string) => {
+  const { error } = await supabase.from('posts').delete().eq('id', postId)
+
+  if (error) {
+    console.error('删除失败:', error.message)
+    return
+  }
+
+  console.log('删除成功')
+}
+```
+
+### 3. 实时订阅（Realtime）
+
+Supabase 的实时功能基于 PostgreSQL 的 LISTEN/NOTIFY，可以监听数据库变化：
+
+```tsx
+'use client'
+
+import { createClient } from '@/lib/supabase/client'
+import { useEffect, useState } from 'react'
+
+export function RealtimePosts() {
+  const [posts, setPosts] = useState([])
+  const supabase = createClient()
+
+  useEffect(() => {
+    // 初始加载
+    async function fetchPosts() {
+      const { data } = await supabase
+        .from('posts')
+        .select('*')
+        .order('created_at', { ascending: false })
+
+      if (data) setPosts(data)
+    }
+
+    fetchPosts()
+
+    // 订阅变化
+    const channel = supabase
+      .channel('posts-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // INSERT, UPDATE, DELETE
+          schema: 'public',
+          table: 'posts',
+        },
+        (payload) => {
+          console.log('变化:', payload)
+
+          if (payload.eventType === 'INSERT') {
+            setPosts((prev) => [payload.new, ...prev])
+          } else if (payload.eventType === 'UPDATE') {
+            setPosts((prev) =>
+              prev.map((post) =>
+                post.id === payload.new.id ? payload.new : post
+              )
+            )
+          } else if (payload.eventType === 'DELETE') {
+            setPosts((prev) =>
+              prev.filter((post) => post.id !== payload.old.id)
+            )
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [])
+
+  return (
+    <div>
+      {posts.map((post) => (
+        <div key={post.id}>{post.title}</div>
+      ))}
+    </div>
+  )
+}
+```
+
+**注意**：实时订阅需要在 Supabase Dashboard 里启用。进入 Database → Replication，找到对应的表，开启 Replication。
+
+### 4. 文件存储（Storage）
+
+#### 上传文件
+
+```tsx
+const handleUpload = async (file: File) => {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  const fileExt = file.name.split('.').pop()
+  const fileName = `${user.id}-${Math.random()}.${fileExt}`
+  const filePath = `avatars/${fileName}`
+
+  const { error } = await supabase.storage
+    .from('avatars')
+    .upload(filePath, file)
+
+  if (error) {
+    console.error('上传失败:', error.message)
+    return
+  }
+
+  // 获取公开 URL
+  const { data } = supabase.storage.from('avatars').getPublicUrl(filePath)
+
+  console.log('上传成功:', data.publicUrl)
+}
+```
+
+#### 下载文件
+
+```tsx
+const handleDownload = async (filePath: string) => {
+  const { data, error } = await supabase.storage
+    .from('avatars')
+    .download(filePath)
+
+  if (error) {
+    console.error('下载失败:', error.message)
+    return
+  }
+
+  // 创建下载链接
+  const url = URL.createObjectURL(data)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filePath.split('/').pop() || 'file'
+  a.click()
+}
+```
+
+#### 删除文件
+
+```tsx
+const handleDelete = async (filePath: string) => {
+  const { error } = await supabase.storage.from('avatars').remove([filePath])
+
+  if (error) {
+    console.error('删除失败:', error.message)
+    return
+  }
+
+  console.log('删除成功')
+}
+```
+
+**注意**：Storage 也需要配置 RLS 策略。在 Dashboard → Storage → Policies 里设置。
+
+## Row Level Security (RLS) 最佳实践
+
+RLS 是 Supabase 安全的核心，一定要用好。几个常见场景：
+
+### 场景 1：用户只能操作自己的数据
+
+```sql
+-- 用户表
+create table users (
+  id uuid references auth.users primary key,
+  email text,
+  name text
+);
+
+alter table users enable row level security;
+
+-- 用户只能看到自己的数据
+create policy "Users can view own data"
+  on users for select
+  using (auth.uid() = id);
+
+-- 用户只能更新自己的数据
+create policy "Users can update own data"
+  on users for update
+  using (auth.uid() = id);
+```
+
+### 场景 2：公开数据，但只有作者能修改
+
+```sql
+-- 文章表
+create table posts (
+  id uuid primary key default gen_random_uuid(),
+  title text,
+  content text,
+  author_id uuid references auth.users,
+  created_at timestamp with time zone default now()
+);
+
+alter table posts enable row level security;
+
+-- 所有人都能看到
+create policy "Posts are viewable by everyone"
+  on posts for select
+  using (true);
+
+-- 只有作者能插入
+create policy "Users can insert own posts"
+  on posts for insert
+  with check (auth.uid() = author_id);
+
+-- 只有作者能更新
+create policy "Users can update own posts"
+  on posts for update
+  using (auth.uid() = author_id);
+
+-- 只有作者能删除
+create policy "Users can delete own posts"
+  on posts for delete
+  using (auth.uid() = author_id);
+```
+
+### 场景 3：管理员拥有所有权限
+
+```sql
+-- 假设有个 roles 表存储用户角色
+create table user_roles (
+  user_id uuid references auth.users primary key,
+  role text -- 'admin' or 'user'
+);
+
+-- 文章表的策略
+create policy "Admins can do everything"
+  on posts for all
+  using (
+    exists (
+      select 1 from user_roles
+      where user_id = auth.uid()
+      and role = 'admin'
+    )
+  );
+```
+
+## 常见问题和踩坑经验
+
+### Q: 为什么 Server Component 拿不到用户信息？
+
+**A**: 需要在 Middleware 里刷新 session。参考上面的 Middleware 配置。
+
+### Q: RLS 策略不生效怎么办？
+
+**A**: 检查几个地方：
+
+1. 表是否启用了 RLS：`alter table xxx enable row level security;`
+2. 策略是否正确：用 `auth.uid()` 而不是直接查 `auth.users`
+3. 客户端用的是不是 `anon key`：`service_role key` 会绕过 RLS
+
+### Q: 实时订阅收不到消息？
+
+**A**:
+
+1. 检查表是否开启了 Replication（Dashboard → Database → Replication）
+2. 检查订阅的 channel 名称和表名是否正确
+3. 检查 RLS 策略是否允许当前用户访问数据
+
+### Q: 文件上传失败，提示权限不足？
+
+**A**: Storage 也需要配置 RLS。在 Dashboard → Storage → Policies 里添加策略：
+
+```sql
+-- 允许用户上传到自己的文件夹
+create policy "Users can upload own files"
+  on storage.objects for insert
+  with check (
+    bucket_id = 'avatars' and
+    auth.uid()::text = (storage.foldername(name))[1]
+  );
+
+-- 允许用户读取自己的文件
+create policy "Users can read own files"
+  on storage.objects for select
+  using (
+    bucket_id = 'avatars' and
+    auth.uid()::text = (storage.foldername(name))[1]
+  );
+```
+
+### Q: 如何批量导入数据？
+
+**A**: 用管理员客户端（`service_role key`），可以绕过 RLS：
+
+```ts
+import { createAdminClient } from '@/lib/supabase/admin'
+
+const admin = createAdminClient()
+
+// 批量插入，不受 RLS 限制
+await admin.from('posts').insert([...大量数据])
+```
+
+### Q: 免费版有什么限制？
+
+**A**:
+
+- 数据库大小：500 MB
+- 带宽：5 GB/月
+- 文件存储：1 GB
+- 边缘函数：50 万次调用/月
+- 实时连接：200 个并发
+
+对于小型项目够用，但生产环境建议升级。
+
+### Q: 如何迁移现有数据库到 Supabase？
+
+**A**:
+
+1. 导出现有数据库：`pg_dump -h host -U user -d database > dump.sql`
+2. 在 Supabase Dashboard → SQL Editor 执行 SQL
+3. 或者用 Supabase CLI：`supabase db push`
+
+### Q: 本地开发怎么连接 Supabase？
+
+**A**: 可以用 Supabase CLI：
+
+```bash
+# 安装 CLI
+npm install -g supabase
+
+# 登录
+supabase login
+
+# 链接项目
+supabase link --project-ref your-project-ref
+
+# 拉取远程数据库结构
+supabase db pull
+
+# 启动本地开发环境（包含 PostgreSQL、Auth、Storage）
+supabase start
+```
+
+## 总结
+
+Supabase 确实是个不错的 BaaS 方案，特别是对于中小型项目。它把后端开发中最繁琐的部分都打包好了，让你能专注于业务逻辑。但也不是万能的，如果你的业务特别复杂，或者需要深度定制性能，可能还是得自己搭后端。
+
+几个建议：
+
+1. **一定要用好 RLS**：这是安全的基础，别偷懒
+2. **合理使用管理员客户端**：只在必要时用，日常开发用普通客户端
+3. **注意免费版限制**：生产环境建议升级，避免突然超限
+4. **本地开发用 CLI**：可以离线开发，不依赖网络
+
+如果你也在用 Supabase，或者有其他 BaaS 方案的踩坑经验，欢迎在评论区分享，大家一起避坑。
