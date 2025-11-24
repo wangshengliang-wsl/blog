@@ -4,7 +4,7 @@ export const SITE: Site = {
   website: 'https://gudao.pages.dev/',
   base: '/',
   title: '孤岛的君',
-  description: "gudao's blog",
+  description: "孤岛的博客",
   author: '孤岛',
   lang: 'zh-Hans',
   ogLocale: 'zh_CN',
