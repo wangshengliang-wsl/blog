@@ -7,9 +7,9 @@
 我喜欢诗歌散文，拍摄剪辑，这些无法养活我的东西，都让我感到满足。
 我喜欢电影，特别是动画电影。
 我年华虚度，空有一身疲惫。
-
+<hr>
 <p>
-  <span class="inline-block mr-1.5 mb-2">找到我</span><hr>
+  <span class="inline-block mr-1.5 mb-2">找到我</span><br>
   <span class="inline-flex flex-wrap gap-2 op-75">
     <a href="https://www.xiaohongshu.com/user/profile/639e96f2000000002702a4ef">
       <span i-simple-icons-xiaohongshu></span> 小红书</a>
