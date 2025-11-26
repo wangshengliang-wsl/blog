@@ -31,13 +31,13 @@ export const UI: Ui = {
       displayMode: 'alwaysText',
       text: '诗歌',
     },
-    // {
-    //   path: '/highlights',
-    //   title: 'Highlights',
-    //   displayMode: 'iconToTextOnMobile',
-    //   text: 'Highlights',
-    //   icon: 'i-ri-screenshot-line',
-    // },
+    {
+       path: '/highlights',
+       title: 'Highlights',
+       displayMode: 'iconToTextOnMobile',
+       text: 'Highlights',
+       icon: 'i-ri-screenshot-line',
+     },
     {
       path: '/photos',
       title: 'Photos',
@@ -59,7 +59,8 @@ export const UI: Ui = {
       title: 'Changelog',
       displayMode: 'iconToTextOnMobile',
       text: '电影',
-      icon: 'i-ri-draft-line',
+      //icon: 'i-ri-draft-line',
+icon: 'i-meteor-icons-grid',
     },
   ],
   socialLinks: [
