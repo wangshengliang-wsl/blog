@@ -62,7 +62,7 @@ export const UI: Ui = {
   ],
   socialLinks: [
     {
-      link: 'https://github.com/wangshengliang-wsl',
+      link: 'https://github.com/rqlmj',
       title: 'GitHub Profile',
       displayMode: 'alwaysIcon',
       icon: 'i-uil-github-alt',
