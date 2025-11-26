@@ -45,22 +45,22 @@ export const UI: Ui = {
       text: '摄影',
       icon: 'i-ri-camera-ai-line',
     },
+/**
     {
       path: '/shorts',
       title: 'Shorts',
       displayMode: 'iconToTextOnMobile',
-      text: '电影',
+      text: 'Shorts',
       icon: 'i-meteor-icons-grid',
     },
-/**
+*/
     {
       path: '/changelog',
       title: 'Changelog',
       displayMode: 'iconToTextOnMobile',
-      text: 'Changelog',
+      text: '电影',
       icon: 'i-ri-draft-line',
     },
-*/
   ],
   socialLinks: [
     {
