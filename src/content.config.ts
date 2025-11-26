@@ -76,7 +76,7 @@ const streams = defineCollection({
 
 const feeds = defineCollection({
   loader: feedLoader({
-    url: 'https://astro.build/rss.xml',
+    url: 'https://feedx.top/rss/doubanmvweek.xml',
   }),
 })
 
