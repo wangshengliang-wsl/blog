@@ -8,12 +8,14 @@
 我喜欢电影，特别是动画电影。
 我年华虚度，空有一身疲惫。
 
-
-## 找到我
-
-如果你也是文学爱好者，随时欢迎来找我：
-
-- [小红书](https://www.xiaohongshu.com/user/profile/639e96f2000000002702a4ef)
-
+<p>
+  <span class="inline-block mr-1.5 mb-2">Find me on</span>
+  <span class="inline-flex flex-wrap gap-2 op-75">
+    <a href="https://www.xiaohongshu.com/user/profile/639e96f2000000002702a4ef">
+      <span i-simple-icons-xiaohongshu></span> 小红书</a>
+    <a href="https://v.douyin.com/dC6ZDi-PgtE/ 3@9.com :3pm">
+      <span i-simple-icons-tiktok></span> 抖音</a>
+  </span>
+</p>
 踏上孤岛的列车🚂
 
