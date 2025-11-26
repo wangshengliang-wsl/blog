@@ -15,19 +15,19 @@ export const UI: Ui = {
   internalNavs: [
     {
       path: '/',
-      title: 'Home',
+      title: '主页',
       displayMode: 'alwaysText',
-      text: 'Home',
+      text: '主页',
     },
     {
       path: '/blog',
       title: 'Blog',
       displayMode: 'alwaysText',
-      text: 'Blog',
+      text: '杂文',
     },
     {
       path: '/projects',
-      title: 'Projects',
+      title: '诗歌',
       displayMode: 'alwaysText',
       text: 'Projects',
     },
@@ -47,7 +47,7 @@ export const UI: Ui = {
     },
     {
       path: '/shorts',
-      title: 'Shorts',
+      title: '电影',
       displayMode: 'iconToTextOnMobile',
       text: 'Shorts',
       icon: 'i-meteor-icons-grid',
