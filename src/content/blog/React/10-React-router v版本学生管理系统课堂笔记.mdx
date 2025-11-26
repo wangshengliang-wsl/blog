@@ -137,44 +137,44 @@ npm run json:server
 
 使用示例如下：
 
-```react
+```jsx
 function Router(props) {
-    return useRoutes([
-        {
-            path: "/home",
-            element: <Home />,
-        },
-        {
-            path: "/about",
-            element: <About />,
-        },
-        {
-            path: "/add",
-            element: <AddOrEdit />,
-        },
-        {
-            path: "/detail/:id",
-            element: <Detail />,
-        },
-        {
-            path: "/edit/:id",
-            element: <AddOrEdit />,
-        },
-        {
-            path: "/",
-            element: <Navigate replace to="/home" />
-        }
-    ]);
+  return useRoutes([
+    {
+      path: '/home',
+      element: <Home />,
+    },
+    {
+      path: '/about',
+      element: <About />,
+    },
+    {
+      path: '/add',
+      element: <AddOrEdit />,
+    },
+    {
+      path: '/detail/:id',
+      element: <Detail />,
+    },
+    {
+      path: '/edit/:id',
+      element: <AddOrEdit />,
+    },
+    {
+      path: '/',
+      element: <Navigate replace to="/home" />,
+    },
+  ])
 }
 
-export default Router;
+export default Router
 ```
 
 ### 嵌套路由
 
 直接在 useRoutes 进行 chilren 属性的配置即可，类似于 vue-router，children 对应的是一个数组，数组里面是一个一个路由对象
 
-```react
+```jsx
  {
    path: "/about",
      element: <About />,

@@ -40,30 +40,28 @@ _React_ 在组件的生命周期中提供了一系列的钩子函数（类似于
   - _render_ 可能不只运行一次，只要需要重新渲染，就会重新运行
   - 严禁使用 _setState_，因为可能会导致无限递归渲染
 
-```react
-import React from "react";
+```jsx
+import React from 'react'
 
 // 类组件
 class App extends React.Component {
-
   constructor() {
-    super();
+    super()
     // 主要做一些初始化操作，例如该组件的状态
     this.state = {
-      value : 1
+      value: 1,
     }
-    console.log("constructor");
+    console.log('constructor')
   }
 
-
-  clickHandle=()=>{
+  clickHandle = () => {
     this.setState({
-      value : this.state.value + 1
+      value: this.state.value + 1,
     })
   }
 
   render() {
-    console.log("render");
+    console.log('render')
     return (
       <div>
         <div>{this.state.value}</div>
@@ -71,11 +69,9 @@ class App extends React.Component {
       </div>
     )
   }
-
 }
 
-export default App;
-
+export default App
 ```
 
 - _componentDidMount_

@@ -24,82 +24,88 @@ category: React
 
 - 一个基本的受控组件
 
-```react
-import React from "react";
+```jsx
+import React from 'react'
 
 // 类组件
 class App extends React.Component {
   state = {
-    value : ""
+    value: '',
   }
 
   handleChange = (e) => {
     this.setState({
-      value : e.target.value
+      value: e.target.value,
     })
   }
 
   clickHandle = () => {
     // 提交整个表单
-    console.log(`你要提交的内容为：${this.state.value}`);
+    console.log(`你要提交的内容为：${this.state.value}`)
   }
 
   render() {
     return (
       <div>
-        <input type="text" value={this.state.value} onChange={this.handleChange}/>
+        <input
+          type="text"
+          value={this.state.value}
+          onChange={this.handleChange}
+        />
         <button onClick={this.clickHandle}>提交</button>
       </div>
     )
   }
-
 }
 
-export default App;
+export default App
 ```
 
 - 对用户输入的内容进行限制
 
-```react
-import React from "react";
+```jsx
+import React from 'react'
 
 // 类组件
 class App extends React.Component {
   state = {
-    value1 : "",
-    value2 : ""
+    value1: '',
+    value2: '',
   }
 
   handleChange = (e) => {
-   const name = e.target.name;
-   switch(name){
-    case "one": {
-      // 用户输入的是第一个输入框
-      // 只能输入大写
-      this.setState({
-        value1 : e.target.value.toUpperCase()
-      })
-      break;
+    const name = e.target.name
+    switch (name) {
+      case 'one': {
+        // 用户输入的是第一个输入框
+        // 只能输入大写
+        this.setState({
+          value1: e.target.value.toUpperCase(),
+        })
+        break
+      }
+      case 'two': {
+        // 用户输入的是第二个输入框
+        // 只能输入数字
+        const newValue = e.target.value
+          .split('')
+          .map((item) => {
+            if (!isNaN(item)) {
+              return item
+            }
+          })
+          .join('')
+        this.setState({
+          value2: newValue,
+        })
+        break
+      }
     }
-    case "two":{
-      // 用户输入的是第二个输入框
-      // 只能输入数字
-      const newValue = e.target.value.split("").map(item=>{
-        if(!isNaN(item)){
-          return item
-        }
-      }).join("");
-      this.setState({
-        value2 : newValue
-      })
-      break;
-    }
-   }
   }
 
   clickHandle = () => {
     // 提交整个表单
-    console.log(`你要提交的内容为：${this.state.value}`);
+    console.log(`你要提交的内容为：${this.state.value}`)
   }
 
   render() {
@@ -123,32 +129,31 @@ class App extends React.Component {
       </div>
     )
   }
-
 }
 
-export default App;
+export default App
 ```
 
 - 文本域
 
-```react
-import React from "react";
+```jsx
+import React from 'react'
 
 // 类组件
 class App extends React.Component {
   state = {
-   value : ""
+    value: '',
   }
 
   handleChange = (e) => {
-   this.setState({
-    value : e.target.value
-   })
+    this.setState({
+      value: e.target.value,
+    })
   }
 
   clickHandle = () => {
     // 提交整个表单
-    console.log(`你要提交的内容为：${this.state.value}`);
+    console.log(`你要提交的内容为：${this.state.value}`)
   }
 
   render() {
@@ -164,91 +169,86 @@ class App extends React.Component {
       </div>
     )
   }
-
 }
 
-export default App;
-
+export default App
 ```
 
 - 多选框
 
-```react
-import React from "react";
+```jsx
+import React from 'react'
 
 // 类组件
 class App extends React.Component {
   state = {
     checkBoxs: [
-      { content: "html", checked: false },
-      { content: "css", checked: false },
-      { content: "js", checked: false },
-      { content: "vue", checked: false },
-      { content: "react", checked: false },
+      { content: 'html', checked: false },
+      { content: 'css', checked: false },
+      { content: 'js', checked: false },
+      { content: 'vue', checked: false },
+      { content: 'react', checked: false },
     ],
   }
 
   handleChange = (index) => {
-    const arr = [...this.state.checkBoxs];
-    arr[index].checked = !arr[index].checked;
+    const arr = [...this.state.checkBoxs]
+    arr[index].checked = !arr[index].checked
     this.setState({
-      checkBoxs: arr
+      checkBoxs: arr,
     })
   }
 
   clickHandle = () => {
     // 提交整个表单
-    console.log(this.state.checkBoxs);
+    console.log(this.state.checkBoxs)
   }
 
   render() {
     return (
       <div>
         <div>
-          {
-            this.state.checkBoxs.map((item, index) => (
-              <div key={index}>
-                <input
-                  type="checkbox"
-                  value={item.content}
-                  checked={item.checked}
-                  onChange={()=>this.handleChange(index)}
-                />
-                <span>{item.content}</span>
-              </div>
-            ))
-          }
+          {this.state.checkBoxs.map((item, index) => (
+            <div key={index}>
+              <input
+                type="checkbox"
+                value={item.content}
+                checked={item.checked}
+                onChange={() => this.handleChange(index)}
+              />
+              <span>{item.content}</span>
+            </div>
+          ))}
         </div>
         <button onClick={this.clickHandle}>提交</button>
       </div>
     )
   }
-
 }
 
-export default App;
+export default App
 ```
 
 - 下拉列表
 
-```react
-import React from "react";
+```jsx
+import React from 'react'
 
 // 类组件
 class App extends React.Component {
   state = {
-    value : "html"
+    value: 'html',
   }
 
   handleChange = (e) => {
     this.setState({
-      value : e.target.value
+      value: e.target.value,
     })
   }
 
   clickHandle = () => {
     // 提交整个表单
-    console.log(this.state.value);
+    console.log(this.state.value)
   }
 
   render() {
@@ -265,10 +265,9 @@ class App extends React.Component {
       </div>
     )
   }
-
 }
 
-export default App;
+export default App
 ```
 
 ## 非受控组件
@@ -279,83 +278,75 @@ export default App;
 
 - 非受控组件基本示例
 
-```react
-import React from "react";
+```jsx
+import React from 'react'
 
 // 类组件
 class App extends React.Component {
-
-  constructor(){
-    super();
+  constructor() {
+    super()
     // 创建了一个 ref，回头我们就可以获取到和该 ref 绑定了的 DOM 节点
-    this.inputCon = React.createRef();
+    this.inputCon = React.createRef()
   }
 
   clickHandle = () => {
     // 通过 this.inputCon.current 可以获取到 input DOM 节点
-    console.log(this.inputCon.current.value);
+    console.log(this.inputCon.current.value)
   }
-
 
   render() {
     return (
       <div>
-        <input type="text" ref={this.inputCon}/>
+        <input type="text" ref={this.inputCon} />
         <button onClick={this.clickHandle}>获取用户输入的内容</button>
       </div>
     )
   }
-
 }
 
-export default App;
-
+export default App
 ```
 
 - 非受控组件的默认值
 
-```react
+```jsx
 <div>
   {/* 一旦你用了 value，React 会认为你这是一个受控组件 */}
   {/* 如果想要给默认值，使用 defaultValue */}
-  <input type="text" ref={this.inputCon} defaultValue="123"/>
+  <input type="text" ref={this.inputCon} defaultValue="123" />
   <button onClick={this.clickHandle}>获取用户输入的内容</button>
 </div>
 ```
 
 - 文件上传
 
-```react
-import React from "react";
+```jsx
+import React from 'react'
 
 // 类组件
 class App extends React.Component {
-
   constructor() {
-    super();
+    super()
     // 创建 ref 的时候，命名一般采用 xxxRef 结尾
-    this.uploadRef = React.createRef();
+    this.uploadRef = React.createRef()
   }
 
   clickHandle = () => {
     // 通过 this.uploadRef.current 可以获取到 input DOM 节点
-    console.log(this.uploadRef.current.files);
+    console.log(this.uploadRef.current.files)
   }
-
 
   render() {
     return (
       <div>
-        <input type="file" ref={this.uploadRef}/>
+        <input type="file" ref={this.uploadRef} />
         <button onClick={this.clickHandle}>获取用户输入的内容</button>
       </div>
     )
   }
-
 }
 
-export default App;
-
+export default App
 ```
 
 关于受控组件和非受控组件，可以参阅：*https://goshacmd.com/controlled-vs-uncontrolled-inputs-react/*

@@ -48,41 +48,43 @@ function 组件名(){
 
 在 _React_ 中绑定事件的写法如下：
 
-```react
+```jsx
 <button onClick={activateLasers}>Activate Lasers</button>
 ```
 
 在 _React_ 中无法通过 _return false_ 来阻止默认行为，所以只有使用 _e.preventDefault_ 的方式来阻止默认行为。
 
-```react
+```jsx
 function Form() {
   function handleSubmit(e) {
-    e.preventDefault();
-    console.log('You clicked submit.');
+    e.preventDefault()
+    console.log('You clicked submit.')
   }
 
   return (
     <form onSubmit={handleSubmit}>
       <button type="submit">Submit</button>
     </form>
-  );
+  )
 }
 ```
 
 如果是类组件，那么事件处理函数写作一个类方法。
 
-```react
+```jsx
 class Welcome extends React.Component {
   // 事件处理函数
-  eventHandler(e){
-    window.alert('Hello');
-    e.preventDefault();
+  eventHandler(e) {
+    window.alert('Hello')
+    e.preventDefault()
   }
 
   render() {
     return (
-      <a href="https://www.baidu.com/" onClick={this.eventHandler}>this is a test</a>
-    );
+      <a href="https://www.baidu.com/" onClick={this.eventHandler}>
+        this is a test
+      </a>
+    )
   }
 }
 ```
@@ -91,7 +93,7 @@ class Welcome extends React.Component {
 
 _React_ 也提供了访问原生事件对象的方式。如下：
 
-```react
+```jsx
 eventHandler(e){
     e.nativeEvent // 原生事件对象
 }

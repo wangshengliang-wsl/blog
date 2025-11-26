@@ -120,7 +120,7 @@ export function CheckoutButton({
       disabled={loading}
       className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
     >
-      {loading ? '处理中...' : `支付 $${(amount / 100).toFixed(2)}`}
+      {loading ? '处理中...' : `支付 \$\${(amount / 100).toFixed(2)}`}
     </button>
   )
 }
@@ -475,7 +475,7 @@ function CheckoutForm({ amount }: { amount: number }) {
         disabled={!stripe || loading}
         className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
       >
-        {loading ? '处理中...' : `支付 $${(amount / 100).toFixed(2)}`}
+        {loading ? '处理中...' : `支付 \$\${(amount / 100).toFixed(2)}`}
       </button>
     </form>
   )
@@ -609,7 +609,7 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 
 ## 常见问题和踩坑
 
-**金额单位问题**：Stripe 的金额单位是**分**（cents），不是元。比如 $10.00 要传 `1000`，不是 `10`。这个坑我踩过好几次，金额对不上才发现。
+**金额单位问题**：Stripe 的金额单位是**分**（cents），不是元。比如 \$10.00 要传 `1000`，不是 `10`。这个坑我踩过好几次，金额对不上才发现。
 
 **Webhook 签名验证**：生产环境一定要验证 Webhook 签名，否则可能被恶意请求伪造支付成功事件。本地开发可以用 Stripe CLI 转发，但生产环境必须验证。
 
@@ -621,7 +621,7 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 
 **测试卡号**：Stripe 提供了测试卡号，比如 `4242 4242 4242 4242`（Visa，成功）、`4000 0000 0000 0002`（Visa，需要 3D Secure）。测试时用这些卡号，不要用真实卡号。
 
-**货币转换**：Stripe 支持多币种，但不同币种的最小金额不一样。比如 USD 最小是 $0.50（50 cents），JPY 最小是 ¥50。创建 Payment Intent 时要检查金额是否满足最小要求。
+**货币转换**：Stripe 支持多币种，但不同币种的最小金额不一样。比如 USD 最小是 \$0.50（50 cents），JPY 最小是 ¥50。创建 Payment Intent 时要检查金额是否满足最小要求。
 
 **退款处理**：退款可以用 `stripe.refunds.create()`，但要注意部分退款、全额退款、退款到原卡还是其他卡这些细节。
 

@@ -129,8 +129,24 @@ export default defineConfig({
     ],
     [
       /^btn-(\w+)$/,
-      ([_, color]) =>
-        `px-2.5 py-1 border border-[#8884]! rounded op-50 transition-all duration-200 ease-out no-underline! hover:(op-100 text-${color} bg-${color}/10)`,
+      ([_, color]) => {
+        // 使用明确的颜色类名，避免动态构建导致的警告
+        const colorMap: Record<string, string> = {
+          primary: 'blue',
+          secondary: 'gray',
+          success: 'green',
+          warning: 'yellow',
+          danger: 'red',
+          info: 'cyan',
+          orange: 'orange',
+          violet: 'violet',
+          purple: 'purple',
+          pink: 'pink',
+          indigo: 'indigo',
+        }
+        const mappedColor = colorMap[color] || color
+        return `px-2.5 py-1 border border-[#8884]! rounded op-50 transition-all duration-200 ease-out no-underline! hover:op-100 hover:text-${mappedColor} hover:bg-${mappedColor}/10`
+      },
     ],
     [
       /^github-(major|minor|patch|pre)$/,
@@ -188,5 +204,31 @@ export default defineConfig({
     /* Toc */
     'i-ri-menu-2-fill',
     'i-ri-menu-3-fill',
+
+    /* btn-* shortcuts - 添加常用的颜色组合到 safelist */
+    'hover:text-primary',
+    'hover:bg-primary/10',
+    'hover:text-blue',
+    'hover:bg-blue/10',
+    'hover:text-gray',
+    'hover:bg-gray/10',
+    'hover:text-green',
+    'hover:bg-green/10',
+    'hover:text-yellow',
+    'hover:bg-yellow/10',
+    'hover:text-red',
+    'hover:bg-red/10',
+    'hover:text-cyan',
+    'hover:bg-cyan/10',
+    'hover:text-orange',
+    'hover:bg-orange/10',
+    'hover:text-violet',
+    'hover:bg-violet/10',
+    'hover:text-purple',
+    'hover:bg-purple/10',
+    'hover:text-pink',
+    'hover:bg-pink/10',
+    'hover:text-indigo',
+    'hover:bg-indigo/10',
   ],
 })

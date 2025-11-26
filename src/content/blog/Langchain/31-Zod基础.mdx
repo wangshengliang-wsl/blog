@@ -978,31 +978,35 @@ console.log(JSON.stringify(jsonSchema, null, 2))
 
 Zod 也常用于前端表单校验，比如配合 **React Hook Form**。
 
-```react
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
+```jsx
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 
 const schema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
-});
+})
 
 function LoginForm() {
-  const { register, handleSubmit, formState: { errors } } = useForm({
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm({
     resolver: zodResolver(schema),
-  });
+  })
 
   return (
     <form onSubmit={handleSubmit((data) => console.log(data))}>
-      <input {...register("email")} />
+      <input {...register('email')} />
       {errors.email && <span>{errors.email.message}</span>}
 
-      <input {...register("password")} type="password" />
+      <input {...register('password')} type="password" />
       {errors.password && <span>{errors.password.message}</span>}
 
       <button type="submit">提交</button>
     </form>
-  );
+  )
 }
 ```
 

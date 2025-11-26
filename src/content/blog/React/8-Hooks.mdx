@@ -24,25 +24,24 @@ _Hooks_ 的出现，首先能解决如下的一些问题：
 - 告别令人疑惑的生命周期
   - 例如下面的例子，相同的代码在不同的生命周期中存在了两份
 
-```react
-import React from "react";
+```jsx
+import React from 'react'
 
 // 类组件
 class App extends React.Component {
-
   constructor() {
-    super();
+    super()
     this.state = {
-      count : 0
+      count: 0,
     }
   }
 
-  componentDidMount(){
-    document.title = `你点击了${this.state.count}次`;
+  componentDidMount() {
+    document.title = `你点击了${this.state.count}次`
   }
 
-  componentDidUpdate(){
-    document.title = `你点击了${this.state.count}次`;
+  componentDidUpdate() {
+    document.title = `你点击了${this.state.count}次`
   }
 
   render() {
@@ -57,8 +56,7 @@ class App extends React.Component {
   }
 }
 
-export default App;
-
+export default App
 ```
 
 - 告别类组件中烦人的 _this_
@@ -99,15 +97,14 @@ _useState_ 包含以下的知识点：
 
 - 基本使用
 
-```react
-import { useState } from 'react';
+```jsx
+import { useState } from 'react'
 
 function App(props) {
+  let [count, setCount] = useState(0)
 
-  let [count, setCount] = useState(0);
-
-  function clickhandle(){
-    setCount(++count);
+  function clickhandle() {
+    setCount(++count)
   }
 
   return (
@@ -115,28 +112,25 @@ function App(props) {
       <div>{count}</div>
       <button onClick={clickhandle}>+1</button>
     </div>
-  );
+  )
 }
 
-export default App;
-
+export default App
 ```
 
 - 声明多个 _state_ 状态
 
-```react
-import { useState } from 'react';
+```jsx
+import { useState } from 'react'
 
 function App(props) {
+  let [age, setAge] = useState(18)
+  const [fruit, setFruit] = useState('banana')
+  const [todos, setTodos] = useState([{ text: '学习 Hook' }])
 
-  let [age, setAge] = useState(18);
-  const [fruit, setFruit] = useState('banana');
-  const [todos, setTodos] = useState([{ text: '学习 Hook' }]);
-
-  function clickhandle(){
-    setAge(++age);
+  function clickhandle() {
+    setAge(++age)
   }
-
 
   return (
     <div>
@@ -145,10 +139,10 @@ function App(props) {
       <div>待办事项：{todos[0].text}</div>
       <button onClick={clickhandle}>+1</button>
     </div>
-  );
+  )
 }
 
-export default App;
+export default App
 ```
 
 _useEffect_ 包含以下知识点：
@@ -170,21 +164,19 @@ _useEffect_ 包含以下知识点：
 
 - 基本使用
 
-```react
-import { useState, useEffect } from 'react';
+```jsx
+import { useState, useEffect } from 'react'
 
 function App() {
+  let [count, setCount] = useState(0)
 
-  let [count, setCount] = useState(0);
-
-  useEffect(()=>{
+  useEffect(() => {
     // 书写你要执行的副作用，会在组件渲染完成后执行
-    document.title = `你点击了${count}次`;
-  });
-
+    document.title = `你点击了${count}次`
+  })
 
   function clickhandle() {
-    setCount(++count);
+    setCount(++count)
   }
 
   return (
@@ -192,39 +184,37 @@ function App() {
       <div>你点击了{count}次</div>
       <button onClick={clickhandle}>+1</button>
     </div>
-  );
+  )
 }
 
-export default App;
+export default App
 ```
 
 - 执行清理工作
 
-```react
-import { useState, useEffect } from 'react';
+```jsx
+import { useState, useEffect } from 'react'
 
 function App() {
+  let [count, setCount] = useState(0)
 
-  let [count, setCount] = useState(0);
-
-  useEffect(()=>{
+  useEffect(() => {
     // 书写你要执行的副作用，会在组件渲染完成后执行
-    const stopTimer = setInterval(()=>{
-      console.log("Hello");
-    },1000)
+    const stopTimer = setInterval(() => {
+      console.log('Hello')
+    }, 1000)
 
     // console.log("副作用函数执行了");
     // 在 useEffect 中，可以返回一个函数，该函数我们称之为清理函数（一般就是做一些清理操作）
     // 该函数会在下一次渲染之后，但是在执行副作用操作之前执行
-    return ()=>{
+    return () => {
       // console.log("清理函数执行了");
-      clearInterval(stopTimer);
+      clearInterval(stopTimer)
     }
-  });
-
+  })
 
   function clickhandle() {
-    setCount(++count);
+    setCount(++count)
   }
 
   return (
@@ -232,41 +222,40 @@ function App() {
       <div>你点击了{count}次</div>
       <button onClick={clickhandle}>+1</button>
     </div>
-  );
+  )
 }
 
-export default App;
+export default App
 ```
 
 - 副作用的依赖
   - 目前，我们的副作用函数，每次重新渲染后，都会重新执行，有些时候我们是需要设置依赖项，传递第二个参数，第二个参数为一个依赖数组
 
-  ```react
-  import { useState, useEffect } from 'react';
+  ```jsx
+  import { useState, useEffect } from 'react'
 
   function App() {
+    let [count1, setCount1] = useState(0)
+    let [count2, setCount2] = useState(0)
+    let [count3, setCount3] = useState(0)
 
-    let [count1, setCount1] = useState(0);
-    let [count2, setCount2] = useState(0);
-    let [count3, setCount3] = useState(0);
-
-    useEffect(()=>{
-      console.log("执行副作用函数");
-    },[count1]);
+    useEffect(() => {
+      console.log('执行副作用函数')
+    }, [count1])
 
     return (
       <div>
         <div>count1:{count1}</div>
         <div>count2:{count2}</div>
         <div>count3:{count3}</div>
-        <button onClick={()=>setCount1(++count1)}>+1</button>
-        <button onClick={()=>setCount2(++count2)}>+1</button>
-        <button onClick={()=>setCount3(++count3)}>+1</button>
+        <button onClick={() => setCount1(++count1)}>+1</button>
+        <button onClick={() => setCount2(++count2)}>+1</button>
+        <button onClick={() => setCount3(++count3)}>+1</button>
       </div>
-    );
+    )
   }
 
-  export default App;
+  export default App
   ```
 
   - 如果想要副作用只执行一次，传递第二个参数为一个空数组
@@ -286,48 +275,46 @@ export default App;
 
 _App.jsx_
 
-```react
-import { useState } from 'react';
-import useMyBook from "./useMyBook"
+```jsx
+import { useState } from 'react'
+import useMyBook from './useMyBook'
 
 function App() {
+  const { bookName, setBookName } = useMyBook()
+  const [value, setValue] = useState('')
 
-  const {bookName, setBookName} = useMyBook();
-  const [value, setValue] = useState("");
-
-
-  function changeHandle(e){
-    setValue(e.target.value);
+  function changeHandle(e) {
+    setValue(e.target.value)
   }
 
-  function clickHandle(){
-    setBookName(value);
+  function clickHandle() {
+    setBookName(value)
   }
 
   return (
     <div>
       <div>{bookName}</div>
-      <input type="text" value={value} onChange={changeHandle}/>
+      <input type="text" value={value} onChange={changeHandle} />
       <button onClick={clickHandle}>确定</button>
     </div>
   )
-
 }
 
-export default App;
+export default App
 ```
 
 _useMyBook_
 
-```react
-import { useState } from "react";
+```jsx
+import { useState } from 'react'
 
-function useMyBook(){
-    const [bookName, setBookName] = useState("React 学习");
-    return {
-        bookName, setBookName
-    }
+function useMyBook() {
+  const [bookName, setBookName] = useState('React 学习')
+  return {
+    bookName,
+    setBookName,
+  }
 }
 
-export default useMyBook;
+export default useMyBook
 ```
