@@ -2,8 +2,8 @@ import { glob, file } from 'astro/loaders'
 import { defineCollection } from 'astro:content'
 
 import { feedLoader } from '@ascorbic/feed-loader'
-// import { githubReleasesLoader } from 'astro-loader-github-releases'
-// import { githubPrsLoader } from 'astro-loader-github-prs'
+import { githubReleasesLoader } from 'astro-loader-github-releases'
+import { githubPrsLoader } from 'astro-loader-github-prs'
 
 import {
   pageSchema,
@@ -32,29 +32,29 @@ const projects = defineCollection({
   schema: projectSchema,
 })
 
-// const releases = defineCollection({
-//   loader: githubReleasesLoader({
-//     mode: 'repoList',
-//     repos: [
-//       'withastro/astro',
-//       'withastro/starlight',
-//       'lin-stephanie/astro-loaders',
-//       'lin-stephanie/astro-antfustyle-theme',
-//     ],
-//     monthsBack: 2,
-//     entryReturnType: 'byRelease',
-//     clearStore: true,
-//   }),
-// })
+const releases = defineCollection({
+  loader: githubReleasesLoader({
+    mode: 'repoList',
+    repos: [
+      'withastro/astro',
+      'withastro/starlight',
+      'lin-stephanie/astro-loaders',
+      'lin-stephanie/astro-antfustyle-theme',
+    ],
+    monthsBack: 2,
+    entryReturnType: 'byRelease',
+    clearStore: true,
+  }),
+})
 
-// const prs = defineCollection({
-//   loader: githubPrsLoader({
-//     search:
-//       'repo:withastro/astro repo:withastro/starlight repo:lin-stephanie/astro-antfustyle-theme',
-//     monthsBack: 1,
-//     clearStore: true,
-//   }),
-// })
+const prs = defineCollection({
+  loader: githubPrsLoader({
+    search:
+      'repo:withastro/astro repo:withastro/starlight repo:lin-stephanie/astro-antfustyle-theme',
+    monthsBack: 1,
+    clearStore: true,
+  }),
+})
 
 const photos = defineCollection({
   loader: file('src/content/photos/data.json'),
@@ -85,8 +85,8 @@ export const collections = {
   home,
   blog,
   projects,
-  // releases,
-  // prs,
+  releases,
+  prs,
   photos,
   changelog,
   streams,
