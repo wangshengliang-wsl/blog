@@ -95,9 +95,9 @@ export const UI: Ui = {
     mergeOnMobile: true,
   },
   tabbedLayoutTabs: [
-    { title: 'Changelog', path: '/changelog' },
-    { title: 'AstroBlog', path: '/feeds' },
-    { title: 'AstroStreams', path: '/streams' },
+    { title: '看过一些', path: '/changelog' },
+    { title: '豆瓣本周口碑', path: '/feeds' },
+    { title: '吃灰收藏', path: '/streams' },
   ],
   groupView: {
     maxGroupColumns: 3,
