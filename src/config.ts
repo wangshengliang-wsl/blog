@@ -27,9 +27,9 @@ export const UI: Ui = {
     },
     {
       path: '/projects',
-      title: '诗歌',
+      title: 'Projects',
       displayMode: 'alwaysText',
-      text: 'Projects',
+      text: '诗歌',
     },
     // {
     //   path: '/highlights',
@@ -42,16 +42,17 @@ export const UI: Ui = {
       path: '/photos',
       title: 'Photos',
       displayMode: 'iconToTextOnMobile',
-      text: 'Photos',
+      text: '摄影',
       icon: 'i-ri-camera-ai-line',
     },
     {
       path: '/shorts',
-      title: '电影',
+      title: 'Shorts',
       displayMode: 'iconToTextOnMobile',
-      text: 'Shorts',
+      text: '电影',
       icon: 'i-meteor-icons-grid',
     },
+/**
     {
       path: '/changelog',
       title: 'Changelog',
@@ -59,6 +60,7 @@ export const UI: Ui = {
       text: 'Changelog',
       icon: 'i-ri-draft-line',
     },
+*/
   ],
   socialLinks: [
     {
