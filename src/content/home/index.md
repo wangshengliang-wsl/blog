@@ -9,7 +9,7 @@
 我年华虚度，空有一身疲惫。
 
 <p>
-  <span class="inline-block mr-1.5 mb-2">找到我</span>
+  <span class="inline-block mr-1.5 mb-2">找到我</span><hr>
   <span class="inline-flex flex-wrap gap-2 op-75">
     <a href="https://www.xiaohongshu.com/user/profile/639e96f2000000002702a4ef">
       <span i-simple-icons-xiaohongshu></span> 小红书</a>
