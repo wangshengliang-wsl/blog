@@ -17,5 +17,5 @@
       <span i-simple-icons-tiktok></span> 抖音</a>
   </span>
 </p>
-踏上孤岛的列车🚂
+一起踏上开往孤岛的列车🚂
 
