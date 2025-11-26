@@ -28,17 +28,17 @@
     "category": "现代诗"
   },
   {
-    "id": "VoiceAccountClient",
-    "link": "https://github.com/wangshengliang-wsl/VoiceAccountClient",
-    "desc": "VoiceAccountClient - A voice account client",
-    "icon": "i-skill-icons:github-dark",
+    "id": "刘过《唐多令·芦叶满汀洲》",
+    "link": "http://xhslink.com/o/AoAKEhTES7z",
+    "desc": "欲买桂花同载酒，终不似，少年游。",
+    "icon": "https://cdn-icons-png.flaticon.com/512/5610/5610612.png",
     "category": "古诗"
   },
   {
-    "id": "VoiceAccountServer",
-    "link": "https://github.com/wangshengliang-wsl/VoiceAccountServer",
-    "desc": "VoiceAccountServer - A voice account server",
-    "icon": "i-skill-icons:github-dark",
+    "id": "唐温如《题龙阳县青草湖》",
+    "link": "http://xhslink.com/o/AVi4zH8iZNL",
+    "desc": "醉后不知天在水，满船清梦压星河。",
+    "icon": "https://cdn-icons-png.flaticon.com/512/17370/17370042.png",
     "category": "古诗"
   }
 ]
