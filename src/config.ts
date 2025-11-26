@@ -31,6 +31,7 @@ export const UI: Ui = {
       displayMode: 'alwaysText',
       text: '诗歌',
     },
+/**
     {
        path: '/highlights',
        title: 'Highlights',
@@ -38,6 +39,7 @@ export const UI: Ui = {
        text: 'Highlights',
        icon: 'i-ri-screenshot-line',
      },
+**/
     {
       path: '/photos',
       title: 'Photos',
