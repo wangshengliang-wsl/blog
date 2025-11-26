@@ -76,7 +76,7 @@ const streams = defineCollection({
 
 const feeds = defineCollection({
   loader: feedLoader({
-    url: 'https://feedx.top/rss/doubanmvweek.xml',
+    url: 'https://rss.app/feeds/g44539aayWqqmZUt.xml',
   }),
 })
 
