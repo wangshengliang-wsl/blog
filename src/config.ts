@@ -59,8 +59,7 @@ export const UI: Ui = {
       title: 'Changelog',
       displayMode: 'iconToTextOnMobile',
       text: '电影',
-      //icon: 'i-ri-draft-line',
-icon: 'i-meteor-icons-grid',
+      icon: 'i-ri-draft-line',
     },
   ],
   socialLinks: [
