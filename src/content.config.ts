@@ -76,7 +76,7 @@ const streams = defineCollection({
 
 const feeds = defineCollection({
   loader: feedLoader({
-    url: 'https://rss.app/feeds/g44539aayWqqmZUt.xml',
+    url: 'https://rsshub.rssforever.com/douban/movie/weekly',
   }),
 })
 
