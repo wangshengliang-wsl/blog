@@ -170,7 +170,7 @@ export const FEATURES: Features = {
   giscus: [
     true,
     {
-      'data-repo': 'wangshengliang-wsl/blog',
+      'data-repo': '',
       'data-repo-id': 'R_kgDOP4yOiQ',
       'data-category': 'Announcements',
       'data-category-id': 'DIC_kwDOP4yOic4CwBgk',
