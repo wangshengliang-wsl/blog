@@ -66,10 +66,10 @@ export const UI: Ui = {
   ],
   socialLinks: [
     {
-      link: 'https://github.com/rqlmj',
-      title: 'GitHub Profile',
+      link: 'https://b23.tv/Cwj3dcP',
+      title: 'BiliBili Profile',
       displayMode: 'alwaysIcon',
-      icon: 'i-uil-github-alt',
+      icon: 'i-ri-bilibili-fill',
     },
     // {
     //   link: 'https://x.com/astrodotbuild',
