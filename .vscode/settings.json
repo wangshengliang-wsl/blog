@@ -5,5 +5,6 @@
   "[astro]": {
     "editor.defaultFormatter": "astro-build.astro-vscode"
   },
-  "astro.content-intellisense": true
+  "astro.content-intellisense": true,
+  "editor.wordWrapColumn": 20
 }
