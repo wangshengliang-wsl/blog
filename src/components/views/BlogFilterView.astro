@@ -263,6 +263,7 @@ for (const [category, posts] of categorizedBlogItems) {
       this.setupFilterTags()
       this.setupExpandButton()
       this.checkNeedExpand()
+      this.restoreCategoryFromStorage()
     }
 
     private setupFilterTags() {
@@ -304,6 +305,22 @@ for (const [category, posts] of categorizedBlogItems) {
       })
     }
 
+    private restoreCategoryFromStorage() {
+      const savedCategory = localStorage.getItem('blog-filter-category')
+      if (
+        savedCategory &&
+        (savedCategory === 'all' || this.categories.includes(savedCategory))
+      ) {
+        const targetTag = this.querySelector(
+          `.filter-tag[data-category="${savedCategory}"]`
+        ) as HTMLElement
+        if (targetTag) {
+          this.filterByCategory(savedCategory)
+          this.updateActivetag(targetTag)
+        }
+      }
+    }
+
     private toggleExpand() {
       const tagsWrapper = this.querySelector(
         '.blog-filter-tags-wrapper'
@@ -334,6 +351,8 @@ for (const [category, posts] of categorizedBlogItems) {
 
     private filterByCategory(category: string) {
       this.currentCategory = category
+      // 保存到 localStorage
+      localStorage.setItem('blog-filter-category', category)
       const postItems = this.querySelectorAll('.post-item')
 
       // 用于追踪每个分类的第一篇文章
