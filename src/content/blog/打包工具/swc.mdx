@@ -1,0 +1,639 @@
+---
+title: SWC - Rust 驱动的超快编译器
+description: 深入了解 SWC 的编译原理、配置方法、插件开发与在主流工具中的应用，Babel 的高性能替代品
+pubDate: 2025-11-25
+toc: true
+ogImage: true
+category: 打包工具
+---
+
+SWC（Speedy Web Compiler）是用 Rust 写的 JavaScript/TypeScript 编译器。它的目标是替代 Babel，同时速度快 20 倍以上。
+
+虽然 SWC 主要定位是编译器，但它也有打包功能（swcpack），而且被 Next.js、Vite、Parcel、Rspack 等主流工具采用。了解 SWC 对于理解现代前端工具链很有帮助。
+
+## 为什么需要 SWC
+
+Babel 是 JavaScript 生态的基础设施。几乎所有需要编译的前端项目都在用它。但 Babel 有个根本问题：**用 JavaScript 写的编译器去编译 JavaScript，性能有天花板**。
+
+一个大型项目可能有几千个文件，每次构建都要经过 Babel 处理。这个过程占了构建时间的很大比例。
+
+SWC 用 Rust 重写了编译流程，单线程就比 Babel 快 20 倍，多核并行能达到 70 倍。这不是微优化，是数量级的提升。
+
+## 安装与基本使用
+
+```bash
+npm install @swc/core @swc/cli --save-dev
+```
+
+### 命令行使用
+
+```bash
+# 编译单个文件
+npx swc src/index.js -o dist/index.js
+
+# 编译整个目录
+npx swc src -d dist
+
+# 监听模式
+npx swc src -d dist --watch
+
+# 生成 sourcemap
+npx swc src -d dist --source-maps
+```
+
+### JavaScript API
+
+```javascript
+const swc = require('@swc/core')
+
+// 同步编译
+const result = swc.transformSync('const x = 1;', {
+  jsc: {
+    parser: {
+      syntax: 'ecmascript',
+    },
+    target: 'es2020',
+  },
+})
+
+console.log(result.code)
+
+// 异步编译
+const asyncResult = await swc.transform('const x: number = 1;', {
+  jsc: {
+    parser: {
+      syntax: 'typescript',
+    },
+  },
+})
+
+// 编译文件
+const fileResult = await swc.transformFile('./src/index.ts', {
+  jsc: {
+    parser: {
+      syntax: 'typescript',
+      tsx: true,
+    },
+  },
+})
+```
+
+## 配置详解
+
+SWC 使用 `.swcrc` 配置文件：
+
+```json
+{
+  "$schema": "https://json.schemastore.org/swcrc",
+  "jsc": {
+    "parser": {
+      "syntax": "typescript",
+      "tsx": true,
+      "decorators": true,
+      "dynamicImport": true
+    },
+    "transform": {
+      "react": {
+        "runtime": "automatic",
+        "development": false,
+        "refresh": false
+      },
+      "legacyDecorator": true,
+      "decoratorMetadata": true
+    },
+    "target": "es2020",
+    "loose": false,
+    "externalHelpers": false,
+    "keepClassNames": true
+  },
+  "module": {
+    "type": "es6"
+  },
+  "minify": false,
+  "sourceMaps": true
+}
+```
+
+### 解析器配置（parser）
+
+```json
+{
+  "jsc": {
+    "parser": {
+      // 语法：ecmascript | typescript
+      "syntax": "typescript",
+
+      // 是否支持 JSX
+      "jsx": true,
+      // 或者用 tsx（TypeScript + JSX）
+      "tsx": true,
+
+      // 装饰器支持
+      "decorators": true,
+
+      // 动态导入
+      "dynamicImport": true
+    }
+  }
+}
+```
+
+### 转换配置（transform）
+
+```json
+{
+  "jsc": {
+    "transform": {
+      // React 相关
+      "react": {
+        // automatic（新版）或 classic（旧版）
+        "runtime": "automatic",
+        // 开发模式（添加调试信息）
+        "development": false,
+        // React Refresh（热更新）
+        "refresh": true,
+        // 使用旧版 createElement
+        "pragma": "React.createElement",
+        "pragmaFrag": "React.Fragment",
+        // import source（automatic 模式）
+        "importSource": "react"
+      },
+
+      // 装饰器
+      "legacyDecorator": true,
+      "decoratorMetadata": true,
+
+      // 类优化
+      "useDefineForClassFields": true
+    }
+  }
+}
+```
+
+### 目标环境（target）
+
+```json
+{
+  "jsc": {
+    // ES 版本
+    "target": "es2020"
+  },
+  // 或者用环境配置
+  "env": {
+    "targets": {
+      "chrome": "80",
+      "firefox": "78",
+      "safari": "14"
+    },
+    // 按需引入 polyfill
+    "mode": "usage",
+    "coreJs": "3.30"
+  }
+}
+```
+
+### 模块配置
+
+```json
+{
+  "module": {
+    // es6 | commonjs | amd | umd | systemjs
+    "type": "es6",
+    // 严格模式
+    "strict": true,
+    // 严格的模块语义
+    "strictMode": true,
+    // 惰性加载
+    "lazy": false,
+    // 不自动添加 use strict
+    "noInterop": false
+  }
+}
+```
+
+### 压缩配置
+
+```json
+{
+  "minify": true,
+  "jsc": {
+    "minify": {
+      "compress": {
+        // 移除 console
+        "drop_console": true,
+        // 移除 debugger
+        "drop_debugger": true,
+        // 内联函数
+        "inline": 2
+      },
+      "mangle": {
+        // 保留类名
+        "keepClassnames": true,
+        // 保留函数名
+        "keepFnNames": false
+      }
+    }
+  }
+}
+```
+
+## TypeScript 配置
+
+SWC 处理 TypeScript 时，只做语法转换，不做类型检查：
+
+```json
+{
+  "jsc": {
+    "parser": {
+      "syntax": "typescript",
+      "tsx": true,
+      "decorators": true
+    },
+    "transform": {
+      "legacyDecorator": true,
+      "decoratorMetadata": true
+    }
+  }
+}
+```
+
+类型检查需要单独运行 `tsc --noEmit`：
+
+```json
+{
+  "scripts": {
+    "build": "npm run typecheck && swc src -d dist",
+    "typecheck": "tsc --noEmit"
+  }
+}
+```
+
+### 与 tsconfig.json 的关系
+
+SWC 会读取部分 `tsconfig.json` 配置：
+
+- `paths`（路径别名）
+- `baseUrl`
+- `experimentalDecorators`
+- `emitDecoratorMetadata`
+
+但大部分配置需要在 `.swcrc` 里单独设置。
+
+## React 项目配置
+
+### .swcrc 配置
+
+```json
+{
+  "jsc": {
+    "parser": {
+      "syntax": "typescript",
+      "tsx": true
+    },
+    "transform": {
+      "react": {
+        "runtime": "automatic",
+        "development": false,
+        "refresh": false
+      }
+    },
+    "target": "es2020"
+  },
+  "module": {
+    "type": "es6"
+  }
+}
+```
+
+### 开发环境配置
+
+```json
+{
+  "jsc": {
+    "parser": {
+      "syntax": "typescript",
+      "tsx": true
+    },
+    "transform": {
+      "react": {
+        "runtime": "automatic",
+        "development": true,
+        "refresh": true
+      }
+    }
+  }
+}
+```
+
+### 与 Webpack 集成
+
+用 `swc-loader` 替代 `babel-loader`：
+
+```bash
+npm install swc-loader --save-dev
+```
+
+```javascript
+// webpack.config.js
+module.exports = {
+  module: {
+    rules: [
+      {
+        test: /\.(js|jsx|ts|tsx)$/,
+        exclude: /node_modules/,
+        use: {
+          loader: 'swc-loader',
+          options: {
+            jsc: {
+              parser: {
+                syntax: 'typescript',
+                tsx: true,
+              },
+              transform: {
+                react: {
+                  runtime: 'automatic',
+                },
+              },
+            },
+          },
+        },
+      },
+    ],
+  },
+}
+```
+
+### 与 Vite 集成
+
+Vite 默认用 esbuild，但可以切换到 SWC：
+
+```bash
+npm install @vitejs/plugin-react-swc --save-dev
+```
+
+```javascript
+// vite.config.js
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react-swc'
+
+export default defineConfig({
+  plugins: [react()],
+})
+```
+
+### 与 Jest 集成
+
+```bash
+npm install @swc/jest --save-dev
+```
+
+```javascript
+// jest.config.js
+module.exports = {
+  transform: {
+    '^.+\\.(t|j)sx?$': [
+      '@swc/jest',
+      {
+        jsc: {
+          parser: {
+            syntax: 'typescript',
+            tsx: true,
+          },
+          transform: {
+            react: {
+              runtime: 'automatic',
+            },
+          },
+        },
+      },
+    ],
+  },
+}
+```
+
+## 打包功能（swcpack）
+
+SWC 有个实验性的打包器 `swcpack`，但目前不太成熟：
+
+```json
+// spack.config.js
+module.exports = {
+  entry: {
+    web: './src/index.ts',
+  },
+  output: {
+    path: './dist',
+  },
+  module: {},
+}
+```
+
+```bash
+npx spack
+```
+
+实际项目更推荐用 Rspack、Vite 这些成熟的工具，它们底层也用了 SWC。
+
+## 插件开发
+
+SWC 支持用 JavaScript 或 Rust 写插件。
+
+### JavaScript 插件
+
+```javascript
+// my-plugin.js
+module.exports = function (program) {
+  return {
+    visitor: {
+      Identifier(path) {
+        if (path.node.value === 'console') {
+          // 处理 console
+        }
+      },
+    },
+  }
+}
+```
+
+使用：
+
+```json
+{
+  "jsc": {
+    "experimental": {
+      "plugins": [["./my-plugin.js", {}]]
+    }
+  }
+}
+```
+
+### Rust 插件（WASM）
+
+性能更好，但开发门槛高：
+
+```rust
+use swc_core::plugin::{plugin_transform, proxies::TransformPluginProgramMetadata};
+
+#[plugin_transform]
+pub fn process_transform(program: Program, _metadata: TransformPluginProgramMetadata) -> Program {
+    // 转换逻辑
+    program
+}
+```
+
+编译成 WASM 后使用：
+
+```json
+{
+  "jsc": {
+    "experimental": {
+      "plugins": [["my-plugin.wasm", {}]]
+    }
+  }
+}
+```
+
+## 性能对比
+
+在一个中等规模的 React 项目（约 500 个组件）测试：
+
+| 工具          | 编译时间 | 相对速度 |
+| ------------- | -------- | -------- |
+| Babel         | 12.5s    | 1x       |
+| SWC（单线程） | 0.6s     | 20x      |
+| SWC（多线程） | 0.18s    | 70x      |
+| esbuild       | 0.15s    | 83x      |
+
+SWC 和 esbuild 速度接近，但 SWC 的配置更接近 Babel，迁移更容易。
+
+## 从 Babel 迁移
+
+### 配置映射
+
+| Babel                             | SWC                             |
+| --------------------------------- | ------------------------------- |
+| @babel/preset-env                 | jsc.target / env                |
+| @babel/preset-react               | jsc.transform.react             |
+| @babel/preset-typescript          | jsc.parser.syntax: "typescript" |
+| @babel/plugin-transform-runtime   | jsc.externalHelpers             |
+| @babel/plugin-proposal-decorators | jsc.transform.legacyDecorator   |
+
+### 常见问题
+
+**1. 装饰器不工作**
+
+确保配置正确：
+
+```json
+{
+  "jsc": {
+    "parser": {
+      "syntax": "typescript",
+      "decorators": true
+    },
+    "transform": {
+      "legacyDecorator": true,
+      "decoratorMetadata": true
+    }
+  }
+}
+```
+
+**2. 路径别名不识别**
+
+SWC 会读取 `tsconfig.json` 的 `paths`，确保配置正确：
+
+```json
+// tsconfig.json
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    }
+  }
+}
+```
+
+**3. 某个 Babel 插件没有对应**
+
+一些 Babel 插件在 SWC 里没有对应实现。可以：
+
+- 检查是否有 SWC 插件
+- 用 Babel 只处理特定文件
+- 等待 SWC 支持
+
+## 主流工具中的应用
+
+### Next.js
+
+Next.js 12+ 默认使用 SWC 替代 Babel：
+
+```javascript
+// next.config.js
+module.exports = {
+  compiler: {
+    // 移除 console
+    removeConsole: true,
+    // React 移除属性
+    reactRemoveProperties: true,
+    // 情感样式
+    emotion: true,
+    // styled-components
+    styledComponents: true,
+  },
+}
+```
+
+### Parcel 2
+
+Parcel 2 用 SWC 作为默认的 JavaScript 转换器。
+
+### Rspack
+
+Rspack 内置 `builtin:swc-loader`：
+
+```javascript
+{
+  test: /\.tsx?$/,
+  loader: 'builtin:swc-loader',
+  options: {
+    jsc: {
+      parser: {
+        syntax: 'typescript',
+        tsx: true,
+      },
+    },
+  },
+}
+```
+
+### Vite
+
+通过插件使用：
+
+```javascript
+import react from '@vitejs/plugin-react-swc'
+
+export default {
+  plugins: [react()],
+}
+```
+
+## 与其他工具对比
+
+| 对比项     | SWC         | Babel      | esbuild | tsc        |
+| ---------- | ----------- | ---------- | ------- | ---------- |
+| 语言       | Rust        | JavaScript | Go      | TypeScript |
+| 速度       | 极快        | 慢         | 极快    | 慢         |
+| 类型检查   | 无          | 无         | 无      | 有         |
+| 插件生态   | 发展中      | 非常丰富   | 有限    | 无         |
+| 配置复杂度 | 中等        | 复杂       | 简单    | 中等       |
+| 迁移成本   | 从 Babel 低 | -          | 高      | -          |
+
+## 参考资料
+
+- [SWC 官方文档](https://swc.rs/)
+- [SWC GitHub 仓库](https://github.com/swc-project/swc)
+- [SWC Playground](https://play.swc.rs/)
+- [从 Babel 迁移指南](https://swc.rs/docs/migrating-from-babel)

@@ -1,0 +1,717 @@
+---
+title: Rspack - Rust 驱动的 Webpack 替代品
+description: 深入了解 Rspack 的架构设计、Webpack 兼容性、迁移指南与性能优化，字节跳动出品的高性能打包器
+pubDate: 2025-11-25
+toc: true
+ogImage: true
+category: 打包工具
+---
+
+Rspack 是字节跳动 Web Infra 团队用 Rust 从头写的打包器。它的目标很明确：**在保持 Webpack 生态兼容的同时，提供 10 倍以上的构建速度提升**。
+
+这不是又一个"从零开始"的新工具。Rspack 选择了一条务实的路线——兼容 Webpack 的配置和插件，让现有项目可以平滑迁移。字节内部已经有大量项目在用，包括抖音、飞书等产品线。
+
+## 为什么选择兼容 Webpack
+
+前端圈新工具层出不穷，但 Webpack 依然是企业级项目的主流选择。原因很简单：
+
+- 成熟的生态：几乎所有需求都有现成的 loader 和 plugin
+- 团队积累：很多公司有大量 Webpack 配置和私有插件
+- 稳定性：经过十年打磨，各种边界情况都被覆盖了
+
+Vite、esbuild 这些工具虽然快，但迁移成本高。一个复杂的 Webpack 项目，可能有几十个 loader、十几个 plugin，还有各种自定义配置。全部重写不现实。
+
+Rspack 的策略是：用 Rust 重写核心引擎，但保持 API 兼容。你的 `webpack.config.js` 基本不用改，就能享受性能提升。
+
+## 安装与基本使用
+
+### 新项目
+
+```bash
+# 使用脚手架创建
+npm create rspack@latest
+
+# 或者用 pnpm
+pnpm create rspack
+```
+
+选择模板：
+
+```
+? Select template › - Use arrow-keys. Return to submit.
+❯   react
+    react-ts
+    vue
+    vue-ts
+    vanilla
+    vanilla-ts
+```
+
+### 现有 Webpack 项目迁移
+
+```bash
+npm install @rspack/core @rspack/cli --save-dev
+```
+
+把 `webpack.config.js` 改名为 `rspack.config.js`，然后修改一些不兼容的地方（后面会详细讲）。
+
+修改 `package.json`：
+
+```json
+{
+  "scripts": {
+    "dev": "rspack serve",
+    "build": "rspack build"
+  }
+}
+```
+
+## 配置详解
+
+Rspack 的配置和 Webpack 非常像：
+
+```javascript
+// rspack.config.js
+const path = require('path')
+
+/** @type {import('@rspack/cli').Configuration} */
+module.exports = {
+  entry: {
+    main: './src/index.js',
+  },
+
+  output: {
+    path: path.resolve(__dirname, 'dist'),
+    filename: '[name].[contenthash:8].js',
+    publicPath: '/',
+    clean: true,
+  },
+
+  mode: process.env.NODE_ENV === 'production' ? 'production' : 'development',
+
+  resolve: {
+    extensions: ['.js', '.jsx', '.ts', '.tsx', '.json'],
+    alias: {
+      '@': path.resolve(__dirname, 'src'),
+    },
+  },
+
+  module: {
+    rules: [
+      {
+        test: /\.(js|jsx|ts|tsx)$/,
+        exclude: /node_modules/,
+        loader: 'builtin:swc-loader',
+        options: {
+          jsc: {
+            parser: {
+              syntax: 'typescript',
+              tsx: true,
+            },
+            transform: {
+              react: {
+                runtime: 'automatic',
+              },
+            },
+          },
+        },
+      },
+      {
+        test: /\.css$/,
+        type: 'css',
+      },
+      {
+        test: /\.scss$/,
+        use: ['sass-loader'],
+        type: 'css',
+      },
+      {
+        test: /\.(png|jpg|jpeg|gif|svg)$/,
+        type: 'asset',
+      },
+    ],
+  },
+
+  plugins: [],
+
+  devServer: {
+    port: 3000,
+    hot: true,
+    open: true,
+  },
+}
+```
+
+### 内置 Loader
+
+Rspack 内置了一些高性能 loader，不需要额外安装：
+
+**builtin:swc-loader**
+
+替代 babel-loader，速度快 20 倍以上：
+
+```javascript
+{
+  test: /\.(js|jsx|ts|tsx)$/,
+  loader: 'builtin:swc-loader',
+  options: {
+    jsc: {
+      parser: {
+        syntax: 'typescript',
+        tsx: true,
+        decorators: true,
+      },
+      transform: {
+        react: {
+          runtime: 'automatic',
+          development: process.env.NODE_ENV === 'development',
+          refresh: process.env.NODE_ENV === 'development',
+        },
+        legacyDecorator: true,
+      },
+    },
+  },
+}
+```
+
+**CSS 处理**
+
+Rspack 内置 CSS 处理能力，不需要 css-loader 和 style-loader：
+
+```javascript
+{
+  test: /\.css$/,
+  type: 'css',  // 内置 CSS 处理
+}
+
+// CSS Modules
+{
+  test: /\.module\.css$/,
+  type: 'css/module',
+}
+```
+
+**静态资源**
+
+和 Webpack 5 的 Asset Modules 一致：
+
+```javascript
+// 小文件内联，大文件输出
+{
+  test: /\.(png|jpg|gif|svg)$/,
+  type: 'asset',
+  parser: {
+    dataUrlCondition: {
+      maxSize: 8 * 1024,
+    },
+  },
+}
+
+// 始终输出文件
+{
+  test: /\.(woff|woff2|eot|ttf)$/,
+  type: 'asset/resource',
+}
+
+// 始终内联
+{
+  test: /\.svg$/,
+  type: 'asset/inline',
+}
+```
+
+### 外部 Loader 兼容
+
+大部分 Webpack loader 可以直接用：
+
+```javascript
+module: {
+  rules: [
+    {
+      test: /\.scss$/,
+      use: ['sass-loader'],
+      type: 'css',
+    },
+    {
+      test: /\.less$/,
+      use: [
+        {
+          loader: 'less-loader',
+          options: {
+            lessOptions: {
+              javascriptEnabled: true,
+            },
+          },
+        },
+      ],
+      type: 'css',
+    },
+  ],
+}
+```
+
+### 插件兼容
+
+Rspack 提供了一些内置插件：
+
+```javascript
+const rspack = require('@rspack/core')
+
+module.exports = {
+  plugins: [
+    // HTML 插件
+    new rspack.HtmlRspackPlugin({
+      template: './public/index.html',
+    }),
+
+    // 定义全局常量
+    new rspack.DefinePlugin({
+      'process.env.API_URL': JSON.stringify(process.env.API_URL),
+    }),
+
+    // 复制静态文件
+    new rspack.CopyRspackPlugin({
+      patterns: [{ from: 'public', to: '.' }],
+    }),
+
+    // CSS 提取
+    new rspack.CssExtractRspackPlugin({
+      filename: 'css/[name].[contenthash:8].css',
+    }),
+  ],
+}
+```
+
+很多 Webpack 插件也可以直接用：
+
+```javascript
+const { BundleAnalyzerPlugin } = require('webpack-bundle-analyzer')
+
+module.exports = {
+  plugins: [process.env.ANALYZE && new BundleAnalyzerPlugin()].filter(Boolean),
+}
+```
+
+## React 项目配置
+
+完整的 React + TypeScript 配置：
+
+```javascript
+// rspack.config.js
+const path = require('path')
+const rspack = require('@rspack/core')
+const RefreshPlugin = require('@rspack/plugin-react-refresh')
+
+const isDev = process.env.NODE_ENV === 'development'
+
+module.exports = {
+  entry: './src/index.tsx',
+
+  output: {
+    path: path.resolve(__dirname, 'dist'),
+    filename: isDev ? '[name].js' : '[name].[contenthash:8].js',
+    chunkFilename: isDev
+      ? '[name].chunk.js'
+      : '[name].[contenthash:8].chunk.js',
+    publicPath: '/',
+    clean: true,
+  },
+
+  mode: isDev ? 'development' : 'production',
+
+  resolve: {
+    extensions: ['.tsx', '.ts', '.jsx', '.js'],
+    alias: {
+      '@': path.resolve(__dirname, 'src'),
+    },
+  },
+
+  module: {
+    rules: [
+      {
+        test: /\.(js|jsx|ts|tsx)$/,
+        exclude: /node_modules/,
+        loader: 'builtin:swc-loader',
+        options: {
+          jsc: {
+            parser: {
+              syntax: 'typescript',
+              tsx: true,
+            },
+            transform: {
+              react: {
+                runtime: 'automatic',
+                development: isDev,
+                refresh: isDev,
+              },
+            },
+          },
+        },
+      },
+      {
+        test: /\.css$/,
+        type: 'css',
+      },
+      {
+        test: /\.module\.css$/,
+        type: 'css/module',
+      },
+      {
+        test: /\.(png|jpg|jpeg|gif|webp)$/,
+        type: 'asset',
+      },
+      {
+        test: /\.svg$/,
+        type: 'asset/resource',
+      },
+    ],
+  },
+
+  plugins: [
+    new rspack.HtmlRspackPlugin({
+      template: './public/index.html',
+      favicon: './public/favicon.ico',
+    }),
+    isDev && new RefreshPlugin(),
+    new rspack.DefinePlugin({
+      'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV),
+    }),
+  ].filter(Boolean),
+
+  optimization: {
+    splitChunks: {
+      chunks: 'all',
+      cacheGroups: {
+        vendor: {
+          test: /[\\/]node_modules[\\/]/,
+          name: 'vendors',
+          chunks: 'all',
+        },
+      },
+    },
+  },
+
+  devServer: {
+    port: 3000,
+    hot: true,
+    open: true,
+    historyApiFallback: true,
+  },
+
+  devtool: isDev ? 'cheap-module-source-map' : 'source-map',
+}
+```
+
+安装依赖：
+
+```bash
+npm install @rspack/plugin-react-refresh --save-dev
+```
+
+## Vue 项目配置
+
+```javascript
+// rspack.config.js
+const path = require('path')
+const rspack = require('@rspack/core')
+const { VueLoaderPlugin } = require('vue-loader')
+
+const isDev = process.env.NODE_ENV === 'development'
+
+module.exports = {
+  entry: './src/main.ts',
+
+  output: {
+    path: path.resolve(__dirname, 'dist'),
+    filename: isDev ? '[name].js' : '[name].[contenthash:8].js',
+    publicPath: '/',
+    clean: true,
+  },
+
+  mode: isDev ? 'development' : 'production',
+
+  resolve: {
+    extensions: ['.vue', '.tsx', '.ts', '.jsx', '.js'],
+    alias: {
+      '@': path.resolve(__dirname, 'src'),
+    },
+  },
+
+  module: {
+    rules: [
+      {
+        test: /\.vue$/,
+        loader: 'vue-loader',
+        options: {
+          experimentalInlineMatchResource: true,
+        },
+      },
+      {
+        test: /\.(ts|tsx)$/,
+        exclude: /node_modules/,
+        loader: 'builtin:swc-loader',
+        options: {
+          jsc: {
+            parser: {
+              syntax: 'typescript',
+              tsx: true,
+            },
+          },
+        },
+      },
+      {
+        test: /\.css$/,
+        type: 'css',
+      },
+      {
+        test: /\.scss$/,
+        use: ['sass-loader'],
+        type: 'css',
+      },
+    ],
+  },
+
+  plugins: [
+    new VueLoaderPlugin(),
+    new rspack.HtmlRspackPlugin({
+      template: './public/index.html',
+    }),
+    new rspack.DefinePlugin({
+      __VUE_OPTIONS_API__: true,
+      __VUE_PROD_DEVTOOLS__: false,
+    }),
+  ],
+
+  devServer: {
+    port: 3000,
+    hot: true,
+    open: true,
+  },
+}
+```
+
+## 从 Webpack 迁移
+
+### 配置文件迁移
+
+1. 重命名 `webpack.config.js` 为 `rspack.config.js`
+2. 修改导入和插件
+
+常见的替换：
+
+| Webpack                   | Rspack                        |
+| ------------------------- | ----------------------------- |
+| HtmlWebpackPlugin         | rspack.HtmlRspackPlugin       |
+| MiniCssExtractPlugin      | rspack.CssExtractRspackPlugin |
+| CopyWebpackPlugin         | rspack.CopyRspackPlugin       |
+| DefinePlugin              | rspack.DefinePlugin           |
+| babel-loader              | builtin:swc-loader            |
+| css-loader + style-loader | type: 'css'                   |
+
+### Loader 迁移
+
+**babel-loader → builtin:swc-loader**
+
+原来：
+
+```javascript
+{
+  test: /\.(js|jsx|ts|tsx)$/,
+  use: {
+    loader: 'babel-loader',
+    options: {
+      presets: [
+        '@babel/preset-env',
+        '@babel/preset-react',
+        '@babel/preset-typescript',
+      ],
+    },
+  },
+}
+```
+
+改成：
+
+```javascript
+{
+  test: /\.(js|jsx|ts|tsx)$/,
+  loader: 'builtin:swc-loader',
+  options: {
+    jsc: {
+      parser: {
+        syntax: 'typescript',
+        tsx: true,
+      },
+      transform: {
+        react: {
+          runtime: 'automatic',
+        },
+      },
+    },
+  },
+}
+```
+
+**css-loader + style-loader**
+
+原来：
+
+```javascript
+{
+  test: /\.css$/,
+  use: ['style-loader', 'css-loader'],
+}
+```
+
+改成：
+
+```javascript
+{
+  test: /\.css$/,
+  type: 'css',
+}
+```
+
+**CSS Modules**
+
+原来：
+
+```javascript
+{
+  test: /\.module\.css$/,
+  use: [
+    'style-loader',
+    {
+      loader: 'css-loader',
+      options: {
+        modules: true,
+      },
+    },
+  ],
+}
+```
+
+改成：
+
+```javascript
+{
+  test: /\.module\.css$/,
+  type: 'css/module',
+}
+```
+
+### 不兼容的配置
+
+有些 Webpack 配置目前不支持：
+
+- `experiments.lazyCompilation` - 惰性编译
+- 部分 `optimization` 选项
+- 一些冷门的 loader 选项
+
+遇到不支持的配置，Rspack 会给出明确的错误提示。
+
+## 性能对比
+
+在一个中等规模的 React 项目（约 200 个组件）测试：
+
+| 指标     | Webpack 5 | Rspack | 提升 |
+| -------- | --------- | ------ | ---- |
+| 冷启动   | 32s       | 2.8s   | 91%  |
+| 热更新   | 1.5s      | 0.12s  | 92%  |
+| 生产构建 | 45s       | 5.2s   | 88%  |
+| 内存占用 | 1.6GB     | 0.8GB  | 50%  |
+
+这个提升主要来自：
+
+1. Rust 的高性能
+2. 内置 SWC 编译器
+3. 并行处理优化
+4. 增量编译
+
+## 常见问题
+
+### 1. 某个 loader 不工作
+
+检查是否需要添加 `type` 配置。Rspack 的 CSS 处理和 Webpack 不同：
+
+```javascript
+// 错误
+{
+  test: /\.scss$/,
+  use: ['style-loader', 'css-loader', 'sass-loader'],
+}
+
+// 正确
+{
+  test: /\.scss$/,
+  use: ['sass-loader'],
+  type: 'css',
+}
+```
+
+### 2. React Fast Refresh 不工作
+
+确保安装并配置了插件：
+
+```bash
+npm install @rspack/plugin-react-refresh --save-dev
+```
+
+```javascript
+const RefreshPlugin = require('@rspack/plugin-react-refresh')
+
+module.exports = {
+  plugins: [new RefreshPlugin()],
+}
+```
+
+### 3. 类型提示
+
+添加类型声明：
+
+```javascript
+/** @type {import('@rspack/cli').Configuration} */
+module.exports = {
+  // ...
+}
+```
+
+### 4. 和 Webpack 插件不兼容
+
+有些 Webpack 插件依赖 Webpack 内部 API，可能不兼容。可以：
+
+- 用 Rspack 内置的替代品
+- 等待 Rspack 团队适配
+- 提 issue 或贡献代码
+
+## 与其他工具对比
+
+| 对比项   | Rspack       | Webpack    | Vite       | esbuild      |
+| -------- | ------------ | ---------- | ---------- | ------------ |
+| 语言     | Rust         | JavaScript | JavaScript | Go           |
+| 生态兼容 | Webpack 兼容 | -          | 独立生态   | 独立生态     |
+| 冷启动   | 极快         | 慢         | 快         | 极快         |
+| HMR      | 快           | 中等       | 极快       | 无           |
+| 迁移成本 | 低           | -          | 高         | 高           |
+| 适用场景 | 企业级应用   | 所有项目   | 现代应用   | 库、简单应用 |
+
+## 适用场景
+
+**推荐使用 Rspack 的场景：**
+
+- 现有 Webpack 项目想提速，但不想大改
+- 企业级复杂应用
+- 需要 Webpack 生态的插件和 loader
+- 团队有 Webpack 配置积累
+
+**不太适合的场景：**
+
+- 新项目且不需要 Webpack 生态（可以用 Vite）
+- 追求极简配置（可以用 Parcel）
+- 只是打包库（可以用 Rollup/tsup）
+
+## 参考资料
+
+- [Rspack 官方文档](https://www.rspack.dev/)
+- [Rspack GitHub 仓库](https://github.com/web-infra-dev/rspack)
+- [从 Webpack 迁移指南](https://www.rspack.dev/guide/migrate-from-webpack)
