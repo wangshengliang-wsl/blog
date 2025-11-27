@@ -61,7 +61,7 @@ export const UI: Ui = {
       title: 'Changelog',
       displayMode: 'iconToTextOnMobile',
       text: '电影',
-      icon: 'i-heroicon-o-film',
+      icon: 'i-ri-film-line',
     },
   ],
   socialLinks: [
