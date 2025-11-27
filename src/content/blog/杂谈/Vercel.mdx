@@ -1,0 +1,349 @@
+---
+title: Vercel 自动化部署指南
+titleIcon: logos:vercel-icon
+description: Vercel 是最流行的前端部署平台，本文涵盖项目部署、自定义域名、环境变量、Serverless Functions 及最佳实践
+pubDate: 2025-11-17
+toc: true
+ogImage: true
+category: 杂谈
+---
+
+Vercel 是由 Next.js 团队打造的前端云平台，专注于为现代 Web 应用提供极致的部署体验。连接 Git 仓库后，每次提交自动构建部署，配合全球 CDN 和边缘网络，让你的应用触达全球用户。
+
+## 为什么选择 Vercel
+
+| 特性       | 说明                                  |
+| ---------- | ------------------------------------- |
+| 零配置部署 | 自动识别框架，无需配置构建命令        |
+| Git 集成   | 连接 GitHub/GitLab/Bitbucket 自动部署 |
+| 预览部署   | 每个 PR 自动生成预览链接              |
+| 边缘网络   | 全球 CDN，国内访问速度优秀            |
+| Serverless | 内置 Serverless Functions             |
+| 免费额度   | 个人项目完全免费                      |
+
+## 快速开始
+
+### 1. 连接 Git 仓库
+
+1. 访问 [vercel.com](https://vercel.com) 并登录
+2. 点击「Add New Project」
+3. 选择 Git 提供商（GitHub/GitLab/Bitbucket）
+4. 授权并选择仓库
+5. 点击「Deploy」
+
+Vercel 会自动检测框架类型并配置构建命令。
+
+### 2. 支持的框架
+
+Vercel 对以下框架提供一流支持：
+
+```text
+前端框架：
+- Next.js（官方维护）
+- React / Vue / Svelte
+- Astro / Nuxt / Remix
+- Angular / SolidJS
+
+静态站点：
+- Vite
+- Create React App
+- Gatsby
+- Hugo / Jekyll
+```
+
+### 3. 项目设置
+
+部署时可自定义配置：
+
+| 配置项           | 说明                         |
+| ---------------- | ---------------------------- |
+| Framework Preset | 框架类型（自动检测）         |
+| Build Command    | 构建命令，如 `npm run build` |
+| Output Directory | 输出目录，如 `dist`、`.next` |
+| Install Command  | 安装命令，如 `npm install`   |
+| Root Directory   | 项目根目录（Monorepo 场景）  |
+
+## 自定义域名
+
+### 添加域名
+
+1. 项目设置 → Domains
+2. 输入域名，如 `example.com`
+3. 按提示配置 DNS 记录
+
+### DNS 配置
+
+**A 记录（推荐）**：
+
+```text
+类型: A
+名称: @
+值: 76.76.21.21
+```
+
+**CNAME 记录**：
+
+```text
+类型: CNAME
+名称: www
+值: cname.vercel-dns.com
+```
+
+### HTTPS
+
+Vercel 自动为所有域名配置免费 SSL 证书，无需手动操作。
+
+## 环境变量
+
+### 配置方式
+
+项目设置 → Environment Variables
+
+```text
+变量名: DATABASE_URL
+值: postgres://user:pass@host:5432/db
+环境: Production / Preview / Development
+```
+
+### 环境类型
+
+| 环境        | 说明                    |
+| ----------- | ----------------------- |
+| Production  | 生产环境（主分支）      |
+| Preview     | 预览环境（其他分支/PR） |
+| Development | 本地开发（vercel dev）  |
+
+### 敏感变量
+
+敏感信息（API Key 等）会被加密存储，不会暴露在构建日志中。
+
+### 在代码中使用
+
+```javascript
+// Next.js
+const apiKey = process.env.API_KEY
+
+// 前端环境变量需要 NEXT_PUBLIC_ 前缀
+const publicKey = process.env.NEXT_PUBLIC_STRIPE_KEY
+```
+
+## Serverless Functions
+
+Vercel 支持在 `api/` 目录下创建 Serverless Functions。
+
+### 创建 API 路由
+
+```text
+项目结构：
+├── api/
+│   ├── hello.js      → /api/hello
+│   └── users/
+│       └── [id].js   → /api/users/:id
+└── ...
+```
+
+### 示例代码
+
+```javascript
+// api/hello.js
+export default function handler(req, res) {
+  res.status(200).json({ message: 'Hello World' })
+}
+```
+
+```typescript
+// api/users/[id].ts (TypeScript)
+import type { VercelRequest, VercelResponse } from '@vercel/node'
+
+export default function handler(req: VercelRequest, res: VercelResponse) {
+  const { id } = req.query
+  res.status(200).json({ userId: id })
+}
+```
+
+### Edge Functions
+
+边缘函数在全球边缘节点运行，延迟更低：
+
+```typescript
+// api/edge.ts
+export const config = {
+  runtime: 'edge',
+}
+
+export default function handler(request: Request) {
+  return new Response('Hello from Edge!')
+}
+```
+
+## vercel.json 配置
+
+在项目根目录创建 `vercel.json` 自定义配置：
+
+```json
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "framework": "vite",
+  "rewrites": [{ "source": "/(.*)", "destination": "/" }],
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [{ "key": "Access-Control-Allow-Origin", "value": "*" }]
+    }
+  ],
+  "redirects": [
+    { "source": "/old-path", "destination": "/new-path", "permanent": true }
+  ]
+}
+```
+
+### 常用配置
+
+| 配置项        | 用途                 |
+| ------------- | -------------------- |
+| rewrites      | URL 重写（SPA 路由） |
+| redirects     | URL 重定向           |
+| headers       | 自定义响应头         |
+| cleanUrls     | 去除 .html 后缀      |
+| trailingSlash | 控制尾部斜杠         |
+
+## Vercel CLI
+
+### 安装
+
+```bash
+npm install -g vercel
+```
+
+### 常用命令
+
+```bash
+# 登录
+vercel login
+
+# 部署（开发环境）
+vercel
+
+# 部署到生产
+vercel --prod
+
+# 本地开发（模拟 Vercel 环境）
+vercel dev
+
+# 拉取环境变量到本地
+vercel env pull .env.local
+
+# 查看部署日志
+vercel logs <deployment-url>
+```
+
+## 团队协作
+
+### 预览部署
+
+每个 Pull Request 自动生成独立的预览链接：
+
+```text
+https://project-git-feature-branch-team.vercel.app
+```
+
+PR 页面会自动显示预览链接和部署状态。
+
+### 部署保护
+
+可为预览部署添加密码保护：
+
+```text
+项目设置 → Deployment Protection → Password Protection
+```
+
+### 评论功能
+
+Vercel 提供实时评论功能，团队成员可直接在预览页面标注反馈。
+
+## 与其他平台对比
+
+| 特性         | Vercel   | Netlify | Cloudflare Pages |
+| ------------ | -------- | ------- | ---------------- |
+| 框架支持     | 极佳     | 好      | 好               |
+| 构建速度     | 快       | 中      | 快               |
+| 边缘函数     | ✅       | ✅      | ✅               |
+| 免费额度     | 充足     | 充足    | 非常充足         |
+| 国内速度     | 好       | 一般    | 优秀             |
+| Next.js 支持 | 官方最佳 | 好      | 好               |
+
+## 最佳实践
+
+### 1. 构建优化
+
+```json
+// package.json
+{
+  "scripts": {
+    "build": "next build",
+    "vercel-build": "prisma generate && next build"
+  }
+}
+```
+
+### 2. 缓存策略
+
+```json
+// vercel.json
+{
+  "headers": [
+    {
+      "source": "/static/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    }
+  ]
+}
+```
+
+### 3. Monorepo 部署
+
+```json
+// vercel.json
+{
+  "framework": "nextjs",
+  "installCommand": "pnpm install",
+  "buildCommand": "pnpm build --filter=web"
+}
+```
+
+设置 Root Directory 为子项目路径。
+
+## 常见问题
+
+### 构建失败
+
+1. 检查构建日志定位错误
+2. 确认 Node.js 版本（Settings → General）
+3. 确认环境变量是否配置
+
+### 404 错误
+
+SPA 应用需要配置 rewrites：
+
+```json
+{
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+}
+```
+
+### 函数超时
+
+Serverless Functions 默认超时 10 秒（Hobby 计划）。Pro 计划可延长至 60 秒。
+
+## 参考资料
+
+- [Vercel 官方文档](https://vercel.com/docs)
+- [Vercel CLI 文档](https://vercel.com/docs/cli)
+- [Next.js 部署指南](https://nextjs.org/docs/deployment)
+- [Vercel 定价](https://vercel.com/pricing)

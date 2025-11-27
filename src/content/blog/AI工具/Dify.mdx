@@ -1,8 +1,476 @@
 ---
-title: dify
-description: dify
+title: Dify 完全指南
+description: Dify 是一款开源的 LLM 应用开发平台，本文涵盖本地部署、应用编排、RAG 知识库、Agent 开发、API 集成及生产最佳实践
 pubDate: 2025-11-13
 toc: true
 ogImage: true
 category: AI工具
 ---
+
+Dify 是一款开源的 LLM 应用开发平台，提供从 Prompt 编排、RAG 引擎、Agent 框架到 LLMOps 的完整工具链。支持对接 OpenAI、Claude、本地模型等多种 LLM，可快速构建生产级 AI 应用。
+
+> 本文基于 Dify v0.8.x 编写。
+
+## 为什么选择 Dify
+
+| 特性       | Dify          | LangChain | Flowise       |
+| ---------- | ------------- | --------- | ------------- |
+| 类型       | 可视化平台    | 代码框架  | 可视化平台    |
+| 开源       | ✅ Apache 2.0 | ✅ MIT    | ✅ Apache 2.0 |
+| 自部署     | ✅            | -         | ✅            |
+| 学习曲线   | 低            | 高        | 低            |
+| RAG 引擎   | ✅ 内置       | 需要代码  | ✅ 内置       |
+| 工作流     | ✅ 可视化     | 需要代码  | ✅ 可视化     |
+| 多模型支持 | ✅ 丰富       | ✅ 丰富   | ✅ 中等       |
+| API 支持   | ✅ 原生       | 需要封装  | ✅ 原生       |
+
+Dify 的定位是「AI 应用的快速开发平台」，适合：
+
+- 需要快速验证 AI 应用想法
+- 非技术人员构建 AI 应用
+- 企业级 RAG 知识库应用
+- LLM 应用的生产化部署
+
+## 快速部署
+
+### Docker Compose（推荐）
+
+```bash
+# 克隆仓库
+git clone https://github.com/langgenius/dify.git
+cd dify/docker
+
+# 复制配置文件
+cp .env.example .env
+
+# 启动服务
+docker compose up -d
+```
+
+首次启动需要拉取镜像，耐心等待。启动后访问 `http://localhost/install` 完成初始化设置。
+
+### 配置说明
+
+编辑 `.env` 文件配置关键参数：
+
+```bash
+# 密钥（生产环境必须修改）
+SECRET_KEY=your-secret-key
+
+# 数据库
+DB_USERNAME=postgres
+DB_PASSWORD=your-password
+DB_HOST=db
+DB_PORT=5432
+DB_DATABASE=dify
+
+# Redis
+REDIS_HOST=redis
+REDIS_PORT=6379
+REDIS_PASSWORD=your-redis-password
+
+# 存储（支持 S3、Azure Blob 等）
+STORAGE_TYPE=local
+STORAGE_LOCAL_PATH=storage
+```
+
+### 服务组件
+
+Dify 由多个服务组成：
+
+| 服务     | 端口 | 说明              |
+| -------- | ---- | ----------------- |
+| web      | 3000 | 前端界面          |
+| api      | 5001 | 后端 API          |
+| worker   | -    | 后台任务处理      |
+| db       | 5432 | PostgreSQL 数据库 |
+| redis    | 6379 | 缓存和消息队列    |
+| weaviate | 8080 | 向量数据库        |
+| sandbox  | -    | 代码执行沙箱      |
+
+## 模型配置
+
+### 添加模型供应商
+
+设置 → 模型供应商 → 添加模型
+
+**OpenAI**：
+
+```text
+API Key: sk-xxxxx
+API Base: https://api.openai.com/v1 (或代理地址)
+```
+
+**Claude**：
+
+```text
+API Key: sk-ant-xxxxx
+```
+
+**本地模型（Ollama）**：
+
+```bash
+# 先安装 Ollama 并拉取模型
+ollama pull llama2
+
+# Dify 中配置
+Base URL: http://host.docker.internal:11434
+```
+
+### 模型类型
+
+| 类型           | 用途       | 示例             |
+| -------------- | ---------- | ---------------- |
+| LLM            | 文本生成   | GPT-4、Claude    |
+| Text Embedding | 文本向量化 | text-embedding-3 |
+| Rerank         | 重排序     | cohere-rerank    |
+| Speech-to-Text | 语音转文字 | Whisper          |
+| Text-to-Speech | 文字转语音 | OpenAI TTS       |
+
+## 应用类型
+
+Dify 支持四种应用类型：
+
+### 1. 聊天助手（Chat）
+
+多轮对话应用，适合客服、问答场景。
+
+**配置要点**：
+
+- 人设 Prompt
+- 开场白
+- 建议问题
+- 对话变量
+
+### 2. 文本生成（Completion）
+
+单次输入输出，适合内容生成、翻译等。
+
+**配置要点**：
+
+- 任务 Prompt
+- 输入变量
+- 输出格式
+
+### 3. Agent
+
+具备工具调用能力的智能体，可执行复杂任务。
+
+**配置要点**：
+
+- 选择工具
+- 定义任务目标
+- 设置推理模式（ReAct/Function Calling）
+
+### 4. 工作流（Workflow）
+
+可视化编排复杂流程，支持条件分支、循环等。
+
+**节点类型**：
+
+```text
+- 开始：定义输入
+- LLM：调用大模型
+- 知识检索：RAG 查询
+- 代码执行：Python/JavaScript
+- 条件分支：IF/ELSE
+- 迭代：循环处理
+- HTTP 请求：调用外部 API
+- 结束：输出结果
+```
+
+## RAG 知识库
+
+RAG（检索增强生成）是 Dify 的核心能力，让 LLM 基于私有数据回答问题。
+
+### 创建知识库
+
+知识库 → 创建知识库 → 上传文档
+
+**支持的数据源**：
+
+- 本地文件：PDF、Word、TXT、Markdown、HTML
+- 同步网页：自动抓取网页内容
+- Notion：同步 Notion 页面
+- 飞书/语雀：同步在线文档
+
+### 文档处理配置
+
+| 配置项     | 说明               |
+| ---------- | ------------------ |
+| 切分方式   | 自动/自定义        |
+| 切分长度   | 每个块的最大字符数 |
+| 切分重叠   | 块之间重叠的字符数 |
+| 文本预处理 | 清洗规则           |
+| 索引模式   | 高质量/经济        |
+
+**索引模式对比**：
+
+```text
+高质量模式：
+- 使用 Embedding 模型向量化
+- 查询时语义匹配
+- 效果好，成本高
+
+经济模式：
+- 使用关键词倒排索引
+- 查询时关键词匹配
+- 成本低，效果一般
+```
+
+### 召回策略
+
+| 策略     | 说明               |
+| -------- | ------------------ |
+| 向量检索 | 语义相似度匹配     |
+| 全文检索 | 关键词匹配         |
+| 混合检索 | 两者结合，效果更好 |
+
+**Rerank**：
+
+启用 Rerank 模型对召回结果重新排序，可显著提升准确率。
+
+### 关联到应用
+
+在应用编排中添加「知识检索」节点或启用「上下文」：
+
+```text
+应用 → 编排 → 上下文 → 添加知识库
+```
+
+配置召回参数：
+
+- Top K：返回结果数量
+- Score 阈值：相似度下限
+- 检索模式：向量/全文/混合
+
+## 工具开发
+
+### 内置工具
+
+Dify 提供了一些内置工具：
+
+```text
+- 天气查询
+- 网页搜索（Google/Bing/SerpAPI）
+- 维基百科
+- WolframAlpha
+- 代码解释器
+- DALL-E 绘图
+```
+
+### 自定义工具
+
+支持通过 OpenAPI Schema 接入外部 API：
+
+```yaml
+openapi: 3.0.0
+info:
+  title: Stock API
+  version: 1.0.0
+paths:
+  /stock/{symbol}:
+    get:
+      operationId: getStockPrice
+      summary: 获取股票价格
+      parameters:
+        - name: symbol
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+```
+
+导入后即可在 Agent 中使用。
+
+### 工作流工具
+
+将工作流发布为工具，供其他应用调用：
+
+```text
+工作流 → 发布 → 发布为工具
+```
+
+## API 集成
+
+### 获取 API Key
+
+应用 → 访问 API → 创建 API 密钥
+
+### 对话接口
+
+```bash
+curl -X POST 'https://your-dify-url/v1/chat-messages' \
+  -H 'Authorization: Bearer app-xxxxx' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "inputs": {},
+    "query": "你好",
+    "response_mode": "streaming",
+    "conversation_id": "",
+    "user": "user-123"
+  }'
+```
+
+### SDK 使用
+
+**Python**：
+
+```python
+from dify_client import ChatClient
+
+client = ChatClient(api_key="app-xxxxx")
+response = client.create_chat_message(
+    query="你好",
+    user="user-123"
+)
+print(response.answer)
+```
+
+**JavaScript**：
+
+```javascript
+import { DifyClient } from 'dify-client'
+
+const client = new DifyClient({
+  apiKey: 'app-xxxxx',
+})
+
+const response = await client.chatMessages({
+  query: '你好',
+  user: 'user-123',
+})
+```
+
+## 生产部署
+
+### 性能优化
+
+**1. 数据库优化**
+
+```bash
+# 使用外部 PostgreSQL
+DB_HOST=your-rds-host
+DB_PORT=5432
+```
+
+**2. 向量数据库**
+
+生产环境推荐使用 Qdrant 或 Milvus 替代 Weaviate：
+
+```bash
+VECTOR_STORE=qdrant
+QDRANT_URL=http://qdrant:6333
+```
+
+**3. 缓存**
+
+使用 Redis 集群提升性能：
+
+```bash
+REDIS_HOST=redis-cluster
+REDIS_USE_SSL=true
+```
+
+### 高可用部署
+
+```yaml
+# 多副本 API 服务
+services:
+  api:
+    deploy:
+      replicas: 3
+    # 配置负载均衡
+```
+
+### 安全配置
+
+```bash
+# 限制 CORS
+WEB_API_CORS_ALLOW_ORIGINS=https://your-domain.com
+
+# 启用 HTTPS
+NGINX_HTTPS_ENABLED=true
+NGINX_SSL_CERT_FILENAME=cert.pem
+NGINX_SSL_CERT_KEY_FILENAME=key.pem
+```
+
+## 实战案例
+
+### 案例一：企业知识库问答
+
+**需求**：基于内部文档回答员工问题
+
+**实现**：
+
+1. 创建知识库，上传产品文档、规章制度
+2. 创建聊天助手，配置专业人设
+3. 关联知识库，启用混合检索 + Rerank
+4. 发布 API，嵌入企业 IM
+
+### 案例二：智能客服 Agent
+
+**需求**：自动处理客户咨询、查询订单
+
+**实现**：
+
+1. 创建 Agent 应用
+2. 接入工具：订单查询、物流追踪
+3. 添加知识库：FAQ、产品说明
+4. 配置工作流：意图识别 → 路由处理
+5. 对接客服系统
+
+### 案例三：内容生成工作流
+
+**需求**：自动生成 SEO 文章
+
+**实现**：
+
+```text
+[输入关键词] → [搜索热点] → [生成大纲] → [分段生成]
+              → [合并润色] → [SEO 优化] → [输出文章]
+```
+
+## 常见问题
+
+### 向量化失败
+
+检查 Embedding 模型是否配置正确，API Key 是否有效。
+
+### 知识库检索不准
+
+1. 调整切分策略
+2. 启用混合检索
+3. 添加 Rerank 模型
+4. 优化查询 Prompt
+
+### Docker 启动失败
+
+```bash
+# 查看日志
+docker compose logs -f
+
+# 常见问题
+- 端口被占用：修改 .env 中的端口
+- 内存不足：增加 Docker 内存限制
+- 网络问题：配置代理或使用国内镜像
+```
+
+### 升级 Dify
+
+```bash
+cd dify/docker
+git pull
+docker compose pull
+docker compose up -d
+```
+
+## 参考资料
+
+- [Dify 官方文档](https://docs.dify.ai/)
+- [Dify GitHub](https://github.com/langgenius/dify)
+- [Dify API 文档](https://docs.dify.ai/api-reference)
+- [Dify 社区](https://github.com/langgenius/dify/discussions)
