@@ -23,28 +23,32 @@ const { collectionType, idx, item, isDiffMonth } = Astro.props
 const isOrg =
   collectionType === 'releases'
     ? item.repoIsInOrganization
-    : item.repository.isInOrganization
+    : item.repository?.isInOrganization ?? false
 
 const mainLogoSrc = item.mainLogo
 const mainLogoAlt =
   collectionType === 'releases'
-    ? item.repoNameWithOwner
-    : item.repository.nameWithOwner
+    ? item.repoNameWithOwner ?? ''
+    : item.repository?.nameWithOwner ?? ''
 const subLogoSrc = item.subLogo
 
-const firstLinkHref = item.url
-const firstLinkText = collectionType === 'releases' ? item.pkgName : item.title
+const firstLinkHref = item.url as string
+const firstLinkText = collectionType === 'releases' ? item.pkgName : (item.title ?? '')
 
 const secondLinkHref =
-  collectionType === 'releases' ? item.repoUrl : item.repository.url
+  collectionType === 'releases' 
+    ? (item.repoUrl ?? '') 
+    : (item.repository?.url ?? '')
 const secondLinkText =
   collectionType === 'releases'
-    ? item.repoNameWithOwner
-    : item.repository.nameWithOwner
+    ? item.repoNameWithOwner ?? ''
+    : item.repository?.nameWithOwner ?? ''
 
-const time = collectionType === 'releases' ? item.publishedAt : item.createdAt
+const time = (collectionType === 'releases' ? item.publishedAt : item.createdAt) as string
 const content =
-  collectionType === 'releases' ? item.descriptionHTML : item.bodyHTML
+  collectionType === 'releases' 
+    ? (item.descriptionHTML ?? '') 
+    : (item.bodyHTML ?? '')
 ---
 
 <details
@@ -123,7 +127,7 @@ const content =
           {collectionType === 'prs' && <span>#{item.number}</span>}
         </Link>
         <time class="op-60 text-sm lt-sm:text-3.2" datetime={time} title={time}>
-          {formatDate(time, false)}
+          {formatDate(time as string | Date, false)}
         </time>
       </div>
     </div>

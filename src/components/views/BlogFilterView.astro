@@ -250,7 +250,6 @@ for (const [category, posts] of categorizedBlogItems) {
   class BlogFilterView extends HTMLElement {
     private categories: string[] = []
     private posts: TocPostData[] = []
-    private currentCategory = 'all'
     private isExpanded = false
 
     connectedCallback() {
@@ -378,7 +377,6 @@ for (const [category, posts] of categorizedBlogItems) {
     }
 
     private filterByCategory(category: string) {
-      this.currentCategory = category
       // 保存到 localStorage
       localStorage.setItem('blog-filter-category', category)
       const postItems = this.querySelectorAll('.post-item')

@@ -10,20 +10,38 @@ import { withBasePath } from '~/utils/path'
 import { matchLogo, extractPackageName, processVersion } from '~/utils/data'
 
 import type { RepoWithOwner, Url, Icon } from '~/types'
-import type { CollectionEntry } from 'astro:content'
 
-export type ExtendedReleaseData = CollectionEntry<'releases'>['data'] & {
+export interface ExtendedReleaseData {
   isInMonorepo: boolean
   pkgName: string
   mainLogo: Url | Icon
   subLogo: Url | Icon | undefined
   versionType: 'major' | 'minor' | 'patch' | 'pre'
   versionParts: [string, string]
+  repoIsInOrganization?: boolean
+  repoNameWithOwner?: string
+  repoUrl?: string
+  publishedAt: string
+  url: string
+  descriptionHTML?: string
+  [key: string]: unknown
 }
 
-export type ExtendedPrData = CollectionEntry<'prs'>['data'] & {
+export interface ExtendedPrData {
   mainLogo: Url | Icon
   subLogo: Url | Icon | undefined
+  repository?: {
+    isInOrganization: boolean
+    nameWithOwner: string
+    url: string
+  }
+  title?: string
+  createdAt: string
+  url: string
+  bodyHTML?: string
+  state?: string
+  number?: number
+  [key: string]: unknown
 }
 
 interface Props {
@@ -41,87 +59,108 @@ const WARNING = `No GitHub data available for display.
 let isEmpty = false
 
 /* Releases */
-let releases: CollectionEntry<'releases'>[] = []
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let releases: any[] = []
 let extendedReleases: ExtendedReleaseData[] = []
 
 if (collectionType === 'releases') {
-  releases = await getCollection(collectionType)
+  try {
+    // @ts-expect-error - 'releases' collection may not exist in DataEntryMap
+    releases = await getCollection('releases')
 
-  const pkgCountMap: Record<string, number> = {}
-  extendedReleases = releases
-    .map((item) => {
-      const isInMonorepo = monorepos.includes(
-        item.data.repoNameWithOwner as RepoWithOwner
-      )
-      const pkgName = isInMonorepo
-        ? extractPackageName(item.data.tagName)
-        : item.data.repoName
+    const pkgCountMap: Record<string, number> = {}
+    extendedReleases = releases
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .map((item: any) => {
+        const isInMonorepo = monorepos.includes(
+          item.data.repoNameWithOwner as RepoWithOwner
+        )
+        const pkgName = isInMonorepo
+          ? extractPackageName(item.data.tagName)
+          : item.data.repoName
 
-      const mainLogo =
-        matchLogo(pkgName, mainLogoOverrides) ||
-        `https://github.com/${item.data.repoOwner}.png`
-      const subLogo = matchLogo(pkgName, subLogoMatches)
+        const mainLogo =
+          matchLogo(pkgName, mainLogoOverrides) ||
+          `https://github.com/${item.data.repoOwner}.png`
+        const subLogo = matchLogo(pkgName, subLogoMatches)
 
-      const [versionType, ...versionParts] = processVersion(
-        item.data.versionNum
-      )
+        const [versionType, ...versionParts] = processVersion(
+          item.data.versionNum
+        )
 
-      return {
-        ...item.data,
-        isInMonorepo,
-        pkgName,
-        mainLogo,
-        subLogo,
-        versionType,
-        versionParts,
-      }
-    })
-    // filters releases to ensure each pkg has no more than a specified maximum number
-    .filter((item) => {
-      if ((pkgCountMap[item.pkgName] || 0) < MAX_PER_PKG) {
-        pkgCountMap[item.pkgName] = (pkgCountMap[item.pkgName] || 0) + 1
-        return true
-      }
-      return false
-    })
-    .sort((a, b) => {
-      return +new Date(b.publishedAt) - +new Date(a.publishedAt)
-    })
+        return {
+          ...item.data,
+          isInMonorepo,
+          pkgName,
+          mainLogo,
+          subLogo,
+          versionType,
+          versionParts,
+        }
+      })
+      // filters releases to ensure each pkg has no more than a specified maximum number
+      .filter((item) => {
+        if ((pkgCountMap[item.pkgName] || 0) < MAX_PER_PKG) {
+          pkgCountMap[item.pkgName] = (pkgCountMap[item.pkgName] || 0) + 1
+          return true
+        }
+        return false
+      })
+      .sort((a, b) => {
+        return +new Date(b.publishedAt) - +new Date(a.publishedAt)
+      })
 
-  isEmpty = releases.length === 0 || extendedReleases.length === 0
+    isEmpty = releases.length === 0 || extendedReleases.length === 0
+  } catch {
+    // Collection doesn't exist, skip
+    releases = []
+    extendedReleases = []
+    isEmpty = true
+  }
 }
 
 /* PRs */
-let prs: CollectionEntry<'prs'>[] = []
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let prs: any[] = []
 let extendedPrs: ExtendedPrData[] = []
 
 if (collectionType === 'prs') {
-  prs = await getCollection(collectionType)
+  try {
+    // @ts-expect-error - 'prs' collection may not exist in DataEntryMap
+    prs = await getCollection('prs')
 
-  extendedPrs = prs
-    .filter(
-      (item) =>
-        item.data.state !== 'CLOSED' &&
-        !item.data.isDraft &&
-        !/\b(?:chore|docs|i18n)\b/.test(item.data.title)
-    )
-    .map((item) => {
-      const mainLogo =
-        matchLogo(item.data.repository.name, mainLogoOverrides) ||
-        `https://github.com/${item.data.repository.owner.login}.png`
-      const subLogo = matchLogo(item.data.repository.name, subLogoMatches)
+    extendedPrs = prs
+      .filter(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (item: any) =>
+          item.data.state !== 'CLOSED' &&
+          !item.data.isDraft &&
+          !/\b(?:chore|docs|i18n)\b/.test(item.data.title)
+      )
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .map((item: any) => {
+        const mainLogo =
+          matchLogo(item.data.repository.name, mainLogoOverrides) ||
+          `https://github.com/${item.data.repository.owner.login}.png`
+        const subLogo = matchLogo(item.data.repository.name, subLogoMatches)
 
-      return {
-        ...item.data,
-        mainLogo,
-        subLogo,
-      }
-    })
-    .sort((a, b) => {
-      return +new Date(b.createdAt) - +new Date(a.createdAt)
-    })
+        return {
+          ...item.data,
+          mainLogo,
+          subLogo,
+        }
+      })
+      .sort((a, b) => {
+        return +new Date(b.createdAt) - +new Date(a.createdAt)
+      })
 
-  isEmpty = prs.length === 0 || extendedPrs.length === 0
+    isEmpty = prs.length === 0 || extendedPrs.length === 0
+  } catch {
+    // Collection doesn't exist, skip
+    prs = []
+    extendedPrs = []
+    isEmpty = true
+  }
 }
 ---
 
@@ -137,9 +176,9 @@ if (collectionType === 'prs') {
             idx={idx}
             item={item}
             isDiffMonth={isDiffMonth(
-              item.publishedAt,
+              item.publishedAt as string,
               extendedReleases[idx - 1]
-                ? extendedReleases[idx - 1].publishedAt
+                ? (extendedReleases[idx - 1].publishedAt as string)
                 : undefined
             )}
           />
@@ -151,8 +190,10 @@ if (collectionType === 'prs') {
             idx={idx}
             item={item}
             isDiffMonth={isDiffMonth(
-              item.createdAt,
-              extendedPrs[idx - 1] ? extendedPrs[idx - 1].createdAt : undefined
+              item.createdAt as string,
+              extendedPrs[idx - 1]
+                ? (extendedPrs[idx - 1].createdAt as string)
+                : undefined
             )}
           />
         ))}

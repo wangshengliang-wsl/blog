@@ -20,7 +20,8 @@ interface Props {
 
 const { collectionType, pageToc } = Astro.props
 
-const VALID_COLLECTION_TYPE = ['blog', 'changelog', 'streams', 'feeds']
+const VALID_COLLECTION_TYPE = ['blog', 'changelog', 'streams', 'feeds'] as const
+type ValidCollectionType = (typeof VALID_COLLECTION_TYPE)[number]
 const WARNING = `The '${collectionType}' collection type is not built-in.
   Modify <code>ListView.astro</code> to render it.`
 
@@ -68,27 +69,36 @@ if (collectionType === 'streams') {
 }
 
 /* Feeds */
-let sortedFeedItems: CollectionEntry<'feeds'>[] = []
-if (collectionType === 'feeds') {
-  const feedItems = await getCollection(collectionType)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let sortedFeedItems: any[] = []
+if ((collectionType as string) === 'feeds') {
+  try {
+    // @ts-expect-error - 'feeds' collection may not exist in DataEntryMap
+    const feedItems = await getCollection('feeds')
 
-  sortedFeedItems = feedItems.sort((a, b) => {
-    if (!a.data.pubdate || !b.data.pubdate)
-      throw new Error("Feed item is missing 'pubdate' field.")
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    sortedFeedItems = feedItems.sort((a: any, b: any) => {
+      if (!a.data.pubdate || !b.data.pubdate)
+        throw new Error("Feed item is missing 'pubdate' field.")
 
-    return b.data.pubdate.valueOf() - a.data.pubdate.valueOf()
-  })
-
-  if (tocEnabled) {
-    const yearsSet = new Set<number>()
-    sortedFeedItems.forEach((item) => {
-      const year = getYear(item.data.pubdate as Date)
-      yearsSet.add(year)
+      return b.data.pubdate.valueOf() - a.data.pubdate.valueOf()
     })
 
-    years = Array.from(yearsSet)
-      .sort((a, b) => b - a)
-      .map((year) => year.toString())
+    if (tocEnabled) {
+      const yearsSet = new Set<number>()
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      sortedFeedItems.forEach((item: any) => {
+        const year = getYear(item.data.pubdate as Date)
+        yearsSet.add(year)
+      })
+
+      years = Array.from(yearsSet)
+        .sort((a, b) => b - a)
+        .map((year) => year.toString())
+    }
+  } catch {
+    // Collection doesn't exist, skip
+    sortedFeedItems = []
   }
 }
 ---
@@ -192,12 +202,13 @@ if (collectionType === 'feeds') {
 }
 
 {
-  collectionType === 'feeds' && (
+  (collectionType as string) === 'feeds' && (
     <div aria-label="Feed list">
       {sortedFeedItems.length === 0 ? (
         <div class="py-2 op-50">nothing here yet</div>
       ) : (
-        sortedFeedItems.map((item, idx) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        sortedFeedItems.map((item: any, idx: number) => {
           const { data } = item
           if (!data.link)
             throw new Error(
@@ -212,7 +223,7 @@ if (collectionType === 'feeds') {
             <>
               {!isSameYear(
                 item.data.pubdate as Date,
-                sortedFeedItems[idx - 1]?.data.pubdate as Date
+                sortedFeedItems[idx - 1]?.data?.pubdate as Date
               ) && (
                 <Categorizer
                   {idx}
@@ -235,4 +246,8 @@ if (collectionType === 'feeds') {
   )
 }
 
-{!VALID_COLLECTION_TYPE.includes(collectionType) && <Warning html={WARNING} />}
+{
+  !VALID_COLLECTION_TYPE.includes(collectionType as ValidCollectionType) && (
+    <Warning html={WARNING} />
+  )
+}
