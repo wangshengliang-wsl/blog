@@ -110,7 +110,7 @@ for (const [category, posts] of categorizedBlogItems) {
             id="filter-tags"
           >
             {/* 全部标签 */}
-            <button type="button" class="filter-tag active" data-category="all">
+            <button type="button" class="filter-tag" data-category="all">
               全部
               <span class="tag-count">({sortedBlogItems.length})</span>
             </button>
@@ -135,7 +135,7 @@ for (const [category, posts] of categorizedBlogItems) {
       </div>
 
       {/* 文章列表 */}
-      <div aria-label="Post list" id="blog-post-list">
+      <div aria-label="Post list" id="blog-post-list" class="mt-10">
         {postsWithReadTime.map(
           ({ post, minutesRead, category, globalIdx }, idx) => {
             const { data, id } = post
@@ -262,8 +262,10 @@ for (const [category, posts] of categorizedBlogItems) {
     private init() {
       this.setupFilterTags()
       this.setupExpandButton()
-      this.checkNeedExpand()
+      // 先恢复分类状态（避免跳动）
       this.restoreCategoryFromStorage()
+      // 再检查是否需要展开按钮和自动展开
+      this.checkNeedExpandAndAutoExpand()
     }
 
     private setupFilterTags() {
@@ -286,7 +288,7 @@ for (const [category, posts] of categorizedBlogItems) {
       })
     }
 
-    private checkNeedExpand() {
+    private checkNeedExpandAndAutoExpand() {
       const tagsWrapper = this.querySelector(
         '.blog-filter-tags-wrapper'
       ) as HTMLElement
@@ -301,23 +303,49 @@ for (const [category, posts] of categorizedBlogItems) {
         if (tags.scrollHeight > singleLineHeight) {
           tagsWrapper.classList.add('collapsed')
           expandBtn.classList.remove('hidden')
+
+          // 检查当前激活的标签是否在折叠区域
+          const activeTag = this.querySelector(
+            '.filter-tag.active'
+          ) as HTMLElement
+          if (activeTag) {
+            this.expandIfTagHidden(activeTag)
+          }
         }
       })
     }
 
     private restoreCategoryFromStorage() {
       const savedCategory = localStorage.getItem('blog-filter-category')
-      if (
+      const categoryToRestore =
         savedCategory &&
         (savedCategory === 'all' || this.categories.includes(savedCategory))
-      ) {
-        const targetTag = this.querySelector(
-          `.filter-tag[data-category="${savedCategory}"]`
-        ) as HTMLElement
-        if (targetTag) {
-          this.filterByCategory(savedCategory)
-          this.updateActivetag(targetTag)
+          ? savedCategory
+          : 'all'
+
+      const targetTag = this.querySelector(
+        `.filter-tag[data-category="${categoryToRestore}"]`
+      ) as HTMLElement
+
+      if (targetTag) {
+        if (categoryToRestore !== 'all') {
+          this.filterByCategory(categoryToRestore)
         }
+        this.updateActivetag(targetTag)
+      }
+    }
+
+    private expandIfTagHidden(tag: HTMLElement) {
+      const tagsWrapper = this.querySelector(
+        '.blog-filter-tags-wrapper'
+      ) as HTMLElement
+      if (!tagsWrapper || !tagsWrapper.classList.contains('collapsed')) return
+
+      // 检查标签是否超出可见区域（单行高度约 40px）
+      const singleLineHeight = 40
+      if (tag.offsetTop >= singleLineHeight) {
+        // 标签在折叠区域，自动展开
+        this.toggleExpand()
       }
     }
 
