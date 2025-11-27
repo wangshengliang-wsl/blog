@@ -1,0 +1,511 @@
+---
+title: Astro 路由与页面
+description: 深入理解 Astro 的文件路由系统，涵盖静态路由、动态路由、API 端点、重定向及 404 页面处理
+pubDate: 2025-11-27
+toc: true
+ogImage: true
+category: Astro
+---
+
+Astro 采用基于文件的路由系统，`src/pages/` 目录下的文件自动映射为 URL 路径。支持静态路由、动态路由、API 端点等多种路由形式。
+
+> 本文基于 Astro v5.x 编写。
+
+## 文件路由基础
+
+### 路由映射规则
+
+`src/pages/` 目录下的文件自动生成对应路由：
+
+```text
+src/pages/
+├── index.astro        → /
+├── about.astro        → /about
+├── blog/
+│   ├── index.astro    → /blog
+│   ├── post-1.astro   → /blog/post-1
+│   └── post-2.astro   → /blog/post-2
+└── contact.astro      → /contact
+```
+
+### 支持的文件类型
+
+| 文件类型  | 用途                   |
+| --------- | ---------------------- |
+| `.astro`  | Astro 页面组件         |
+| `.md`     | Markdown 页面          |
+| `.mdx`    | MDX 页面（需安装集成） |
+| `.html`   | 纯 HTML 页面           |
+| `.js/.ts` | API 端点               |
+
+### 基础页面示例
+
+```astro
+---
+// src/pages/about.astro
+import Layout from '../layouts/Layout.astro'
+
+const title = '关于我们'
+const description = '了解更多关于我们的信息'
+---
+
+<Layout title={title} description={description}>
+  <main>
+    <h1>{title}</h1>
+    <p>这是关于页面的内容...</p>
+  </main>
+</Layout>
+```
+
+## 静态路由
+
+### 嵌套路由
+
+目录结构映射为 URL 路径：
+
+```text
+src/pages/
+├── products/
+│   ├── index.astro      → /products
+│   ├── shirts/
+│   │   ├── index.astro  → /products/shirts
+│   │   └── blue.astro   → /products/shirts/blue
+│   └── pants.astro      → /products/pants
+```
+
+### index 页面
+
+每个目录的 `index.astro` 作为该目录的默认页面：
+
+```astro
+---
+// src/pages/blog/index.astro
+import Layout from '../../layouts/Layout.astro'
+import { getCollection } from 'astro:content'
+
+const posts = await getCollection('blog')
+---
+
+<Layout title="博客">
+  <h1>所有文章</h1>
+  <ul>
+    {
+      posts.map((post) => (
+        <li>
+          <a href={`/blog/${post.slug}`}>{post.data.title}</a>
+        </li>
+      ))
+    }
+  </ul>
+</Layout>
+```
+
+## 动态路由
+
+动态路由使用方括号 `[]` 语法定义动态参数。
+
+### 基本动态路由
+
+```astro
+---
+// src/pages/blog/[slug].astro
+import Layout from '../../layouts/Layout.astro'
+import { getCollection } from 'astro:content'
+
+// 静态模式必须导出 getStaticPaths
+export async function getStaticPaths() {
+  const posts = await getCollection('blog')
+
+  return posts.map((post) => ({
+    params: { slug: post.slug },
+    props: { post },
+  }))
+}
+
+const { post } = Astro.props
+const { Content } = await post.render()
+---
+
+<Layout title={post.data.title}>
+  <article>
+    <h1>{post.data.title}</h1>
+    <time>{post.data.pubDate.toLocaleDateString()}</time>
+    <Content />
+  </article>
+</Layout>
+```
+
+### 多级动态路由
+
+```astro
+---
+// src/pages/[category]/[slug].astro
+export async function getStaticPaths() {
+  const posts = await getCollection('blog')
+
+  return posts.map((post) => ({
+    params: {
+      category: post.data.category,
+      slug: post.slug,
+    },
+    props: { post },
+  }))
+}
+
+const { category, slug } = Astro.params
+const { post } = Astro.props
+---
+```
+
+URL 示例：`/tech/my-article`、`/life/travel-notes`
+
+### 剩余参数（Rest Parameters）
+
+捕获多级路径：
+
+```astro
+---
+// src/pages/docs/[...path].astro
+export async function getStaticPaths() {
+  return [
+    { params: { path: 'getting-started' } },
+    { params: { path: 'guides/routing' } },
+    { params: { path: 'guides/content/collections' } },
+  ]
+}
+
+const { path } = Astro.params
+// path 可能是 'getting-started' 或 'guides/routing' 等
+---
+```
+
+URL 映射：
+
+```text
+/docs/getting-started         → path = 'getting-started'
+/docs/guides/routing          → path = 'guides/routing'
+/docs/guides/content/collections → path = 'guides/content/collections'
+```
+
+### 分页
+
+Astro 内置分页支持：
+
+```astro
+---
+// src/pages/blog/[...page].astro
+import { getCollection } from 'astro:content'
+
+export async function getStaticPaths({ paginate }) {
+  const posts = await getCollection('blog')
+
+  // 按日期排序
+  const sortedPosts = posts.sort(
+    (a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf()
+  )
+
+  // 每页 10 篇
+  return paginate(sortedPosts, { pageSize: 10 })
+}
+
+const { page } = Astro.props
+---
+
+<h1>博客文章</h1>
+
+<ul>
+  {page.data.map((post) => <li>{post.data.title}</li>)}
+</ul>
+
+<nav>
+  {page.url.prev && <a href={page.url.prev}>上一页</a>}
+  <span>第 {page.currentPage} 页，共 {page.lastPage} 页</span>
+  {page.url.next && <a href={page.url.next}>下一页</a>}
+</nav>
+```
+
+`page` 对象属性：
+
+| 属性               | 说明                   |
+| ------------------ | ---------------------- |
+| `page.data`        | 当前页数据             |
+| `page.currentPage` | 当前页码               |
+| `page.lastPage`    | 总页数                 |
+| `page.total`       | 总条目数               |
+| `page.url.prev`    | 上一页 URL（可能为空） |
+| `page.url.next`    | 下一页 URL（可能为空） |
+
+## API 端点
+
+在 `src/pages/` 中创建 `.js` 或 `.ts` 文件定义 API 端点。
+
+### GET 请求
+
+```typescript
+// src/pages/api/posts.json.ts
+import type { APIRoute } from 'astro'
+import { getCollection } from 'astro:content'
+
+export const GET: APIRoute = async () => {
+  const posts = await getCollection('blog')
+
+  const data = posts.map((post) => ({
+    slug: post.slug,
+    title: post.data.title,
+    pubDate: post.data.pubDate,
+  }))
+
+  return new Response(JSON.stringify(data), {
+    headers: { 'Content-Type': 'application/json' },
+  })
+}
+```
+
+### POST 请求
+
+```typescript
+// src/pages/api/contact.ts
+import type { APIRoute } from 'astro'
+
+export const POST: APIRoute = async ({ request }) => {
+  const formData = await request.formData()
+  const name = formData.get('name')
+  const email = formData.get('email')
+  const message = formData.get('message')
+
+  // 处理表单数据...
+
+  return new Response(JSON.stringify({ success: true }), { status: 200 })
+}
+```
+
+### 动态 API 端点
+
+```typescript
+// src/pages/api/users/[id].ts
+import type { APIRoute } from 'astro'
+
+export const GET: APIRoute = async ({ params }) => {
+  const { id } = params
+
+  // 获取用户数据...
+  const user = { id, name: 'User ' + id }
+
+  return new Response(JSON.stringify(user), {
+    headers: { 'Content-Type': 'application/json' },
+  })
+}
+```
+
+### SSR 模式下的 API
+
+静态模式需要预生成所有端点。SSR 模式下可动态处理：
+
+```javascript
+// astro.config.mjs
+export default defineConfig({
+  output: 'server', // 或 'hybrid'
+})
+```
+
+## 重定向
+
+### 配置文件重定向
+
+```javascript
+// astro.config.mjs
+export default defineConfig({
+  redirects: {
+    '/old-page': '/new-page',
+    '/blog/[...slug]': '/articles/[...slug]',
+    '/external': 'https://example.com',
+  },
+})
+```
+
+### 页面内重定向
+
+```astro
+---
+// src/pages/old-page.astro
+return Astro.redirect('/new-page', 301)
+---
+```
+
+### 条件重定向
+
+```astro
+---
+const isLoggedIn = checkAuth()
+
+if (!isLoggedIn) {
+  return Astro.redirect('/login')
+}
+---
+
+<h1>欢迎回来</h1>
+```
+
+## 404 页面
+
+创建 `src/pages/404.astro` 处理未匹配的路由：
+
+```astro
+---
+// src/pages/404.astro
+import Layout from '../layouts/Layout.astro'
+---
+
+<Layout title="页面未找到">
+  <main class="error-page">
+    <h1>404</h1>
+    <p>抱歉，您访问的页面不存在</p>
+    <a href="/">返回首页</a>
+  </main>
+</Layout>
+
+<style>
+  .error-page {
+    text-align: center;
+    padding: 4rem;
+  }
+
+  h1 {
+    font-size: 6rem;
+    margin: 0;
+  }
+</style>
+```
+
+## 路由优先级
+
+当多个路由可能匹配同一 URL 时，Astro 按以下优先级处理：
+
+1. 静态路由（无参数）
+2. 具名动态路由（`[named]`）
+3. 剩余参数路由（`[...rest]`）
+
+```text
+src/pages/
+├── posts/
+│   ├── create.astro      → /posts/create（最高优先级）
+│   ├── [id].astro        → /posts/123
+│   └── [...slug].astro   → /posts/a/b/c（最低优先级）
+```
+
+## 链接导航
+
+### 使用 a 标签
+
+```astro
+<a href="/about">关于我们</a>
+<a href="/blog/post-1">文章一</a>
+```
+
+### 动态链接
+
+```astro
+---
+const posts = await getCollection('blog')
+---
+
+<ul>
+  {
+    posts.map((post) => (
+      <li>
+        <a href={`/blog/${post.slug}`}>{post.data.title}</a>
+      </li>
+    ))
+  }
+</ul>
+```
+
+### 获取当前路径
+
+```astro
+---
+const currentPath = Astro.url.pathname
+const isActive = (path) => currentPath === path
+---
+
+<nav>
+  <a href="/" class:list={[{ active: isActive('/') }]}>首页</a>
+  <a href="/about" class:list={[{ active: isActive('/about') }]}>关于</a>
+  <a href="/blog" class:list={[{ active: currentPath.startsWith('/blog') }]}
+    >博客</a
+  >
+</nav>
+```
+
+## 国际化路由
+
+### 目录结构
+
+```text
+src/pages/
+├── en/
+│   ├── index.astro      → /en
+│   └── about.astro      → /en/about
+├── zh/
+│   ├── index.astro      → /zh
+│   └── about.astro      → /zh/about
+└── index.astro          → /（默认语言）
+```
+
+### 使用 i18n 配置
+
+```javascript
+// astro.config.mjs
+export default defineConfig({
+  i18n: {
+    defaultLocale: 'zh',
+    locales: ['zh', 'en'],
+    routing: {
+      prefixDefaultLocale: false,
+    },
+  },
+})
+```
+
+## 最佳实践
+
+### 1. 合理组织目录
+
+```text
+src/pages/
+├── api/              # API 端点
+├── blog/             # 博客相关
+├── docs/             # 文档相关
+├── index.astro       # 首页
+├── about.astro       # 关于页
+└── 404.astro         # 404 页
+```
+
+### 2. 使用布局组件
+
+为不同类型页面创建专用布局：
+
+```text
+src/layouts/
+├── BaseLayout.astro     # 基础布局
+├── BlogLayout.astro     # 博客布局
+└── DocsLayout.astro     # 文档布局
+```
+
+### 3. 类型安全
+
+```astro
+---
+import type { GetStaticPaths } from 'astro'
+
+export const getStaticPaths = (async () => {
+  // ...
+}) satisfies GetStaticPaths
+---
+```
+
+## 参考资料
+
+- [Astro 路由文档](https://docs.astro.build/zh-cn/core-concepts/routing/)
+- [API 端点](https://docs.astro.build/zh-cn/core-concepts/endpoints/)
+- [国际化](https://docs.astro.build/zh-cn/guides/internationalization/)

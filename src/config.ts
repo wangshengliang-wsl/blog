@@ -131,7 +131,7 @@ export const UI: Ui = {
  *  - Set to `[true, {...}]` to enable and configure the feature.
  */
 export const FEATURES: Features = {
-  slideEnterAnim: [true, { enterStep: 10 }],
+  slideEnterAnim: [true, { enterStep: 1 }],
   ogImage: [
     true,
     {

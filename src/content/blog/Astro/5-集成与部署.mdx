@@ -1,0 +1,609 @@
+---
+title: Astro 集成与部署
+description: 掌握 Astro 常用集成配置，涵盖 UI 框架、SSR 适配器、SEO 优化、图片处理及主流平台部署方案
+pubDate: 2025-11-27
+toc: true
+ogImage: true
+category: Astro
+---
+
+Astro 通过集成（Integrations）扩展功能，支持添加 UI 框架、SSR 适配器、工具链等。本文介绍常用集成和各平台部署方案。
+
+> 本文基于 Astro v5.x 编写。
+
+## 集成管理
+
+### 添加集成
+
+```bash
+# 使用 astro add（推荐）
+npx astro add react
+npx astro add tailwind
+npx astro add vercel
+
+# 手动安装
+npm install @astrojs/react
+```
+
+`astro add` 会自动：
+
+- 安装依赖
+- 更新 `astro.config.mjs`
+- 添加必要的配置文件
+
+### 配置集成
+
+```javascript
+// astro.config.mjs
+import { defineConfig } from 'astro/config'
+import react from '@astrojs/react'
+import tailwind from '@astrojs/tailwind'
+import vercel from '@astrojs/vercel/serverless'
+
+export default defineConfig({
+  integrations: [
+    react(),
+    tailwind({
+      applyBaseStyles: false,
+    }),
+  ],
+  output: 'server',
+  adapter: vercel(),
+})
+```
+
+## UI 框架集成
+
+### React
+
+```bash
+npx astro add react
+```
+
+```javascript
+// astro.config.mjs
+import react from '@astrojs/react'
+
+export default defineConfig({
+  integrations: [
+    react({
+      include: ['**/react/*'], // 指定目录
+    }),
+  ],
+})
+```
+
+### Vue
+
+```bash
+npx astro add vue
+```
+
+```javascript
+import vue from '@astrojs/vue'
+
+export default defineConfig({
+  integrations: [
+    vue({
+      appEntrypoint: '/src/pages/_app',
+    }),
+  ],
+})
+```
+
+### Svelte
+
+```bash
+npx astro add svelte
+```
+
+### Solid
+
+```bash
+npx astro add solid-js
+```
+
+### 多框架共存
+
+```javascript
+import react from '@astrojs/react'
+import vue from '@astrojs/vue'
+import svelte from '@astrojs/svelte'
+
+export default defineConfig({
+  integrations: [
+    react({ include: ['**/react/*'] }),
+    vue({ include: ['**/vue/*'] }),
+    svelte({ include: ['**/svelte/*'] }),
+  ],
+})
+```
+
+## 样式集成
+
+### Tailwind CSS
+
+```bash
+npx astro add tailwind
+```
+
+自动生成 `tailwind.config.mjs`：
+
+```javascript
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: ['./src/**/*.{astro,html,js,jsx,md,mdx,svelte,ts,tsx,vue}'],
+  theme: {
+    extend: {},
+  },
+  plugins: [],
+}
+```
+
+### UnoCSS
+
+```bash
+npm install unocss
+npx astro add unocss
+```
+
+```javascript
+// uno.config.ts
+import { defineConfig, presetUno, presetIcons, presetTypography } from 'unocss'
+
+export default defineConfig({
+  presets: [presetUno(), presetIcons(), presetTypography()],
+})
+```
+
+## 内容集成
+
+### MDX
+
+```bash
+npx astro add mdx
+```
+
+```javascript
+import mdx from '@astrojs/mdx'
+
+export default defineConfig({
+  integrations: [
+    mdx({
+      syntaxHighlight: 'shiki',
+      shikiConfig: { theme: 'github-dark' },
+      remarkPlugins: [],
+      rehypePlugins: [],
+    }),
+  ],
+})
+```
+
+### Markdoc
+
+```bash
+npx astro add markdoc
+```
+
+适合需要自定义组件的文档站点。
+
+## SEO 与性能
+
+### Sitemap
+
+```bash
+npx astro add sitemap
+```
+
+```javascript
+import sitemap from '@astrojs/sitemap'
+
+export default defineConfig({
+  site: 'https://example.com',
+  integrations: [
+    sitemap({
+      filter: (page) => !page.includes('/draft/'),
+      changefreq: 'weekly',
+      priority: 0.7,
+    }),
+  ],
+})
+```
+
+构建后生成 `sitemap-index.xml`。
+
+### Partytown
+
+将第三方脚本移至 Web Worker：
+
+```bash
+npx astro add partytown
+```
+
+```astro
+<head>
+  <!-- Google Analytics -->
+  <script
+    type="text/partytown"
+    src="https://www.googletagmanager.com/gtag/js?id=G-XXXX"></script>
+</head>
+```
+
+### 图片优化
+
+Astro 内置图片优化，无需额外集成：
+
+```astro
+---
+import { Image } from 'astro:assets'
+import heroImage from '../assets/hero.jpg'
+---
+
+<Image
+  src={heroImage}
+  alt="Hero"
+  width={800}
+  height={400}
+  format="webp"
+  quality={80}
+/>
+```
+
+## SSR 适配器
+
+默认情况下 Astro 生成静态站点。使用适配器启用服务端渲染。
+
+### 输出模式
+
+```javascript
+export default defineConfig({
+  // 'static' - 完全静态（默认）
+  // 'server' - 完全 SSR
+  // 'hybrid' - 混合模式
+  output: 'hybrid',
+})
+```
+
+### Vercel
+
+```bash
+npx astro add vercel
+```
+
+```javascript
+import vercel from '@astrojs/vercel/serverless'
+
+export default defineConfig({
+  output: 'server',
+  adapter: vercel({
+    webAnalytics: { enabled: true },
+  }),
+})
+```
+
+### Netlify
+
+```bash
+npx astro add netlify
+```
+
+```javascript
+import netlify from '@astrojs/netlify'
+
+export default defineConfig({
+  output: 'server',
+  adapter: netlify({
+    edgeMiddleware: true,
+  }),
+})
+```
+
+### Cloudflare
+
+```bash
+npx astro add cloudflare
+```
+
+```javascript
+import cloudflare from '@astrojs/cloudflare'
+
+export default defineConfig({
+  output: 'server',
+  adapter: cloudflare({
+    mode: 'directory',
+  }),
+})
+```
+
+### Node.js
+
+```bash
+npx astro add node
+```
+
+```javascript
+import node from '@astrojs/node'
+
+export default defineConfig({
+  output: 'server',
+  adapter: node({
+    mode: 'standalone', // 或 'middleware'
+  }),
+})
+```
+
+启动服务：
+
+```bash
+node ./dist/server/entry.mjs
+```
+
+## 部署方案
+
+### Vercel
+
+**静态部署**：
+
+1. 连接 GitHub 仓库
+2. Vercel 自动检测 Astro
+3. 零配置部署
+
+**SSR 部署**：
+
+```javascript
+// astro.config.mjs
+import vercel from '@astrojs/vercel/serverless'
+
+export default defineConfig({
+  output: 'server',
+  adapter: vercel(),
+})
+```
+
+### Netlify
+
+**netlify.toml**：
+
+```toml
+[build]
+  command = "npm run build"
+  publish = "dist"
+```
+
+**SSR 配置**：
+
+```javascript
+import netlify from '@astrojs/netlify'
+
+export default defineConfig({
+  output: 'server',
+  adapter: netlify(),
+})
+```
+
+### Cloudflare Pages
+
+1. 连接 Git 仓库
+2. 构建命令：`npm run build`
+3. 输出目录：`dist`
+
+**SSR 配置**：
+
+```javascript
+import cloudflare from '@astrojs/cloudflare'
+
+export default defineConfig({
+  output: 'server',
+  adapter: cloudflare(),
+})
+```
+
+### GitHub Pages
+
+```yaml
+# .github/workflows/deploy.yml
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - run: npm run build
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/deploy-pages@v4
+        id: deployment
+```
+
+```javascript
+// astro.config.mjs
+export default defineConfig({
+  site: 'https://username.github.io',
+  base: '/repo-name',
+})
+```
+
+### Docker
+
+**Dockerfile**：
+
+```dockerfile
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
+
+FROM node:20-alpine AS runner
+WORKDIR /app
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/node_modules ./node_modules
+COPY package.json .
+
+ENV HOST=0.0.0.0
+ENV PORT=4321
+EXPOSE 4321
+
+CMD ["node", "./dist/server/entry.mjs"]
+```
+
+需要 Node 适配器：
+
+```javascript
+import node from '@astrojs/node'
+
+export default defineConfig({
+  output: 'server',
+  adapter: node({ mode: 'standalone' }),
+})
+```
+
+### 自托管（PM2）
+
+```bash
+# 构建
+npm run build
+
+# 使用 PM2 运行
+pm2 start dist/server/entry.mjs --name astro-app
+```
+
+## 环境变量
+
+### 配置环境变量
+
+```bash
+# .env
+PUBLIC_API_URL=https://api.example.com
+SECRET_API_KEY=sk-xxxxx
+```
+
+### 使用环境变量
+
+```astro
+---
+// 服务端可访问所有变量
+const secretKey = import.meta.env.SECRET_API_KEY
+
+// 客户端只能访问 PUBLIC_ 前缀的变量
+const apiUrl = import.meta.env.PUBLIC_API_URL
+---
+```
+
+### 类型定义
+
+```typescript
+// src/env.d.ts
+/// <reference types="astro/client" />
+
+interface ImportMetaEnv {
+  readonly PUBLIC_API_URL: string
+  readonly SECRET_API_KEY: string
+}
+
+interface ImportMeta {
+  readonly env: ImportMetaEnv
+}
+```
+
+## 常用集成推荐
+
+| 集成                | 用途             |
+| ------------------- | ---------------- |
+| `@astrojs/react`    | React 组件支持   |
+| `@astrojs/vue`      | Vue 组件支持     |
+| `@astrojs/tailwind` | Tailwind CSS     |
+| `@astrojs/mdx`      | MDX 支持         |
+| `@astrojs/sitemap`  | 站点地图生成     |
+| `@astrojs/rss`      | RSS 订阅         |
+| `astro-icon`        | 图标组件         |
+| `astro-seo`         | SEO 组件         |
+| `@astrojs/image`    | 图片优化（内置） |
+
+## 最佳实践
+
+### 1. 按需添加集成
+
+只添加需要的集成，避免不必要的依赖。
+
+### 2. 静态优先
+
+能用静态生成就不用 SSR：
+
+```javascript
+// hybrid 模式：默认静态，按需 SSR
+export default defineConfig({
+  output: 'hybrid',
+})
+```
+
+```astro
+---
+// 标记此页面需要 SSR
+export const prerender = false
+---
+```
+
+### 3. 优化构建
+
+```javascript
+export default defineConfig({
+  build: {
+    inlineStylesheets: 'auto',
+  },
+  compressHTML: true,
+  vite: {
+    build: {
+      cssMinify: true,
+    },
+  },
+})
+```
+
+### 4. 缓存策略
+
+```javascript
+// vercel.json
+{
+  "headers": [
+    {
+      "source": "/_astro/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    }
+  ]
+}
+```
+
+## 参考资料
+
+- [Astro 集成目录](https://astro.build/integrations/)
+- [部署指南](https://docs.astro.build/zh-cn/guides/deploy/)
+- [SSR 适配器](https://docs.astro.build/zh-cn/guides/server-side-rendering/)
+- [环境变量](https://docs.astro.build/zh-cn/guides/environment-variables/)

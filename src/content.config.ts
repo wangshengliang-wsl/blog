@@ -1,9 +1,9 @@
 import { glob, file } from 'astro/loaders'
 import { defineCollection } from 'astro:content'
 
-import { feedLoader } from '@ascorbic/feed-loader'
-import { githubReleasesLoader } from 'astro-loader-github-releases'
-import { githubPrsLoader } from 'astro-loader-github-prs'
+// import { feedLoader } from '@ascorbic/feed-loader'
+// import { githubReleasesLoader } from 'astro-loader-github-releases'
+// import { githubPrsLoader } from 'astro-loader-github-prs'
 
 import {
   pageSchema,
@@ -32,29 +32,30 @@ const projects = defineCollection({
   schema: projectSchema,
 })
 
-const releases = defineCollection({
-  loader: githubReleasesLoader({
-    mode: 'repoList',
-    repos: [
-      'withastro/astro',
-      'withastro/starlight',
-      'lin-stephanie/astro-loaders',
-      'lin-stephanie/astro-antfustyle-theme',
-    ],
-    monthsBack: 2,
-    entryReturnType: 'byRelease',
-    clearStore: true,
-  }),
-})
+// 注释掉需要 GitHub Token 的 loader，避免开发时报错
+// const releases = defineCollection({
+//   loader: githubReleasesLoader({
+//     mode: 'repoList',
+//     repos: [
+//       'withastro/astro',
+//       'withastro/starlight',
+//       'lin-stephanie/astro-loaders',
+//       'lin-stephanie/astro-antfustyle-theme',
+//     ],
+//     monthsBack: 2,
+//     entryReturnType: 'byRelease',
+//     clearStore: true,
+//   }),
+// })
 
-const prs = defineCollection({
-  loader: githubPrsLoader({
-    search:
-      'repo:withastro/astro repo:withastro/starlight repo:lin-stephanie/astro-antfustyle-theme',
-    monthsBack: 1,
-    clearStore: true,
-  }),
-})
+// const prs = defineCollection({
+//   loader: githubPrsLoader({
+//     search:
+//       'repo:withastro/astro repo:withastro/starlight repo:lin-stephanie/astro-antfustyle-theme',
+//     monthsBack: 1,
+//     clearStore: true,
+//   }),
+// })
 
 const photos = defineCollection({
   loader: file('src/content/photos/data.json'),
@@ -74,21 +75,22 @@ const streams = defineCollection({
   schema: streamSchema,
 })
 
-const feeds = defineCollection({
-  loader: feedLoader({
-    url: 'https://astro.build/rss.xml',
-  }),
-})
+// 注释掉需要网络请求的 loader，避免开发时网络超时报错
+// const feeds = defineCollection({
+//   loader: feedLoader({
+//     url: 'https://astro.build/rss.xml',
+//   }),
+// })
 
 export const collections = {
   pages,
   home,
   blog,
   projects,
-  releases,
-  prs,
+  // releases,
+  // prs,
   photos,
   changelog,
   streams,
-  feeds,
+  // feeds,
 }

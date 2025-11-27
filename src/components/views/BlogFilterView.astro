@@ -1,0 +1,418 @@
+---
+import { render } from 'astro:content'
+
+import Categorizer from '~/components/base/Categorizer.astro'
+import ListItem from '~/components/views/ListItem.astro'
+// import Toc from '~/components/toc/Toc.astro'
+import Warning from '~/components/base/Warning.astro'
+
+import { FEATURES } from '~/config'
+import { getFilteredPosts, getPostsByCategory } from '~/utils/data'
+import { slug } from '~/utils/toc'
+
+import type { CollectionEntry } from 'astro:content'
+
+interface Props {
+  pageToc: boolean
+}
+
+const { pageToc } = Astro.props
+
+const WARNING = `No content available for display.`
+
+/* Toc */
+const { toc } = FEATURES
+const tocEnabled = Array.isArray(toc) && toc[0] && pageToc
+
+/* Posts */
+const blogItems = await getFilteredPosts('blog')
+const categorizedBlogItems = getPostsByCategory(blogItems)
+const sortedBlogItems = categorizedBlogItems.flatMap(([_, posts]) => posts)
+
+const categories = categorizedBlogItems.map(([category]) => category)
+const isEmpty = sortedBlogItems.length === 0
+
+// 预处理文章数据，添加阅读时间
+interface PostWithReadTime {
+  post: CollectionEntry<'blog' | 'changelog'>
+  minutesRead: number
+  category: string
+  globalIdx: number
+}
+
+const postsWithReadTime: PostWithReadTime[] = []
+let globalIdx = 0
+
+// 用于 TOC 的文章数据
+interface TocPostData {
+  title: string
+  slug: string
+  category: string
+}
+const tocPostsData: TocPostData[] = []
+
+for (const [category, posts] of categorizedBlogItems) {
+  for (const post of posts) {
+    const { remarkPluginFrontmatter } = await render(post)
+    const minutesRead =
+      post.data.minutesRead || remarkPluginFrontmatter.minutesRead
+    postsWithReadTime.push({
+      post,
+      minutesRead,
+      category,
+      globalIdx: globalIdx++,
+    })
+    // 收集 TOC 数据
+    tocPostsData.push({
+      title: post.data.title,
+      slug: post.id,
+      category,
+    })
+  }
+}
+---
+
+{
+  isEmpty ? (
+    <Warning html={WARNING} />
+  ) : (
+    <blog-filter-view
+      data-categories={JSON.stringify(categories)}
+      data-posts={JSON.stringify(tocPostsData)}
+    >
+      {/* TOC - 动态更新 */}
+      {tocEnabled && (
+        <aside>
+          <nav class="toc-desktop toc-desktop-content" id="blog-filter-toc">
+            <div class="toc-desktop-anchor i-ri-menu-2-fill" />
+            <ul id="blog-filter-toc-list">
+              {categories.map((cat) => (
+                <li>
+                  <a
+                    href={`#${slug(cat)}`}
+                    aria-label={`Scroll to ${cat}`}
+                    class="border-b-none!"
+                  >
+                    {cat}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </nav>
+        </aside>
+      )}
+
+      {/* 筛选器标签栏 */}
+      <div class="blog-filter-container mb-6">
+        <div class="blog-filter-tags-wrapper relative overflow-hidden">
+          <div
+            class="blog-filter-tags flex flex-wrap gap-2 transition-all duration-300"
+            id="filter-tags"
+          >
+            {/* 全部标签 */}
+            <button type="button" class="filter-tag active" data-category="all">
+              全部
+              <span class="tag-count">({sortedBlogItems.length})</span>
+            </button>
+            {/* 分类标签 */}
+            {categorizedBlogItems.map(([category, posts]) => (
+              <button type="button" class="filter-tag" data-category={category}>
+                {category}
+                <span class="tag-count">({posts.length})</span>
+              </button>
+            ))}
+          </div>
+        </div>
+        {/* 展开/收起按钮 */}
+        <button
+          type="button"
+          class="expand-btn mt-2 text-sm op-60 hover:op-100 transition-opacity hidden"
+          id="expand-btn"
+        >
+          <span class="expand-text">展开更多</span>
+          <span class="i-ri-arrow-down-s-line align-middle ml-1" />
+        </button>
+      </div>
+
+      {/* 文章列表 */}
+      <div aria-label="Post list" id="blog-post-list">
+        {postsWithReadTime.map(
+          ({ post, minutesRead, category, globalIdx }, idx) => {
+            const { data, id } = post
+            const isFirstInCategory =
+              idx === 0 || postsWithReadTime[idx - 1]?.category !== category
+
+            return (
+              <div class="post-item" data-category={category}>
+                {isFirstInCategory && (
+                  <Categorizer
+                    idx={globalIdx}
+                    needId={tocEnabled}
+                    text={category}
+                  />
+                )}
+                <ListItem
+                  idx={globalIdx}
+                  collectionType="blog"
+                  redirect={data.redirect}
+                  postSlug={id}
+                  title={data.title}
+                  titleIcon={data.titleIcon}
+                  video={data.video}
+                  radio={data.radio}
+                  date={data.pubDate}
+                  {minutesRead}
+                  platform={data.platform}
+                />
+              </div>
+            )
+          }
+        )}
+      </div>
+    </blog-filter-view>
+  )
+}
+
+<style>
+  .filter-tag {
+    padding: 0.375rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.875rem;
+    border: none;
+    background: rgba(0, 0, 0, 0.03);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+  }
+
+  .filter-tag:hover {
+    background: rgba(0, 0, 0, 0.06);
+  }
+
+  .filter-tag.active {
+    background: rgba(0, 0, 0, 0.09);
+    font-weight: 500;
+  }
+
+  :global(.dark) .filter-tag {
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  :global(.dark) .filter-tag:hover {
+    background: rgba(255, 255, 255, 0.15);
+  }
+
+  :global(.dark) .filter-tag.active {
+    background: rgba(255, 255, 255, 0.2);
+  }
+
+  .filter-tag .tag-count {
+    opacity: 0.5;
+    font-size: 0.75rem;
+    margin-left: 0.25rem;
+  }
+
+  .blog-filter-tags-wrapper.collapsed .blog-filter-tags {
+    max-height: 2.5rem;
+    overflow: hidden;
+  }
+
+  .expand-btn {
+    display: inline-flex;
+    align-items: center;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: inherit;
+  }
+
+  .expand-btn.expanded .i-ri-arrow-down-s-line {
+    transform: rotate(180deg);
+  }
+
+  .post-item.hidden {
+    display: none;
+  }
+
+  /* TOC 隐藏的分类链接 */
+  #blog-filter-toc li.hidden {
+    display: none;
+  }
+</style>
+
+<script>
+  interface TocPostData {
+    title: string
+    slug: string
+    category: string
+  }
+
+  class BlogFilterView extends HTMLElement {
+    private categories: string[] = []
+    private posts: TocPostData[] = []
+    private currentCategory = 'all'
+    private isExpanded = false
+
+    connectedCallback() {
+      this.categories = JSON.parse(this.dataset.categories || '[]')
+      this.posts = JSON.parse(this.dataset.posts || '[]')
+      this.init()
+    }
+
+    private init() {
+      this.setupFilterTags()
+      this.setupExpandButton()
+      this.checkNeedExpand()
+    }
+
+    private setupFilterTags() {
+      const tags = this.querySelectorAll('.filter-tag')
+      tags.forEach((tag) => {
+        tag.addEventListener('click', () => {
+          const category = (tag as HTMLElement).dataset.category || 'all'
+          this.filterByCategory(category)
+          this.updateActivetag(tag as HTMLElement)
+        })
+      })
+    }
+
+    private setupExpandButton() {
+      const expandBtn = this.querySelector('#expand-btn') as HTMLButtonElement
+      if (!expandBtn) return
+
+      expandBtn.addEventListener('click', () => {
+        this.toggleExpand()
+      })
+    }
+
+    private checkNeedExpand() {
+      const tagsWrapper = this.querySelector(
+        '.blog-filter-tags-wrapper'
+      ) as HTMLElement
+      const tags = this.querySelector('.blog-filter-tags') as HTMLElement
+      const expandBtn = this.querySelector('#expand-btn') as HTMLButtonElement
+
+      if (!tagsWrapper || !tags || !expandBtn) return
+
+      // 检查是否需要展开按钮
+      requestAnimationFrame(() => {
+        const singleLineHeight = 40 // 单行高度约 40px
+        if (tags.scrollHeight > singleLineHeight) {
+          tagsWrapper.classList.add('collapsed')
+          expandBtn.classList.remove('hidden')
+        }
+      })
+    }
+
+    private toggleExpand() {
+      const tagsWrapper = this.querySelector(
+        '.blog-filter-tags-wrapper'
+      ) as HTMLElement
+      const expandBtn = this.querySelector('#expand-btn') as HTMLButtonElement
+      const expandText = expandBtn?.querySelector('.expand-text')
+
+      if (!tagsWrapper || !expandBtn || !expandText) return
+
+      this.isExpanded = !this.isExpanded
+
+      if (this.isExpanded) {
+        tagsWrapper.classList.remove('collapsed')
+        expandBtn.classList.add('expanded')
+        expandText.textContent = '收起'
+      } else {
+        tagsWrapper.classList.add('collapsed')
+        expandBtn.classList.remove('expanded')
+        expandText.textContent = '展开更多'
+      }
+    }
+
+    private updateActivetag(activeTag: HTMLElement) {
+      const tags = this.querySelectorAll('.filter-tag')
+      tags.forEach((tag) => tag.classList.remove('active'))
+      activeTag.classList.add('active')
+    }
+
+    private filterByCategory(category: string) {
+      this.currentCategory = category
+      const postItems = this.querySelectorAll('.post-item')
+
+      // 用于追踪每个分类的第一篇文章
+      const categoryFirstPost = new Map<string, boolean>()
+
+      postItems.forEach((item) => {
+        const itemCategory = (item as HTMLElement).dataset.category
+        const categorizer = item.querySelector('.toc-heading')
+
+        if (category === 'all') {
+          // 显示所有文章
+          item.classList.remove('hidden')
+          // 显示分类标题（如果是该分类的第一篇）
+          if (categorizer) {
+            if (!categoryFirstPost.has(itemCategory!)) {
+              categoryFirstPost.set(itemCategory!, true)
+              ;(categorizer as HTMLElement).style.display = ''
+            }
+          }
+        } else {
+          // 筛选特定分类
+          if (itemCategory === category) {
+            item.classList.remove('hidden')
+            // 隐藏分类标题（因为已经通过筛选器选中了分类）
+            if (categorizer) {
+              ;(categorizer as HTMLElement).style.display = 'none'
+            }
+          } else {
+            item.classList.add('hidden')
+            if (categorizer) {
+              ;(categorizer as HTMLElement).style.display = 'none'
+            }
+          }
+        }
+      })
+
+      // 更新 TOC
+      this.updateToc(category)
+    }
+
+    private updateToc(category: string) {
+      const tocList = document.querySelector('#blog-filter-toc-list')
+      if (!tocList) return
+
+      // 清空现有内容
+      tocList.innerHTML = ''
+
+      if (category === 'all') {
+        // 显示所有分类
+        this.categories.forEach((cat) => {
+          const li = document.createElement('li')
+          const a = document.createElement('a')
+          a.href = `#${this.slugify(cat)}`
+          a.setAttribute('aria-label', `Scroll to ${cat}`)
+          a.className = 'border-b-none!'
+          a.textContent = cat
+          li.appendChild(a)
+          tocList.appendChild(li)
+        })
+      } else {
+        // 显示该分类下的文章标题
+        const categoryPosts = this.posts.filter((p) => p.category === category)
+        categoryPosts.forEach((post) => {
+          const li = document.createElement('li')
+          const a = document.createElement('a')
+          a.href = `/blog/${post.slug}/`
+          a.setAttribute('aria-label', `Go to ${post.title}`)
+          a.className = 'border-b-none!'
+          a.textContent = post.title
+          li.appendChild(a)
+          tocList.appendChild(li)
+        })
+      }
+    }
+
+    private slugify(text: string): string {
+      return text.toLowerCase().replace(/[\s\\/]+/g, '-')
+    }
+  }
+
+  customElements.define('blog-filter-view', BlogFilterView)
+</script>

@@ -8,7 +8,7 @@ ogImage: true
 
 import BaseLayout from '~/layouts/BaseLayout.astro'
 import StandardLayout from '~/layouts/StandardLayout.astro'
-import ListView from '~/components/views/ListView.astro'
+import BlogFilterView from '~/components/views/BlogFilterView.astro'
 
 <BaseLayout
   title={frontmatter.title}
@@ -21,6 +21,6 @@ import ListView from '~/components/views/ListView.astro'
     title={frontmatter.title}
     subtitle={frontmatter.subtitle}
   >
-    <ListView collectionType="blog" pageToc={frontmatter.toc} />
+    <BlogFilterView pageToc={frontmatter.toc} />
   </StandardLayout>
 </BaseLayout>

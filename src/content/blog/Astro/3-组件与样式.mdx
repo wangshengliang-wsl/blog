@@ -1,0 +1,630 @@
+---
+title: Astro 组件与样式
+description: 掌握 Astro 组件开发，涵盖 Astro 组件、框架组件集成、样式管理、CSS 方案及群岛架构的实践
+pubDate: 2025-11-27
+toc: true
+ogImage: true
+category: Astro
+---
+
+Astro 组件是构建页面的基础单元，同时支持集成 React、Vue、Svelte 等框架组件。本文深入讲解组件开发和样式管理。
+
+> 本文基于 Astro v5.x 编写。
+
+## Astro 组件
+
+### 组件结构
+
+Astro 组件由三部分组成：
+
+```astro
+---
+// 1. 组件脚本（服务端执行）
+import SomeComponent from './SomeComponent.astro'
+
+interface Props {
+  title: string
+  count?: number
+}
+
+const { title, count = 0 } = Astro.props
+const items = ['A', 'B', 'C']
+---
+
+<!-- 2. 组件模板（HTML） -->
+<div class="container">
+  <h1>{title}</h1>
+  <p>Count: {count}</p>
+  <SomeComponent />
+</div>
+
+<!-- 3. 组件样式 -->
+<style>
+  .container {
+    padding: 1rem;
+  }
+  h1 {
+    color: navy;
+  }
+</style>
+```
+
+### Props 类型定义
+
+```astro
+---
+// 使用 interface
+interface Props {
+  title: string
+  description?: string
+  tags: string[]
+  author: {
+    name: string
+    avatar?: string
+  }
+}
+
+// 或使用 type
+type Props = {
+  variant: 'primary' | 'secondary' | 'danger'
+  size?: 'sm' | 'md' | 'lg'
+}
+
+const { title, description = '默认描述', tags, author } = Astro.props
+---
+```
+
+### Slots 插槽
+
+**默认插槽**：
+
+```astro
+---
+// Card.astro
+---
+
+<div class="card">
+  <slot />
+</div>
+```
+
+```astro
+<Card>
+  <p>这是卡片内容</p>
+</Card>
+```
+
+**具名插槽**：
+
+```astro
+---
+// Modal.astro
+---
+
+<div class="modal">
+  <header>
+    <slot name="header">默认标题</slot>
+  </header>
+  <main>
+    <slot />
+  </main>
+  <footer>
+    <slot name="footer" />
+  </footer>
+</div>
+```
+
+```astro
+<Modal>
+  <h2 slot="header">自定义标题</h2>
+  <p>Modal 内容</p>
+  <div slot="footer">
+    <button>取消</button>
+    <button>确认</button>
+  </div>
+</Modal>
+```
+
+**检查插槽是否存在**：
+
+```astro
+---
+const hasFooter = Astro.slots.has('footer')
+---
+
+<div class="card">
+  <slot />
+  {
+    hasFooter && (
+      <footer>
+        <slot name="footer" />
+      </footer>
+    )
+  }
+</div>
+```
+
+### 渲染插槽内容
+
+```astro
+---
+const html = await Astro.slots.render('default')
+---
+
+<div set:html={html} />
+```
+
+## 框架组件集成
+
+Astro 支持在同一项目中使用多种 UI 框架。
+
+### 安装框架集成
+
+```bash
+# React
+npx astro add react
+
+# Vue
+npx astro add vue
+
+# Svelte
+npx astro add svelte
+
+# Solid
+npx astro add solid-js
+
+# Preact
+npx astro add preact
+```
+
+### 使用 React 组件
+
+```tsx
+// src/components/Counter.tsx
+import { useState } from 'react'
+
+export default function Counter() {
+  const [count, setCount] = useState(0)
+
+  return (
+    <div>
+      <p>Count: {count}</p>
+      <button onClick={() => setCount(count + 1)}>+1</button>
+    </div>
+  )
+}
+```
+
+```astro
+---
+import Counter from '../components/Counter'
+---
+
+<Counter client:load />
+```
+
+### 使用 Vue 组件
+
+```vue
+<!-- src/components/Counter.vue -->
+<script setup>
+import { ref } from 'vue'
+
+const count = ref(0)
+</script>
+
+<template>
+  <div>
+    <p>Count: {{ count }}</p>
+    <button @click="count++">+1</button>
+  </div>
+</template>
+```
+
+```astro
+---
+import Counter from '../components/Counter.vue'
+---
+
+<Counter client:load />
+```
+
+### 客户端指令（Client Directives）
+
+框架组件默认只在服务端渲染为 HTML。使用客户端指令启用交互：
+
+| 指令             | 说明                   |
+| ---------------- | ---------------------- |
+| `client:load`    | 页面加载时立即 hydrate |
+| `client:idle`    | 浏览器空闲时 hydrate   |
+| `client:visible` | 组件进入视口时 hydrate |
+| `client:media`   | 满足媒体查询时 hydrate |
+| `client:only`    | 跳过 SSR，仅客户端渲染 |
+
+```astro
+<!-- 立即加载（关键交互） -->
+<Counter client:load />
+
+<!-- 空闲时加载（非关键交互） -->
+<Newsletter client:idle />
+
+<!-- 可见时加载（页面下方组件） -->
+<Comments client:visible />
+
+<!-- 移动端才加载 -->
+<MobileNav client:media="(max-width: 768px)" />
+
+<!-- 仅客户端渲染（使用浏览器 API 的组件） -->
+<NoSSRComponent client:only="react" />
+```
+
+### 传递 Props 和 Children
+
+```astro
+---
+import ReactComponent from './ReactComponent'
+---
+
+<!-- 传递 props -->
+<ReactComponent client:load title="Hello" count={42} items={['a', 'b']} />
+
+<!-- 传递 children -->
+<ReactComponent client:load>
+  <p>这是子内容</p>
+</ReactComponent>
+```
+
+### 多框架混用
+
+```astro
+---
+import ReactCounter from './ReactCounter'
+import VueCounter from './VueCounter.vue'
+import SvelteCounter from './SvelteCounter.svelte'
+---
+
+<h2>React</h2>
+<ReactCounter client:visible />
+
+<h2>Vue</h2>
+<VueCounter client:visible />
+
+<h2>Svelte</h2>
+<SvelteCounter client:visible />
+```
+
+## 样式管理
+
+### 作用域样式
+
+Astro 组件内的 `<style>` 默认是作用域样式：
+
+```astro
+<h1>标题</h1>
+
+<style>
+  /* 只作用于当前组件 */
+  h1 {
+    color: red;
+  }
+</style>
+```
+
+编译后会生成唯一类名：
+
+```html
+<h1 class="astro-XXXXXX">标题</h1>
+```
+
+### 全局样式
+
+**使用 `is:global`**：
+
+```astro
+<style is:global>
+  /* 全局样式 */
+  body {
+    margin: 0;
+    font-family: system-ui;
+  }
+</style>
+```
+
+**使用 `:global()` 选择器**：
+
+```astro
+<style>
+  /* 局部样式 */
+  .container {
+    padding: 1rem;
+  }
+
+  /* 全局样式 */
+  :global(body) {
+    background: #f5f5f5;
+  }
+
+  /* 嵌套全局 */
+  .container :global(h1) {
+    color: navy;
+  }
+</style>
+```
+
+### 导入外部样式
+
+```astro
+---
+// 导入全局 CSS
+import '../styles/global.css'
+
+// 导入 npm 包样式
+import 'normalize.css'
+---
+```
+
+### CSS 变量
+
+```astro
+---
+const primaryColor = '#007bff'
+const fontSize = '16px'
+---
+
+<div class="box">内容</div>
+
+<style define:vars={{ primaryColor, fontSize }}>
+  .box {
+    color: var(--primaryColor);
+    font-size: var(--fontSize);
+  }
+</style>
+```
+
+### 外部样式表
+
+```astro
+<head>
+  <!-- 本地样式 -->
+  <link rel="stylesheet" href="/styles/global.css" />
+
+  <!-- 外部 CDN -->
+  <link rel="stylesheet" href="https://cdn.example.com/style.css" />
+</head>
+```
+
+## CSS 方案
+
+### Tailwind CSS
+
+```bash
+npx astro add tailwind
+```
+
+```astro
+<div class="bg-blue-500 text-white p-4 rounded-lg">Tailwind CSS</div>
+```
+
+### UnoCSS
+
+```bash
+npx astro add unocss
+```
+
+```javascript
+// uno.config.ts
+import { defineConfig, presetUno, presetIcons } from 'unocss'
+
+export default defineConfig({
+  presets: [presetUno(), presetIcons()],
+})
+```
+
+### CSS Modules
+
+```css
+/* Button.module.css */
+.button {
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+}
+
+.primary {
+  background: blue;
+  color: white;
+}
+```
+
+```astro
+---
+import styles from './Button.module.css'
+---
+
+<button class={`${styles.button} ${styles.primary}`}> 按钮 </button>
+```
+
+### Sass/SCSS
+
+```bash
+npm install sass
+```
+
+```astro
+<style lang="scss">
+  $primary-color: #007bff;
+
+  .container {
+    padding: 1rem;
+
+    h1 {
+      color: $primary-color;
+    }
+
+    &:hover {
+      background: lighten($primary-color, 40%);
+    }
+  }
+</style>
+```
+
+### Less
+
+```bash
+npm install less
+```
+
+```astro
+<style lang="less">
+  @primary-color: #007bff;
+
+  .container {
+    h1 {
+      color: @primary-color;
+    }
+  }
+</style>
+```
+
+## class:list 指令
+
+动态类名管理：
+
+```astro
+---
+const isActive = true
+const size = 'large'
+---
+
+<div
+  class:list={[
+    'base-class',
+    { active: isActive },
+    { 'is-large': size === 'large' },
+  ]}
+>
+  内容
+</div>
+
+<!-- 输出: <div class="base-class active is-large"> -->
+```
+
+支持的值类型：
+
+```astro
+<div
+  class:list={[
+    'string-class', // 字符串
+    { active: true }, // 对象（条件类）
+    ['array', 'of', 'classes'], // 数组
+    undefined, // 忽略
+    null, // 忽略
+    false, // 忽略
+  ]}
+>
+</div>
+```
+
+## 资源导入
+
+### 图片
+
+```astro
+---
+// 从 src/assets 导入（会被优化）
+import logo from '../assets/logo.png'
+
+// 或使用 Image 组件
+import { Image } from 'astro:assets'
+import heroImage from '../assets/hero.jpg'
+---
+
+<!-- 导入的图片 -->
+<img src={logo.src} alt="Logo" />
+
+<!-- Image 组件（自动优化） -->
+<Image src={heroImage} alt="Hero" width={800} height={400} />
+
+<!-- public 目录图片（不优化） -->
+<img src="/images/photo.jpg" alt="Photo" />
+```
+
+### 字体
+
+```astro
+<style>
+  @font-face {
+    font-family: 'CustomFont';
+    src: url('/fonts/custom.woff2') format('woff2');
+    font-display: swap;
+  }
+
+  body {
+    font-family: 'CustomFont', sans-serif;
+  }
+</style>
+```
+
+### JSON
+
+```astro
+---
+import data from '../data/config.json'
+---
+
+<ul>
+  {data.items.map((item) => <li>{item.name}</li>)}
+</ul>
+```
+
+## 组件库推荐
+
+### Astro 原生组件
+
+- [Astro SEO](https://github.com/jonasmerlin/astro-seo) - SEO 组件
+- [Astro Icon](https://github.com/natemoo-re/astro-icon) - 图标组件
+
+### UI 框架组件
+
+配合客户端指令使用：
+
+- **React**: Radix UI、shadcn/ui
+- **Vue**: Element Plus、Naive UI
+- **Svelte**: Skeleton、DaisyUI
+
+## 最佳实践
+
+### 1. 组件职责单一
+
+```text
+src/components/
+├── ui/              # 基础 UI 组件
+│   ├── Button.astro
+│   └── Card.astro
+├── layout/          # 布局组件
+│   ├── Header.astro
+│   └── Footer.astro
+└── feature/         # 业务组件
+    └── PostCard.astro
+```
+
+### 2. 优先使用 Astro 组件
+
+静态内容使用 Astro 组件，只有需要交互时才使用框架组件。
+
+### 3. 延迟加载框架组件
+
+```astro
+<!-- 使用 client:visible 而非 client:load -->
+<HeavyComponent client:visible />
+```
+
+### 4. 样式隔离
+
+使用作用域样式或 CSS Modules，避免样式冲突。
+
+## 参考资料
+
+- [Astro 组件文档](https://docs.astro.build/zh-cn/core-concepts/astro-components/)
+- [框架组件](https://docs.astro.build/zh-cn/core-concepts/framework-components/)
+- [样式指南](https://docs.astro.build/zh-cn/guides/styling/)
+- [客户端指令](https://docs.astro.build/zh-cn/reference/directives-reference/#client-directives)
