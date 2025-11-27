@@ -1,0 +1,429 @@
+---
+title: Bun 完全指南
+description: Bun 是一款极速的 JavaScript 运行时、包管理器与构建工具，本文涵盖安装配置、包管理、脚本运行、与 Node.js 对比及迁移方案
+pubDate: 2025-11-09
+toc: true
+ogImage: true
+category: 包管理工具
+---
+
+Bun 是一款用 Zig 语言编写的全能 JavaScript 工具链，集运行时、包管理器、构建器、测试器于一体。它的包管理器速度比 npm 快 25 倍以上，是目前最快的 JavaScript 包管理解决方案。
+
+> 本文基于 Bun v1.1.x 编写。
+
+## Bun 是什么
+
+Bun 不仅是包管理器，它是完整的 JavaScript/TypeScript 工具链：
+
+| 功能       | 说明                              |
+| ---------- | --------------------------------- |
+| 运行时     | 替代 Node.js，原生支持 TypeScript |
+| 包管理器   | 替代 npm/yarn/pnpm                |
+| 打包器     | 替代 webpack/esbuild/parcel       |
+| 测试运行器 | 替代 Jest/Vitest                  |
+
+本文主要聚焦于 Bun 作为包管理器的使用。
+
+## 为什么选择 Bun
+
+### 极致的速度
+
+Bun 的包管理器使用原生代码实现，利用系统级 API 和硬链接技术：
+
+| 操作           | npm   | pnpm  | Bun  |
+| -------------- | ----- | ----- | ---- |
+| 安装（无缓存） | 25.6s | 14.2s | 1.1s |
+| 安装（有缓存） | 5.2s  | 1.8s  | 0.3s |
+
+_数据基于典型中型项目，实际速度因项目而异_
+
+### 兼容性
+
+Bun 高度兼容 Node.js 生态：
+
+- 支持 `package.json`
+- 支持 `node_modules`
+- 支持绝大多数 npm 包
+- 支持 CommonJS 和 ESM
+- 内置 Node.js API 兼容层
+
+### 开箱即用
+
+无需配置即可运行 TypeScript、JSX：
+
+```bash
+$ bun run index.ts   # 直接运行 TypeScript
+$ bun run App.tsx    # 直接运行 TSX
+```
+
+## 安装 Bun
+
+### macOS / Linux
+
+```bash
+$ curl -fsSL https://bun.sh/install | bash
+```
+
+### macOS（Homebrew）
+
+```bash
+$ brew install oven-sh/bun/bun
+```
+
+### Windows
+
+```powershell
+> powershell -c "irm bun.sh/install.ps1 | iex"
+```
+
+或使用 Scoop：
+
+```powershell
+> scoop install bun
+```
+
+验证安装：
+
+```bash
+$ bun --version
+1.1.38
+```
+
+### 升级 Bun
+
+```bash
+$ bun upgrade
+```
+
+## 项目初始化
+
+```bash
+$ mkdir my-project && cd my-project
+$ bun init
+```
+
+交互式创建 `package.json`，或使用 `-y` 跳过：
+
+```bash
+$ bun init -y
+```
+
+Bun 会生成 `package.json` 和 `tsconfig.json`（如果是 TypeScript 项目）。
+
+## 依赖管理
+
+### 安装依赖
+
+```bash
+# 安装 package.json 中的所有依赖
+$ bun install
+# 或简写
+$ bun i
+
+# 安装指定包
+$ bun add lodash
+
+# 安装开发依赖
+$ bun add -d typescript
+# 或
+$ bun add --dev typescript
+
+# 安装指定版本
+$ bun add lodash@4.17.21
+
+# 全局安装
+$ bun add -g typescript
+```
+
+### 移除依赖
+
+```bash
+$ bun remove lodash
+
+# 全局移除
+$ bun remove -g typescript
+```
+
+### 更新依赖
+
+```bash
+# 更新指定包
+$ bun update lodash
+
+# 更新所有包
+$ bun update
+```
+
+## bun.lockb
+
+Bun 使用二进制格式的 `bun.lockb` 作为 lockfile，比 JSON/YAML 格式更紧凑、解析更快。
+
+```bash
+# 查看 lockfile 内容（转为 yarn.lock 格式）
+$ bun bun.lockb
+```
+
+若需要与非 Bun 环境兼容，可生成 `yarn.lock`：
+
+```bash
+$ bun install --yarn
+```
+
+## 运行脚本
+
+```bash
+# 运行 package.json 中的脚本
+$ bun run dev
+$ bun run build
+
+# 简写（无同名文件时）
+$ bun dev
+$ bun build
+
+# 传递参数
+$ bun run test --watch
+```
+
+### 直接运行文件
+
+Bun 可直接运行 JavaScript/TypeScript 文件：
+
+```bash
+$ bun run index.ts
+$ bun run script.js
+
+# 简写
+$ bun index.ts
+```
+
+## bunx - 执行包命令
+
+类似 npx，临时下载并执行包：
+
+```bash
+$ bunx create-react-app my-app
+$ bunx cowsay "Hello Bun!"
+
+# 执行本地包
+$ bunx eslint src
+```
+
+## Workspaces
+
+Bun 支持 npm/yarn 风格的 workspaces：
+
+```json
+{
+  "name": "my-monorepo",
+  "workspaces": ["packages/*", "apps/*"]
+}
+```
+
+在 monorepo 中安装依赖：
+
+```bash
+$ bun install
+```
+
+Bun 会解析所有 workspace 的依赖并统一安装。
+
+### Workspace 命令
+
+```bash
+# 在指定 workspace 执行命令
+$ bun run --filter @my-monorepo/web dev
+
+# 添加依赖到指定 workspace
+$ bun add react --filter @my-monorepo/web
+```
+
+## 配置
+
+### bunfig.toml
+
+Bun 使用 `bunfig.toml` 作为配置文件：
+
+```toml
+# bunfig.toml
+
+# 设置 npm 源
+[install]
+registry = "https://registry.npmmirror.com"
+
+# 缓存目录
+cache = "~/.bun/install/cache"
+
+# 生产模式（不安装 devDependencies）
+production = false
+
+# 冻结 lockfile
+frozen-lockfile = false
+```
+
+### 常用配置项
+
+```toml
+[install]
+# npm 源
+registry = "https://registry.npmmirror.com"
+
+# scope 私有源
+[install.scopes]
+"@company" = "https://npm.company.com/"
+
+# 信任特定包的安装脚本
+[install.trustedDependencies]
+my-package = true
+```
+
+## 与 Node.js 兼容性
+
+Bun 实现了大部分 Node.js API，但仍有差异：
+
+### 已支持
+
+- `fs`、`path`、`os` 等核心模块
+- `process`、`Buffer`、`console`
+- `http`、`https`（基础功能）
+- CommonJS 和 ESM
+- 大多数 npm 包
+
+### 部分支持 / 不支持
+
+- `worker_threads`（部分支持）
+- `vm` 模块（部分支持）
+- 一些 Node.js 特定的边缘 API
+
+对于生产环境，建议测试确保依赖包兼容。
+
+## 从 npm/yarn/pnpm 迁移
+
+### 迁移步骤
+
+```bash
+# 1. 删除现有 lockfile 和 node_modules
+$ rm -rf node_modules package-lock.json yarn.lock pnpm-lock.yaml
+
+# 2. 使用 Bun 安装
+$ bun install
+```
+
+Bun 会读取 `package.json` 并生成 `bun.lockb`。
+
+### 保持兼容性
+
+如需与非 Bun 环境兼容，可同时生成其他格式的 lockfile：
+
+```bash
+$ bun install --yarn  # 生成 yarn.lock
+```
+
+### CI/CD 适配
+
+```yaml
+# GitHub Actions
+- uses: oven-sh/setup-bun@v2
+  with:
+    bun-version: latest
+
+- run: bun install --frozen-lockfile
+- run: bun run build
+```
+
+## Bun 作为运行时
+
+Bun 不仅是包管理器，也是高性能 JavaScript 运行时。
+
+### 运行 TypeScript
+
+```bash
+# 无需编译，直接运行
+$ bun run server.ts
+```
+
+### 运行测试
+
+```bash
+# Bun 内置测试运行器
+$ bun test
+```
+
+测试文件示例：
+
+```typescript
+// math.test.ts
+import { expect, test } from 'bun:test'
+
+test('2 + 2', () => {
+  expect(2 + 2).toBe(4)
+})
+```
+
+### 构建打包
+
+```bash
+$ bun build ./src/index.ts --outdir ./dist
+```
+
+## 常用命令速查
+
+| 命令               | 用途         |
+| ------------------ | ------------ |
+| `bun install`      | 安装所有依赖 |
+| `bun add <pkg>`    | 添加依赖     |
+| `bun add -d <pkg>` | 添加开发依赖 |
+| `bun add -g <pkg>` | 全局安装     |
+| `bun remove <pkg>` | 移除依赖     |
+| `bun update`       | 更新依赖     |
+| `bun run <script>` | 运行脚本     |
+| `bun <file>`       | 运行文件     |
+| `bunx <pkg>`       | 执行包命令   |
+| `bun test`         | 运行测试     |
+| `bun build`        | 构建打包     |
+| `bun upgrade`      | 升级 Bun     |
+
+## npm vs yarn vs pnpm vs Bun
+
+| 特性       | npm    | yarn   | pnpm   | Bun  |
+| ---------- | ------ | ------ | ------ | ---- |
+| 语言       | JS     | JS     | JS     | Zig  |
+| 安装速度   | 慢     | 中     | 快     | 极快 |
+| 磁盘占用   | 高     | 高     | 低     | 低   |
+| 运行时     | Node   | Node   | Node   | Bun  |
+| TypeScript | 需编译 | 需编译 | 需编译 | 原生 |
+| Windows    | ✅     | ✅     | ✅     | ✅   |
+| 生态成熟度 | 最高   | 高     | 高     | 中   |
+
+## 常见问题
+
+### 某些包不兼容
+
+部分包依赖 Node.js 特定 API，Bun 可能不完全支持。解决方案：
+
+1. 检查 [Bun 兼容性列表](https://bun.sh/docs/runtime/nodejs-apis)
+2. 使用替代包
+3. 对该项目继续使用 Node.js
+
+### lockfile 格式问题
+
+如需与团队共享，且团队使用不同工具：
+
+```bash
+# 生成 yarn.lock 兼容文件
+$ bun install --yarn
+```
+
+### 生产环境建议
+
+Bun 仍在快速迭代中，对于关键生产环境：
+
+- 确保充分测试
+- 关注 Bun 的 changelog
+- 考虑保留 Node.js 作为备选
+
+## 参考资料
+
+- [Bun 官方文档](https://bun.sh/docs)
+- [Bun GitHub](https://github.com/oven-sh/bun)
+- [Bun 兼容性](https://bun.sh/docs/runtime/nodejs-apis)
+- [Bun vs Node.js 性能对比](https://bun.sh/docs/runtime/nodejs-apis)

@@ -1,0 +1,335 @@
+---
+title: ni 完全指南
+description: ni 是由 antfu 开发的自动检测包管理器工具，本文涵盖安装使用、命令对照、配置选项及实用场景
+pubDate: 2025-11-09
+toc: true
+ogImage: true
+category: 包管理工具
+---
+
+ni 是由 [Anthony Fu](https://github.com/antfu) 开发的命令行工具，能够自动检测项目使用的包管理器（npm/yarn/pnpm/bun），并使用对应的命令执行操作。在多项目、多包管理器环境下，不再需要记忆各种命令差异。
+
+> 本文基于 @antfu/ni v0.23.x 编写。
+
+## 为什么需要 ni
+
+不同项目可能使用不同的包管理器。每次切换项目都要想一下：
+
+- 这个项目用的是 npm 还是 pnpm？
+- pnpm 的安装命令是 `pnpm add` 还是 `pnpm install`？
+- yarn 运行脚本要不要 `run`？
+
+ni 解决了这个问题。只需记住一套命令，ni 会根据 lockfile 自动识别包管理器并调用对应命令。
+
+```bash
+# 无论项目用的是 npm/yarn/pnpm/bun
+$ ni        # 安装依赖
+$ nr dev    # 运行脚本
+$ nu        # 更新依赖
+```
+
+## 安装
+
+```bash
+$ npm install -g @antfu/ni
+
+# 或
+$ pnpm add -g @antfu/ni
+
+# 或
+$ yarn global add @antfu/ni
+```
+
+验证安装：
+
+```bash
+$ ni --version
+0.23.0
+```
+
+## 核心命令
+
+ni 提供了一组简短的命令，对应不同包管理器的常用操作：
+
+| ni 命令  | npm             | yarn           | pnpm           | bun           |
+| -------- | --------------- | -------------- | -------------- | ------------- |
+| `ni`     | `npm install`   | `yarn install` | `pnpm install` | `bun install` |
+| `ni pkg` | `npm i pkg`     | `yarn add pkg` | `pnpm add pkg` | `bun add pkg` |
+| `nr`     | `npm run`       | `yarn run`     | `pnpm run`     | `bun run`     |
+| `nu`     | `npm update`    | `yarn upgrade` | `pnpm update`  | `bun update`  |
+| `nun`    | `npm uninstall` | `yarn remove`  | `pnpm remove`  | `bun remove`  |
+| `nlx`    | `npx`           | `yarn dlx`     | `pnpm dlx`     | `bunx`        |
+| `na`     | `npm`           | `yarn`         | `pnpm`         | `bun`         |
+
+## ni - 安装依赖
+
+```bash
+# 安装 package.json 中的所有依赖
+$ ni
+
+# 安装指定包（生产依赖）
+$ ni lodash
+
+# 安装开发依赖
+$ ni -D typescript
+
+# 安装多个包
+$ ni express cors helmet
+
+# 冻结安装（CI 环境）
+$ ni --frozen
+```
+
+ni 会根据项目中的 lockfile 检测包管理器：
+
+| Lockfile            | 包管理器 |
+| ------------------- | -------- |
+| `package-lock.json` | npm      |
+| `yarn.lock`         | yarn     |
+| `pnpm-lock.yaml`    | pnpm     |
+| `bun.lockb`         | bun      |
+
+## nr - 运行脚本
+
+```bash
+# 运行 dev 脚本
+$ nr dev
+
+# 运行带参数的脚本
+$ nr test --watch
+
+# 交互式选择脚本
+$ nr
+
+# 运行指定脚本，如果不存在则忽略
+$ nr build --if-present
+```
+
+不带参数执行 `nr` 会列出所有可用脚本供选择：
+
+```bash
+$ nr
+? script › - Use arrow-keys. Return to submit.
+❯   dev
+    build
+    test
+    lint
+```
+
+### nr 的便捷之处
+
+无论项目用什么包管理器：
+
+```bash
+# 不用区分 npm run dev / yarn dev / pnpm dev
+$ nr dev
+```
+
+## nu - 更新依赖
+
+```bash
+# 交互式更新
+$ nu
+
+# 更新指定包
+$ nu lodash
+
+# 更新所有包
+$ nu -i
+```
+
+## nun - 卸载包
+
+```bash
+# 卸载包
+$ nun lodash
+
+# 卸载多个包
+$ nun lodash express
+```
+
+## nlx - 执行包命令
+
+```bash
+# 类似 npx，临时下载并执行
+$ nlx create-react-app my-app
+
+# 执行本地包命令
+$ nlx eslint src
+```
+
+## na - 直接调用包管理器
+
+当需要执行 ni 没有封装的命令时，使用 na：
+
+```bash
+# 等同于 npm/yarn/pnpm/bun 的原生命令
+$ na cache clean
+$ na audit
+$ na outdated
+```
+
+## 全局安装
+
+```bash
+# 全局安装包
+$ ni -g typescript
+
+# 全局卸载
+$ nun -g typescript
+```
+
+## 检测机制
+
+ni 按以下顺序检测包管理器：
+
+1. 检查当前目录及父目录的 lockfile
+2. 检查 `package.json` 中的 `packageManager` 字段
+3. 如果都没有，提示选择
+
+### 使用 packageManager 字段
+
+在 `package.json` 中指定包管理器（Corepack 规范）：
+
+```json
+{
+  "packageManager": "pnpm@9.15.0"
+}
+```
+
+ni 会识别并使用指定的包管理器。
+
+## 配置
+
+在用户目录创建 `~/.nirc` 配置文件：
+
+```ini
+; 默认使用的包管理器（无 lockfile 时）
+defaultAgent=pnpm
+
+; 全局包使用的管理器
+globalAgent=npm
+```
+
+### 配置选项
+
+| 选项           | 说明                   | 默认值   |
+| -------------- | ---------------------- | -------- |
+| `defaultAgent` | 默认包管理器           | 提示选择 |
+| `globalAgent`  | 全局安装使用的包管理器 | npm      |
+
+## 实用场景
+
+### 多项目开发
+
+假设你同时维护多个项目：
+
+- 项目 A：使用 npm
+- 项目 B：使用 yarn
+- 项目 C：使用 pnpm
+
+有了 ni，无需切换思维：
+
+```bash
+$ cd project-a && ni && nr dev
+$ cd project-b && ni && nr dev
+$ cd project-c && ni && nr dev
+```
+
+### CI/CD 环境
+
+在 CI 中使用 `--frozen` 确保依赖版本一致：
+
+```yaml
+# GitHub Actions 示例
+- name: Install dependencies
+  run: npx @antfu/ni --frozen
+
+- name: Build
+  run: npx @antfu/ni run build
+```
+
+### 脚本中使用
+
+在 npm scripts 中也可以使用 ni：
+
+```json
+{
+  "scripts": {
+    "setup": "ni",
+    "dev": "nr dev"
+  }
+}
+```
+
+### 项目模板
+
+创建项目模板时，使用 ni 命令可以让模板适配任何包管理器：
+
+```bash
+# setup.sh
+#!/bin/bash
+ni
+nr build
+```
+
+## 与其他工具对比
+
+| 工具     | 特点                 |
+| -------- | -------------------- |
+| ni       | 自动检测，统一命令   |
+| npx      | npm 专属，执行包命令 |
+| pnpx     | pnpm 专属            |
+| yarn dlx | yarn 专属            |
+| bunx     | bun 专属             |
+
+ni 的优势在于跨包管理器的统一体验。
+
+## 常用命令速查
+
+| 命令          | 用途                 |
+| ------------- | -------------------- |
+| `ni`          | 安装所有依赖         |
+| `ni <pkg>`    | 安装包               |
+| `ni -D <pkg>` | 安装开发依赖         |
+| `ni -g <pkg>` | 全局安装             |
+| `ni --frozen` | 冻结安装（CI）       |
+| `nr`          | 交互式运行脚本       |
+| `nr <script>` | 运行指定脚本         |
+| `nu`          | 更新依赖             |
+| `nu <pkg>`    | 更新指定包           |
+| `nun <pkg>`   | 卸载包               |
+| `nlx <pkg>`   | 执行包命令           |
+| `na <cmd>`    | 调用原生包管理器命令 |
+
+## 常见问题
+
+### 检测到错误的包管理器
+
+删除不需要的 lockfile，或在 `package.json` 中明确指定：
+
+```json
+{
+  "packageManager": "pnpm@9.15.0"
+}
+```
+
+### 想要强制使用某个包管理器
+
+使用环境变量：
+
+```bash
+$ NI_DEFAULT_AGENT=pnpm ni
+```
+
+或在 `~/.nirc` 中设置 `defaultAgent`。
+
+### Windows 兼容性
+
+ni 完全支持 Windows，包括 PowerShell 和 CMD。
+
+## 参考资料
+
+- [ni GitHub](https://github.com/antfu/ni)
+- [Anthony Fu 的博客](https://antfu.me/)
+- [Corepack 文档](https://nodejs.org/api/corepack.html)

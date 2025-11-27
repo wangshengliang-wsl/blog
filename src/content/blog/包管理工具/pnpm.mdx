@@ -1,8 +1,439 @@
 ---
-title: pnpm
-description: pnpm
+title: pnpm 完全指南
+description: pnpm 是一款高效节省磁盘空间的 JavaScript 包管理器，本文涵盖安装配置、硬链接机制、严格依赖管理、Workspace 与 Monorepo 实践
 pubDate: 2025-11-09
 toc: true
 ogImage: true
 category: 包管理工具
 ---
+
+pnpm（Performant npm）通过硬链接和内容寻址存储机制，解决了 npm/yarn 重复安装依赖、磁盘占用大的问题。在大型项目和 Monorepo 场景下，pnpm 的优势尤为明显。
+
+> 本文基于 pnpm v9.x 编写，Node.js v20.x 环境。
+
+## 为什么选择 pnpm
+
+### 磁盘空间节省
+
+传统包管理器为每个项目复制一份完整的依赖。假设 10 个项目都用了 lodash，磁盘上就有 10 份相同的文件。
+
+pnpm 采用内容寻址存储：所有包只在全局 store 中保存一份，项目中通过硬链接引用。同样 10 个项目，lodash 实际只占用一份磁盘空间。
+
+### 安装速度快
+
+由于大部分文件已在 store 中，pnpm 安装依赖时只需创建硬链接，无需复制文件。在有缓存的情况下，安装速度比 npm/yarn 快 2-3 倍。
+
+### 严格的依赖结构
+
+npm/yarn 的扁平化 `node_modules` 允许项目访问未声明的依赖（幽灵依赖）。pnpm 默认使用非扁平结构，只有显式声明的依赖才能被访问，从根本上杜绝了幽灵依赖问题。
+
+## 安装 pnpm
+
+### 通过 Corepack（推荐）
+
+```bash
+$ corepack enable
+$ corepack prepare pnpm@latest --activate
+$ pnpm -v
+9.15.0
+```
+
+### 通过 npm
+
+```bash
+$ npm install -g pnpm
+```
+
+### 通过独立脚本
+
+```bash
+# macOS / Linux
+$ curl -fsSL https://get.pnpm.io/install.sh | sh -
+
+# Windows (PowerShell)
+$ iwr https://get.pnpm.io/install.ps1 -useb | iex
+```
+
+### 通过 Homebrew（macOS）
+
+```bash
+$ brew install pnpm
+```
+
+## 项目初始化
+
+```bash
+$ mkdir my-project && cd my-project
+$ pnpm init
+```
+
+生成标准 `package.json`。
+
+## 依赖管理
+
+### 安装依赖
+
+```bash
+# 安装 package.json 中的所有依赖
+$ pnpm install
+# 或简写
+$ pnpm i
+
+# 安装生产依赖
+$ pnpm add lodash
+
+# 安装开发依赖
+$ pnpm add -D typescript
+
+# 安装指定版本
+$ pnpm add lodash@4.17.21
+
+# 全局安装
+$ pnpm add -g typescript
+```
+
+### 移除依赖
+
+```bash
+$ pnpm remove lodash
+# 或简写
+$ pnpm rm lodash
+
+# 全局移除
+$ pnpm remove -g typescript
+```
+
+### 更新依赖
+
+```bash
+# 更新指定包
+$ pnpm update lodash
+# 或简写
+$ pnpm up lodash
+
+# 更新所有包
+$ pnpm update
+
+# 交互式更新
+$ pnpm update -i
+
+# 更新到最新版本（忽略 semver 范围）
+$ pnpm update lodash --latest
+```
+
+## node_modules 结构
+
+pnpm 的 `node_modules` 结构与 npm/yarn 不同：
+
+```
+node_modules/
+├── .pnpm/                    # 所有依赖的实际存储位置
+│   ├── lodash@4.17.21/
+│   │   └── node_modules/
+│   │       └── lodash/       # 硬链接到全局 store
+│   └── express@4.18.2/
+│       └── node_modules/
+│           ├── express/
+│           └── body-parser/  # express 的依赖
+├── lodash -> .pnpm/lodash@4.17.21/node_modules/lodash
+└── express -> .pnpm/express@4.18.2/node_modules/express
+```
+
+顶层 `node_modules` 只包含项目直接声明的依赖的符号链接，间接依赖被「隐藏」在 `.pnpm` 目录中，无法直接访问。
+
+### 处理兼容性问题
+
+部分老旧包依赖扁平化结构，可能无法正常工作。解决方案：
+
+**1. 提升指定包**
+
+在 `.npmrc` 中配置：
+
+```ini
+public-hoist-pattern[]=*eslint*
+public-hoist-pattern[]=*prettier*
+```
+
+**2. 使用 shamefully-hoist**
+
+将所有包提升到顶层（不推荐，失去严格依赖的优势）：
+
+```ini
+shamefully-hoist=true
+```
+
+## pnpm-lock.yaml
+
+pnpm 使用 `pnpm-lock.yaml` 锁定依赖版本。格式与 npm/yarn 的锁文件不同，但功能一致。
+
+```bash
+# 强制根据 lock 文件安装（CI 环境推荐）
+$ pnpm install --frozen-lockfile
+```
+
+## 全局 Store
+
+pnpm 的全局 store 默认位于：
+
+- macOS/Linux：`~/.local/share/pnpm/store`
+- Windows：`%LOCALAPPDATA%/pnpm/store`
+
+```bash
+# 查看 store 路径
+$ pnpm store path
+
+# 清理未被引用的包
+$ pnpm store prune
+
+# 查看 store 状态
+$ pnpm store status
+```
+
+## 运行脚本
+
+```bash
+# 运行 package.json 中的脚本
+$ pnpm run dev
+$ pnpm run build
+
+# 简写（非内置命令时）
+$ pnpm dev
+$ pnpm build
+
+# 传递参数
+$ pnpm test -- --watch
+```
+
+## 执行包命令
+
+```bash
+# 类似 npx，临时下载并执行
+$ pnpm dlx create-react-app my-app
+$ pnpm dlx degit user/repo my-project
+
+# 执行本地已安装的包
+$ pnpm exec eslint src
+```
+
+## 配置管理
+
+pnpm 配置写在 `.npmrc` 文件中（与 npm 共用格式）：
+
+```ini
+# 设置源
+registry=https://registry.npmmirror.com
+
+# 设置 store 目录
+store-dir=~/.pnpm-store
+
+# 严格对等依赖检查
+strict-peer-dependencies=true
+
+# 自动安装对等依赖
+auto-install-peers=true
+
+# 提升指定模式的包
+public-hoist-pattern[]=*eslint*
+public-hoist-pattern[]=@types/*
+```
+
+命令行查看/设置配置：
+
+```bash
+$ pnpm config list
+$ pnpm config get registry
+$ pnpm config set registry https://registry.npmmirror.com
+```
+
+## Workspace（Monorepo）
+
+pnpm 内置强大的 Workspace 支持，是 Monorepo 项目的理想选择。
+
+### 配置
+
+在项目根目录创建 `pnpm-workspace.yaml`：
+
+```yaml
+packages:
+  - 'packages/*'
+  - 'apps/*'
+  - '!**/test/**' # 排除测试目录
+```
+
+目录结构：
+
+```
+my-monorepo/
+├── package.json
+├── pnpm-workspace.yaml
+├── pnpm-lock.yaml
+├── packages/
+│   ├── shared/
+│   │   └── package.json
+│   └── utils/
+│       └── package.json
+└── apps/
+    ├── web/
+    │   └── package.json
+    └── api/
+        └── package.json
+```
+
+### Workspace 命令
+
+```bash
+# 在根目录安装所有 workspace 的依赖
+$ pnpm install
+
+# 在指定 workspace 执行命令
+$ pnpm --filter @my-monorepo/web dev
+
+# 使用通配符匹配
+$ pnpm --filter "@my-monorepo/*" build
+
+# 在所有 workspace 执行命令
+$ pnpm -r run build
+# 或
+$ pnpm --recursive run build
+
+# 并行执行
+$ pnpm -r --parallel run build
+
+# 只在有变更的 workspace 执行
+$ pnpm -r --filter "...[origin/main]" run build
+```
+
+### 跨 Workspace 依赖
+
+使用 `workspace:` 协议引用本地包：
+
+```json
+{
+  "name": "@my-monorepo/web",
+  "dependencies": {
+    "@my-monorepo/shared": "workspace:*",
+    "@my-monorepo/utils": "workspace:^1.0.0"
+  }
+}
+```
+
+| 协议          | 发布时转换           |
+| ------------- | -------------------- |
+| `workspace:*` | 当前版本，如 `1.2.3` |
+| `workspace:^` | `^1.2.3`             |
+| `workspace:~` | `~1.2.3`             |
+
+发布到 npm 时，`workspace:` 协议会自动转换为实际版本号。
+
+### 添加依赖到 Workspace
+
+```bash
+# 给指定 workspace 添加依赖
+$ pnpm --filter @my-monorepo/web add react
+
+# 给根项目添加开发依赖
+$ pnpm add -D -w typescript
+
+# 给所有 workspace 添加依赖
+$ pnpm -r add lodash
+```
+
+## 过滤器语法
+
+pnpm 的 `--filter` 非常强大：
+
+```bash
+# 按名称
+$ pnpm --filter @my-monorepo/web run build
+
+# 按目录
+$ pnpm --filter ./apps/web run build
+
+# 通配符
+$ pnpm --filter "@my-monorepo/*" run build
+$ pnpm --filter "*web*" run build
+
+# 依赖链
+$ pnpm --filter @my-monorepo/web... run build  # web 及其依赖
+$ pnpm --filter ...@my-monorepo/shared run build  # shared 及依赖它的包
+
+# 变更检测
+$ pnpm --filter "...[origin/main]" run test  # 相对 main 分支有变更的包
+```
+
+## 导入其他锁文件
+
+从现有项目迁移到 pnpm：
+
+```bash
+# 从 package-lock.json 导入
+$ pnpm import
+
+# 从 yarn.lock 导入
+$ pnpm import
+```
+
+pnpm 会自动检测现有锁文件并转换为 `pnpm-lock.yaml`。
+
+## 补丁功能
+
+pnpm 支持直接修补 node_modules 中的包：
+
+```bash
+# 准备修补
+$ pnpm patch lodash
+
+# 编辑 <临时目录> 中的文件...
+
+# 提交修补
+$ pnpm patch-commit <临时目录>
+```
+
+修补内容保存在 `patches/` 目录，并记录在 `package.json` 中：
+
+```json
+{
+  "pnpm": {
+    "patchedDependencies": {
+      "lodash@4.17.21": "patches/lodash@4.17.21.patch"
+    }
+  }
+}
+```
+
+## 常用命令速查
+
+| 命令                   | 用途           |
+| ---------------------- | -------------- |
+| `pnpm install`         | 安装所有依赖   |
+| `pnpm add <pkg>`       | 添加生产依赖   |
+| `pnpm add -D <pkg>`    | 添加开发依赖   |
+| `pnpm add -g <pkg>`    | 全局安装       |
+| `pnpm remove <pkg>`    | 移除依赖       |
+| `pnpm update`          | 更新依赖       |
+| `pnpm run <script>`    | 运行脚本       |
+| `pnpm dlx <pkg>`       | 临时执行包     |
+| `pnpm exec <cmd>`      | 执行本地命令   |
+| `pnpm --filter <name>` | 过滤 workspace |
+| `pnpm -r <cmd>`        | 递归执行       |
+| `pnpm store prune`     | 清理 store     |
+| `pnpm import`          | 导入锁文件     |
+| `pnpm patch <pkg>`     | 修补依赖       |
+
+## npm vs yarn vs pnpm
+
+| 特性     | npm      | yarn     | pnpm     |
+| -------- | -------- | -------- | -------- |
+| 磁盘占用 | 高       | 高       | 低       |
+| 安装速度 | 中       | 快       | 更快     |
+| 幽灵依赖 | 存在     | 存在     | 杜绝     |
+| Monorepo | v7+ 支持 | 原生支持 | 原生支持 |
+| 内容寻址 | ❌       | ❌       | ✅       |
+| 硬链接   | ❌       | ❌       | ✅       |
+
+## 参考资料
+
+- [pnpm 官方文档](https://pnpm.io/zh/)
+- [pnpm 与其他包管理器对比](https://pnpm.io/benchmarks)
+- [Flat node_modules is not the only way](https://pnpm.io/blog/2020/05/27/flat-node-modules-is-not-the-only-way)
+- [Monorepo 最佳实践](https://pnpm.io/workspaces)

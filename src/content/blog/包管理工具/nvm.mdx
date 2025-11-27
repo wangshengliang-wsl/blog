@@ -1,0 +1,412 @@
+---
+title: nvm 完全指南
+description: nvm 是最流行的 Node.js 版本管理工具，本文涵盖安装配置、版本管理、项目级版本锁定及常见问题解决方案
+pubDate: 2025-11-09
+toc: true
+ogImage: true
+category: 包管理工具
+---
+
+nvm（Node Version Manager）是最早也是最流行的 Node.js 版本管理工具。它允许在同一台机器上安装和切换多个 Node.js 版本，解决了不同项目依赖不同 Node 版本的问题。
+
+> 本文基于 nvm v0.40.x 编写，仅适用于 macOS 和 Linux。Windows 用户请使用 [nvm-windows](https://github.com/coreybutler/nvm-windows) 或 fnm。
+
+## 安装 nvm
+
+### 安装脚本（推荐）
+
+```bash
+$ curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+
+# 或使用 wget
+$ wget -qO- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+```
+
+安装脚本会自动将以下内容添加到 Shell 配置文件（`~/.bashrc`、`~/.zshrc` 等）：
+
+```bash
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+```
+
+重新加载配置：
+
+```bash
+$ source ~/.zshrc
+# 或
+$ source ~/.bashrc
+```
+
+### 通过 Homebrew（macOS）
+
+```bash
+$ brew install nvm
+```
+
+需要手动配置环境变量。在 `~/.zshrc` 中添加：
+
+```bash
+export NVM_DIR="$HOME/.nvm"
+[ -s "/opt/homebrew/opt/nvm/nvm.sh" ] && \. "/opt/homebrew/opt/nvm/nvm.sh"
+[ -s "/opt/homebrew/opt/nvm/etc/bash_completion.d/nvm" ] && \. "/opt/homebrew/opt/nvm/etc/bash_completion.d/nvm"
+```
+
+验证安装：
+
+```bash
+$ nvm --version
+0.40.1
+```
+
+## 安装 Node.js
+
+```bash
+# 安装最新 LTS 版本
+$ nvm install --lts
+
+# 安装最新版本
+$ nvm install node
+
+# 安装指定版本
+$ nvm install 20.10.0
+
+# 安装指定主版本的最新版
+$ nvm install 20
+```
+
+查看可安装的版本：
+
+```bash
+# 列出所有可用版本
+$ nvm ls-remote
+
+# 只列出 LTS 版本
+$ nvm ls-remote --lts
+
+# 过滤特定版本
+$ nvm ls-remote 20
+```
+
+卸载版本：
+
+```bash
+$ nvm uninstall 18.19.0
+```
+
+## 切换版本
+
+```bash
+# 切换到指定版本
+$ nvm use 20
+
+# 切换到最新 LTS
+$ nvm use --lts
+
+# 切换到最新版本
+$ nvm use node
+
+# 切换到系统版本
+$ nvm use system
+```
+
+查看当前版本：
+
+```bash
+$ nvm current
+v20.10.0
+
+$ node -v
+v20.10.0
+```
+
+查看已安装的版本：
+
+```bash
+$ nvm ls
+
+->     v20.10.0
+       v18.19.0
+         system
+default -> 20 (-> v20.10.0)
+lts/* -> lts/iron (-> v20.10.0)
+```
+
+## 设置默认版本
+
+```bash
+$ nvm alias default 20
+```
+
+设置后，新终端窗口会自动使用该版本。
+
+## 版本别名
+
+```bash
+# 创建别名
+$ nvm alias my-project 20.10.0
+
+# 使用别名
+$ nvm use my-project
+
+# 删除别名
+$ nvm unalias my-project
+
+# 查看所有别名
+$ nvm alias
+```
+
+## 项目级版本锁定
+
+在项目根目录创建 `.nvmrc` 文件：
+
+```bash
+$ echo "20" > .nvmrc
+```
+
+然后使用：
+
+```bash
+$ nvm use
+Found '/path/to/project/.nvmrc' with version <20>
+Now using node v20.10.0 (npm v10.2.3)
+```
+
+### 自动切换版本
+
+nvm 默认不支持目录切换时自动切换版本，需要手动配置。
+
+**Zsh（使用 zsh-nvm 插件或手动配置）**
+
+在 `~/.zshrc` 中添加：
+
+```bash
+autoload -U add-zsh-hook
+
+load-nvmrc() {
+  local nvmrc_path
+  nvmrc_path="$(nvm_find_nvmrc)"
+
+  if [ -n "$nvmrc_path" ]; then
+    local nvmrc_node_version
+    nvmrc_node_version=$(nvm version "$(cat "${nvmrc_path}")")
+
+    if [ "$nvmrc_node_version" = "N/A" ]; then
+      nvm install
+    elif [ "$nvmrc_node_version" != "$(nvm version)" ]; then
+      nvm use
+    fi
+  elif [ -n "$(PWD=$OLDPWD nvm_find_nvmrc)" ] && [ "$(nvm version)" != "$(nvm version default)" ]; then
+    echo "Reverting to nvm default version"
+    nvm use default
+  fi
+}
+
+add-zsh-hook chpwd load-nvmrc
+load-nvmrc
+```
+
+**Bash**
+
+在 `~/.bashrc` 中添加：
+
+```bash
+cdnvm() {
+    command cd "$@" || return $?
+    nvm_path="$(nvm_find_up .nvmrc | command tr -d '\n')"
+
+    if [[ ! $nvm_path = *[^[:space:]]* ]]; then
+        declare default_version
+        default_version="$(nvm version default)"
+
+        if [ $? -eq 0 ]; then
+            if [[ $(nvm current) != "${default_version}" ]]; then
+                nvm use default
+            fi
+        fi
+    elif [[ -s "${nvm_path}/.nvmrc" && -r "${nvm_path}/.nvmrc" ]]; then
+        declare nvm_version
+        nvm_version=$(<"${nvm_path}"/.nvmrc)
+
+        declare locally_resolved_nvm_version
+        locally_resolved_nvm_version=$(nvm ls --no-colors "${nvm_version}" | command tail -1 | command tr -d '\->*' | command tr -d '[:space:]')
+
+        if [[ "${locally_resolved_nvm_version}" == "N/A" ]]; then
+            nvm install "${nvm_version}"
+        elif [[ $(nvm current) != "${locally_resolved_nvm_version}" ]]; then
+            nvm use "${nvm_version}"
+        fi
+    fi
+}
+
+alias cd='cdnvm'
+cdnvm "$PWD" || exit
+```
+
+## 全局包管理
+
+每个 Node 版本有独立的全局包目录。切换版本后，全局包不会自动迁移。
+
+### 迁移全局包
+
+```bash
+# 切换到新版本时，从指定版本迁移全局包
+$ nvm install 20 --reinstall-packages-from=18
+
+# 从当前版本迁移
+$ nvm install 22 --reinstall-packages-from=current
+```
+
+### 设置默认全局包
+
+创建 `~/.nvm/default-packages` 文件，列出需要自动安装的包：
+
+```
+pnpm
+typescript
+@antfu/ni
+```
+
+之后每次 `nvm install` 都会自动安装这些包。
+
+## 环境变量
+
+| 变量                    | 说明             | 默认值                    |
+| ----------------------- | ---------------- | ------------------------- |
+| `NVM_DIR`               | nvm 安装目录     | `~/.nvm`                  |
+| `NVM_NODEJS_ORG_MIRROR` | Node.js 下载镜像 | `https://nodejs.org/dist` |
+| `NVM_IOJS_ORG_MIRROR`   | io.js 下载镜像   | `https://iojs.org/dist`   |
+
+使用国内镜像加速：
+
+```bash
+export NVM_NODEJS_ORG_MIRROR=https://npmmirror.com/mirrors/node
+```
+
+## 常用命令速查
+
+| 命令                          | 用途                   |
+| ----------------------------- | ---------------------- |
+| `nvm install <version>`       | 安装指定版本           |
+| `nvm install --lts`           | 安装最新 LTS           |
+| `nvm uninstall <version>`     | 卸载版本               |
+| `nvm use <version>`           | 切换版本               |
+| `nvm use`                     | 使用 .nvmrc 指定的版本 |
+| `nvm current`                 | 显示当前版本           |
+| `nvm ls`                      | 列出已安装版本         |
+| `nvm ls-remote`               | 列出可安装版本         |
+| `nvm alias <name> <version>`  | 创建别名               |
+| `nvm alias default <version>` | 设置默认版本           |
+| `nvm unalias <name>`          | 删除别名               |
+| `nvm which <version>`         | 显示版本安装路径       |
+| `nvm cache clear`             | 清理缓存               |
+
+## 性能优化
+
+nvm 每次打开终端都需要加载大量 Shell 脚本，可能导致终端启动变慢。
+
+### 延迟加载
+
+在 `~/.zshrc` 中使用延迟加载：
+
+```bash
+export NVM_DIR="$HOME/.nvm"
+
+# 延迟加载 nvm
+nvm() {
+  unset -f nvm node npm npx
+  [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+  nvm "$@"
+}
+
+node() {
+  unset -f nvm node npm npx
+  [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+  node "$@"
+}
+
+npm() {
+  unset -f nvm node npm npx
+  [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+  npm "$@"
+}
+
+npx() {
+  unset -f nvm node npm npx
+  [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+  npx "$@"
+}
+```
+
+这样只有在首次使用 nvm/node/npm 时才会加载。
+
+### 更好的选择
+
+如果对终端启动速度有要求，建议迁移到 fnm。fnm 使用 Rust 编写，启动速度快 40 倍以上，且命令兼容 nvm。
+
+## 卸载 nvm
+
+删除安装目录：
+
+```bash
+$ rm -rf "$NVM_DIR"
+```
+
+从 Shell 配置文件中移除 nvm 相关配置：
+
+```bash
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+```
+
+## 常见问题
+
+### nvm: command not found
+
+确保 Shell 配置正确。检查 `~/.nvm` 目录是否存在，以及配置是否添加到正确的文件（Zsh 用 `.zshrc`，Bash 用 `.bashrc`）。
+
+### 新终端窗口 Node 版本丢失
+
+设置默认版本：
+
+```bash
+$ nvm alias default 20
+```
+
+### M1/M2 Mac 安装老版本失败
+
+Apple Silicon 原生支持从 Node 16 开始。安装老版本需要使用 Rosetta：
+
+```bash
+$ arch -x86_64 zsh
+$ nvm install 14
+```
+
+### 下载速度慢
+
+配置国内镜像：
+
+```bash
+$ export NVM_NODEJS_ORG_MIRROR=https://npmmirror.com/mirrors/node
+$ nvm install 20
+```
+
+## nvm vs fnm
+
+| 特性       | nvm         | fnm         |
+| ---------- | ----------- | ----------- |
+| 语言       | Bash        | Rust        |
+| 启动速度   | ~40ms+      | ~1ms        |
+| Windows    | ❌ 需要 WSL | ✅ 原生支持 |
+| 自动切换   | 需要配置    | 内置支持    |
+| 生态成熟度 | 非常成熟    | 成熟        |
+| 兼容性     | -           | .nvmrc 兼容 |
+
+如果终端启动速度不是问题，nvm 是稳定可靠的选择；追求性能和跨平台支持，推荐 fnm。
+
+## 参考资料
+
+- [nvm GitHub](https://github.com/nvm-sh/nvm)
+- [nvm-windows](https://github.com/coreybutler/nvm-windows)
+- [Node.js 发布计划](https://nodejs.org/en/about/releases/)

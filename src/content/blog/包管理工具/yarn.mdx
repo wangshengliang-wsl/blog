@@ -1,8 +1,396 @@
 ---
-title: yarn
-description: yarn
+title: Yarn 完全指南
+description: Yarn 是 Facebook 开源的 JavaScript 包管理器，本文涵盖 Yarn Classic 与 Yarn Berry 的安装配置、依赖管理、Plug'n'Play 模式与 Workspaces 实践
 pubDate: 2025-11-09
 toc: true
 ogImage: true
 category: 包管理工具
 ---
+
+Yarn 由 Facebook 于 2016 年发布，旨在解决当时 npm 的性能和一致性问题。如今 Yarn 分为两个主要版本线：Yarn Classic（1.x）和 Yarn Berry（2.x+，也称 Yarn Modern）。两者在架构和使用方式上有显著差异。
+
+> 本文基于 Yarn v1.22.x（Classic）和 Yarn v4.x（Berry）编写，Node.js v20.x 环境。
+
+## Yarn Classic vs Yarn Berry
+
+| 特性         | Yarn Classic (1.x) | Yarn Berry (2.x+)   |
+| ------------ | ------------------ | ------------------- |
+| node_modules | ✅ 传统目录结构    | ❌ 默认禁用         |
+| Plug'n'Play  | ❌                 | ✅ 默认启用         |
+| 零安装       | ❌                 | ✅ 可提交依赖到 Git |
+| 配置文件     | .yarnrc            | .yarnrc.yml         |
+| 锁文件       | yarn.lock (v1)     | yarn.lock (v8)      |
+
+如果项目对兼容性要求较高，建议使用 Yarn Classic；追求更激进的优化可尝试 Yarn Berry。
+
+## 安装 Yarn
+
+### 通过 Corepack（推荐）
+
+Node.js v16.10+ 内置 Corepack，可直接管理 Yarn：
+
+```bash
+# 启用 Corepack
+$ corepack enable
+
+# 激活最新稳定版 Yarn
+$ corepack prepare yarn@stable --activate
+
+# 验证安装
+$ yarn -v
+4.5.3
+```
+
+### 通过 npm 安装
+
+```bash
+# 安装 Yarn Classic
+$ npm install -g yarn
+
+# 验证
+$ yarn -v
+1.22.22
+```
+
+### 指定项目使用的 Yarn 版本
+
+在项目中锁定 Yarn 版本（Yarn Berry 特性）：
+
+```bash
+# 设置项目使用 Yarn 4.x
+$ yarn set version stable
+
+# 设置使用特定版本
+$ yarn set version 4.5.3
+
+# 设置使用 Classic
+$ yarn set version classic
+```
+
+执行后会在项目中生成 `.yarn/releases/` 目录和 `.yarnrc.yml` 配置。
+
+## 项目初始化
+
+```bash
+$ mkdir my-project && cd my-project
+$ yarn init
+```
+
+交互式填写项目信息，或使用 `-y` 跳过：
+
+```bash
+$ yarn init -y
+```
+
+### Yarn Berry 初始化
+
+若要从零开始使用 Yarn Berry：
+
+```bash
+$ yarn init -2
+```
+
+这会初始化一个使用 Yarn Berry 的项目，并自动创建 `.yarnrc.yml`。
+
+## 依赖管理
+
+### 安装依赖
+
+```bash
+# 安装 package.json 中的所有依赖
+$ yarn
+# 或
+$ yarn install
+
+# 安装生产依赖
+$ yarn add lodash
+
+# 安装开发依赖
+$ yarn add -D typescript
+
+# 安装指定版本
+$ yarn add lodash@4.17.21
+
+# 全局安装
+$ yarn global add typescript
+```
+
+### 移除依赖
+
+```bash
+$ yarn remove lodash
+
+# 全局移除
+$ yarn global remove typescript
+```
+
+### 更新依赖
+
+```bash
+# 交互式更新
+$ yarn upgrade-interactive
+
+# 更新指定包
+$ yarn upgrade lodash
+
+# 更新到最新版本（忽略 semver 范围）
+$ yarn upgrade lodash --latest
+```
+
+### Yarn Berry 的依赖命令
+
+Yarn Berry 对部分命令做了调整：
+
+```bash
+# 添加依赖（同 Classic）
+$ yarn add lodash
+
+# 更新依赖
+$ yarn up lodash
+
+# 交互式更新
+$ yarn upgrade-interactive
+```
+
+## yarn.lock
+
+`yarn.lock` 锁定依赖的精确版本。与 npm 的 `package-lock.json` 类似，但格式不同。
+
+**重要：** 务必将 `yarn.lock` 提交到版本控制，确保团队环境一致。
+
+```bash
+# 若 lock 文件与 package.json 冲突，重新生成
+$ rm yarn.lock
+$ yarn install
+```
+
+## Yarn Scripts
+
+在 `package.json` 中定义脚本：
+
+```json
+{
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "test": "vitest"
+  }
+}
+```
+
+运行脚本：
+
+```bash
+$ yarn dev
+$ yarn build
+$ yarn test
+```
+
+与 npm 不同，Yarn 运行自定义脚本无需 `run` 关键字（除非脚本名与 Yarn 内置命令冲突）。
+
+传递参数时无需 `--`：
+
+```bash
+$ yarn test --watch --coverage
+```
+
+## Plug'n'Play (PnP)
+
+Yarn Berry 默认启用 Plug'n'Play 模式，不再生成 `node_modules` 目录。依赖以 zip 文件形式存储在 `.yarn/cache/` 中，通过 `.pnp.cjs` 文件进行模块解析。
+
+### PnP 的优势
+
+- **安装速度快**：无需写入大量小文件
+- **零安装**：可将 `.yarn/cache/` 提交到 Git，团队成员无需执行 `yarn install`
+- **确定性**：杜绝幽灵依赖（Phantom Dependencies）
+
+### 兼容性问题
+
+部分工具不支持 PnP，需要配置 SDK 或回退到 node_modules：
+
+```bash
+# 安装 IDE SDK（VS Code、WebStorm 等）
+$ yarn dlx @yarnpkg/sdks vscode
+```
+
+若工具完全不兼容，可在 `.yarnrc.yml` 中禁用 PnP：
+
+```yaml
+nodeLinker: node-modules
+```
+
+### .yarnrc.yml 常用配置
+
+```yaml
+# 使用 node_modules 模式
+nodeLinker: node-modules
+
+# 设置 npm 源
+npmRegistryServer: 'https://registry.npmmirror.com'
+
+# 启用全局缓存
+enableGlobalCache: true
+
+# 设置缓存目录
+cacheFolder: './.yarn/cache'
+```
+
+## Workspaces
+
+Yarn 原生支持 Workspaces，适合 Monorepo 项目管理。
+
+### 配置
+
+在根目录 `package.json` 中声明：
+
+```json
+{
+  "name": "my-monorepo",
+  "private": true,
+  "workspaces": ["packages/*", "apps/*"]
+}
+```
+
+目录结构示例：
+
+```
+my-monorepo/
+├── package.json
+├── packages/
+│   ├── shared/
+│   │   └── package.json
+│   └── utils/
+│       └── package.json
+└── apps/
+    ├── web/
+    │   └── package.json
+    └── api/
+        └── package.json
+```
+
+### Workspaces 命令
+
+```bash
+# 在根目录安装所有 workspace 依赖
+$ yarn install
+
+# 在指定 workspace 执行命令
+$ yarn workspace @my-monorepo/web dev
+
+# 在所有 workspace 执行命令
+$ yarn workspaces foreach run build
+
+# Yarn Berry 语法
+$ yarn workspaces foreach -A run build
+```
+
+### 跨 Workspace 依赖
+
+在一个 workspace 中引用另一个：
+
+```json
+{
+  "name": "@my-monorepo/web",
+  "dependencies": {
+    "@my-monorepo/shared": "workspace:*"
+  }
+}
+```
+
+`workspace:*` 协议表示使用本地 workspace 版本。
+
+## 离线模式
+
+Yarn 支持离线安装，前提是依赖已被缓存：
+
+```bash
+$ yarn install --offline
+```
+
+Yarn Berry 的零安装特性可以将整个 `.yarn/cache/` 提交到 Git，实现真正的离线安装。
+
+## 缓存管理
+
+```bash
+# 查看缓存目录
+$ yarn cache dir
+
+# 清理缓存
+$ yarn cache clean
+
+# Yarn Berry
+$ yarn cache clean --all
+```
+
+## 常用命令对比
+
+| 操作         | npm                  | Yarn Classic          | Yarn Berry        |
+| ------------ | -------------------- | --------------------- | ----------------- |
+| 安装所有依赖 | `npm install`        | `yarn`                | `yarn`            |
+| 添加依赖     | `npm install pkg`    | `yarn add pkg`        | `yarn add pkg`    |
+| 添加开发依赖 | `npm install -D pkg` | `yarn add -D pkg`     | `yarn add -D pkg` |
+| 移除依赖     | `npm uninstall pkg`  | `yarn remove pkg`     | `yarn remove pkg` |
+| 更新依赖     | `npm update pkg`     | `yarn upgrade pkg`    | `yarn up pkg`     |
+| 运行脚本     | `npm run dev`        | `yarn dev`            | `yarn dev`        |
+| 执行二进制   | `npx pkg`            | `yarn dlx pkg`        | `yarn dlx pkg`    |
+| 全局安装     | `npm install -g pkg` | `yarn global add pkg` | 不推荐全局安装    |
+
+## 从 npm 迁移
+
+若项目原先使用 npm，迁移到 Yarn：
+
+```bash
+# 删除 npm 锁文件
+$ rm package-lock.json
+
+# 删除 node_modules
+$ rm -rf node_modules
+
+# 使用 Yarn 安装
+$ yarn install
+```
+
+Yarn 会根据 `package.json` 生成 `yarn.lock`。
+
+## 常见问题
+
+### 依赖安装失败
+
+```bash
+# 清理缓存后重试
+$ yarn cache clean
+$ rm -rf node_modules yarn.lock
+$ yarn install
+```
+
+### PnP 模式下模块找不到
+
+确保 IDE 安装了对应 SDK：
+
+```bash
+$ yarn dlx @yarnpkg/sdks vscode
+```
+
+然后在 VS Code 中选择「使用工作区版本的 TypeScript」。
+
+### 切换回 node_modules 模式
+
+在 `.yarnrc.yml` 中添加：
+
+```yaml
+nodeLinker: node-modules
+```
+
+然后重新安装：
+
+```bash
+$ rm -rf .yarn/cache .pnp.cjs
+$ yarn install
+```
+
+## 参考资料
+
+- [Yarn 官方文档](https://yarnpkg.com/)
+- [Yarn Classic 文档](https://classic.yarnpkg.com/)
+- [Plug'n'Play 说明](https://yarnpkg.com/features/pnp)
+- [Workspaces 指南](https://yarnpkg.com/features/workspaces)

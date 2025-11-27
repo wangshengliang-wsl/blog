@@ -1,8 +1,307 @@
 ---
-title: nrm
-description: nrm
+title: nrm 完全指南
+description: nrm 是 npm registry 源管理工具，本文涵盖安装配置、源切换、自定义源、测速对比等实用技巧
 pubDate: 2025-11-09
 toc: true
 ogImage: true
 category: 包管理工具
 ---
+
+nrm（NPM Registry Manager）用于快速切换 npm 源。国内开发者经常需要在 npm 官方源和国内镜像之间切换，手动修改配置繁琐且易出错，nrm 提供了简洁的命令行方式解决这个问题。
+
+> 本文基于 nrm v1.2.6 编写，适用于 npm、yarn、pnpm。
+
+## 为什么需要 nrm
+
+npm 默认从 `https://registry.npmjs.org` 下载包，由于网络原因，国内访问速度较慢。常见做法是切换到淘宝镜像（npmmirror）或其他国内源。
+
+手动切换源需要记住完整的 URL 并执行配置命令：
+
+```bash
+$ npm config set registry https://registry.npmmirror.com
+```
+
+使用 nrm 只需：
+
+```bash
+$ nrm use taobao
+```
+
+## 安装
+
+```bash
+$ npm install -g nrm
+```
+
+验证安装：
+
+```bash
+$ nrm -V
+1.2.6
+```
+
+## 查看可用源
+
+```bash
+$ nrm ls
+
+  npm ---------- https://registry.npmjs.org/
+  yarn --------- https://registry.yarnpkg.com/
+  tencent ------ https://mirrors.cloud.tencent.com/npm/
+  cnpm --------- https://r.cnpmjs.org/
+  taobao ------- https://registry.npmmirror.com/
+  npmMirror ---- https://skimdb.npmjs.com/registry/
+* huawei ------- https://repo.huaweicloud.com/repository/npm/
+```
+
+`*` 标记表示当前使用的源。
+
+## 切换源
+
+```bash
+# 切换到淘宝镜像
+$ nrm use taobao
+   Registry has been set to: https://registry.npmmirror.com/
+
+# 切换回 npm 官方源
+$ nrm use npm
+   Registry has been set to: https://registry.npmjs.org/
+
+# 切换到腾讯源
+$ nrm use tencent
+   Registry has been set to: https://mirrors.cloud.tencent.com/npm/
+```
+
+切换操作会修改 `~/.npmrc` 中的 `registry` 配置，对 npm、yarn（Classic）、pnpm 均生效。
+
+## 测试源速度
+
+```bash
+# 测试所有源的响应速度
+$ nrm test
+
+  npm ---------- 873 ms
+  yarn --------- 987 ms
+  tencent ------ 134 ms
+  cnpm --------- 236 ms
+  taobao ------- 68 ms
+  npmMirror ---- 1234 ms
+  huawei ------- 89 ms
+
+# 测试指定源
+$ nrm test taobao
+  taobao ------- 68 ms
+```
+
+根据测速结果选择最快的源。通常国内推荐使用 `taobao`（npmmirror）或 `huawei`。
+
+## 添加自定义源
+
+企业内部私有 npm 仓库可以添加为自定义源：
+
+```bash
+$ nrm add <名称> <地址>
+
+# 示例：添加公司私有源
+$ nrm add company https://npm.company.com/
+
+# 验证添加成功
+$ nrm ls
+  npm ---------- https://registry.npmjs.org/
+  ...
+  company ------ https://npm.company.com/
+```
+
+带认证的私有源：
+
+```bash
+$ nrm add company https://npm.company.com/ --home https://npm.company.com
+```
+
+添加后切换使用：
+
+```bash
+$ nrm use company
+```
+
+## 删除源
+
+```bash
+$ nrm del <名称>
+
+# 删除自定义源
+$ nrm del company
+```
+
+内置源无法删除。
+
+## 查看当前源
+
+```bash
+$ nrm current
+
+# 输出
+taobao
+```
+
+或带完整 URL：
+
+```bash
+$ nrm current -u
+
+# 输出
+https://registry.npmmirror.com/
+```
+
+## 打开源主页
+
+```bash
+$ nrm home taobao
+```
+
+会在浏览器中打开对应源的主页。
+
+## 常用国内镜像
+
+| 名称                | 地址                                         | 说明                   |
+| ------------------- | -------------------------------------------- | ---------------------- |
+| npmmirror（原淘宝） | https://registry.npmmirror.com               | 同步频率 10 分钟，推荐 |
+| 腾讯云              | https://mirrors.cloud.tencent.com/npm/       | 腾讯云加速             |
+| 华为云              | https://repo.huaweicloud.com/repository/npm/ | 华为云加速             |
+| cnpm                | https://r.cnpmjs.org                         | 阿里巴巴               |
+
+**注意：** 淘宝源域名已从 `registry.npm.taobao.org` 迁移到 `registry.npmmirror.com`，老域名仍可用但建议更新。
+
+## 配合 yarn/pnpm 使用
+
+nrm 修改的是 `~/.npmrc`，yarn（Classic）和 pnpm 默认也会读取这个配置。
+
+若 yarn 或 pnpm 有独立配置文件覆盖了 registry，需单独处理：
+
+**Yarn Classic**
+
+```bash
+$ yarn config set registry https://registry.npmmirror.com
+```
+
+**Yarn Berry**
+
+在 `.yarnrc.yml` 中：
+
+```yaml
+npmRegistryServer: 'https://registry.npmmirror.com'
+```
+
+**pnpm**
+
+在 `.npmrc`（项目级或用户级）中：
+
+```ini
+registry=https://registry.npmmirror.com
+```
+
+## 项目级源配置
+
+若不想全局切换源，可在项目根目录创建 `.npmrc`：
+
+```ini
+registry=https://registry.npmmirror.com
+```
+
+项目级配置优先级高于用户级，便于团队统一源配置。
+
+这种方式适用于：
+
+- 团队协作需要统一源
+- 项目依赖私有包
+- 避免开发者手动切换源
+
+## nrm 替代方案
+
+### 手动配置
+
+不使用 nrm，直接修改 `~/.npmrc`：
+
+```ini
+registry=https://registry.npmmirror.com
+```
+
+或命令行设置：
+
+```bash
+$ npm config set registry https://registry.npmmirror.com
+```
+
+### 临时使用其他源
+
+安装时指定源，不修改全局配置：
+
+```bash
+$ npm install lodash --registry=https://registry.npmmirror.com
+$ pnpm add lodash --registry=https://registry.npmmirror.com
+```
+
+### cgr（切换源工具）
+
+类似 nrm 的另一个工具：
+
+```bash
+$ npm install -g cgr
+$ cgr use taobao
+```
+
+功能与 nrm 相似，二选一即可。
+
+## 常见问题
+
+### 切换源后仍然慢
+
+可能原因：
+
+1. **缓存问题**：清理缓存后重试
+
+```bash
+$ npm cache clean --force
+$ pnpm store prune
+```
+
+2. **锁文件中的 resolved 地址**：锁文件中记录了包的下载地址，切换源后可能仍从老地址下载
+
+```bash
+$ rm -rf node_modules package-lock.json
+$ npm install
+```
+
+### 私有包和公共包混用
+
+部分包在私有源，部分在 npm 官方源。可在 `.npmrc` 中配置 scope 映射：
+
+```ini
+registry=https://registry.npmmirror.com
+@company:registry=https://npm.company.com/
+```
+
+`@company` 开头的包从私有源下载，其他包从 npmmirror 下载。
+
+### nrm ls 不显示星号
+
+某些终端或 nrm 版本可能有显示问题，使用 `nrm current` 确认当前源。
+
+## 命令速查
+
+| 命令                   | 用途           |
+| ---------------------- | -------------- |
+| `nrm ls`               | 列出所有可用源 |
+| `nrm current`          | 显示当前源     |
+| `nrm use <name>`       | 切换源         |
+| `nrm test`             | 测试所有源速度 |
+| `nrm test <name>`      | 测试指定源速度 |
+| `nrm add <name> <url>` | 添加自定义源   |
+| `nrm del <name>`       | 删除源         |
+| `nrm home <name>`      | 打开源主页     |
+
+## 参考资料
+
+- [nrm GitHub](https://github.com/Pana/nrm)
+- [npmmirror 中国镜像站](https://npmmirror.com/)
+- [npm 配置文档](https://docs.npmjs.com/cli/v10/configuring-npm/npmrc)

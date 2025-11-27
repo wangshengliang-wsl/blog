@@ -1,8 +1,410 @@
 ---
-title: npm
-description: npm
+title: npm 完全指南
+description: npm 是 Node.js 官方包管理器，本文涵盖安装配置、依赖管理、脚本运行、版本控制、发布包等核心操作与实用技巧
 pubDate: 2025-11-09
 toc: true
 ogImage: true
 category: 包管理工具
 ---
+
+npm（Node Package Manager）随 Node.js 一同安装，是 JavaScript 生态中使用最广泛的包管理器。截至 2024 年，npm registry 托管了超过 200 万个包，每周下载量达数十亿次。
+
+> 本文基于 npm v10.x 编写，Node.js v20.x 环境。
+
+## 安装与版本管理
+
+npm 随 Node.js 捆绑安装，无需单独下载。可通过以下命令检查版本：
+
+```bash
+$ node -v
+v20.10.0
+
+$ npm -v
+10.2.3
+```
+
+升级 npm 到最新版本：
+
+```bash
+$ npm install -g npm@latest
+```
+
+若需要安装特定版本：
+
+```bash
+$ npm install -g npm@9.8.1
+```
+
+## 项目初始化
+
+创建新项目时，使用 `npm init` 生成 `package.json`：
+
+```bash
+$ mkdir my-project && cd my-project
+$ npm init
+```
+
+按提示填写项目信息，或使用 `-y` 跳过所有提问，采用默认值：
+
+```bash
+$ npm init -y
+```
+
+生成的 `package.json` 结构如下：
+
+```json
+{
+  "name": "my-project",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
+```
+
+## 依赖管理
+
+### 安装依赖
+
+```bash
+# 安装生产依赖（写入 dependencies）
+$ npm install lodash
+
+# 安装开发依赖（写入 devDependencies）
+$ npm install -D typescript
+
+# 安装指定版本
+$ npm install lodash@4.17.21
+
+# 安装多个包
+$ npm install express cors helmet
+
+# 全局安装
+$ npm install -g typescript
+```
+
+依赖安装后会写入 `package.json`，同时生成 `package-lock.json` 锁定精确版本。
+
+### 依赖类型
+
+| 类型       | 字段                 | 用途             | 安装参数    |
+| ---------- | -------------------- | ---------------- | ----------- |
+| 生产依赖   | dependencies         | 运行时必需       | 默认或 `-S` |
+| 开发依赖   | devDependencies      | 开发/构建时使用  | `-D`        |
+| 可选依赖   | optionalDependencies | 安装失败不阻断   | `-O`        |
+| 同版本依赖 | peerDependencies     | 插件声明宿主版本 | 手动添加    |
+
+### 更新与卸载
+
+```bash
+# 检查过时的包
+$ npm outdated
+
+# 更新指定包
+$ npm update lodash
+
+# 更新所有包（遵循 semver 范围）
+$ npm update
+
+# 卸载包
+$ npm uninstall lodash
+
+# 卸载全局包
+$ npm uninstall -g typescript
+```
+
+### 版本范围语法
+
+`package.json` 中的版本号遵循 [SemVer](https://semver.org/) 规范：
+
+| 写法       | 含义                        |
+| ---------- | --------------------------- |
+| `4.17.21`  | 精确版本                    |
+| `^4.17.21` | 兼容 4.x.x，不低于 4.17.21  |
+| `~4.17.21` | 兼容 4.17.x，不低于 4.17.21 |
+| `>=4.0.0`  | 大于等于指定版本            |
+| `*`        | 任意版本                    |
+
+`^`（caret）是 npm 默认使用的前缀，允许次版本和补丁版本更新，但不允许主版本变更。
+
+## npm scripts
+
+`package.json` 中的 `scripts` 字段用于定义可执行命令：
+
+```json
+{
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "eslint src --ext .ts,.tsx",
+    "test": "vitest",
+    "prepare": "husky install"
+  }
+}
+```
+
+运行脚本：
+
+```bash
+# 内置脚本（test、start、stop、restart）可省略 run
+$ npm test
+$ npm start
+
+# 自定义脚本需要 run
+$ npm run dev
+$ npm run build
+```
+
+### 脚本钩子
+
+npm 支持 `pre` 和 `post` 钩子，在目标脚本前后自动执行：
+
+```json
+{
+  "scripts": {
+    "prebuild": "rm -rf dist",
+    "build": "tsc",
+    "postbuild": "cp package.json dist/"
+  }
+}
+```
+
+执行 `npm run build` 时，会依次运行 `prebuild` → `build` → `postbuild`。
+
+### 传递参数
+
+向脚本传递参数使用 `--`：
+
+```bash
+$ npm run test -- --watch --coverage
+```
+
+## package-lock.json
+
+`package-lock.json` 记录依赖树的精确版本，确保团队成员和 CI 环境安装一致的依赖。
+
+**不要手动编辑此文件**，它由 npm 自动维护。
+
+若遇到依赖问题，可尝试删除后重新安装：
+
+```bash
+$ rm -rf node_modules package-lock.json
+$ npm install
+```
+
+## npx 执行工具
+
+npx 是 npm v5.2.0 引入的命令执行工具，用于运行本地或远程的可执行包：
+
+```bash
+# 运行本地安装的可执行文件
+$ npx eslint src
+
+# 临时下载并执行（不安装到项目）
+$ npx create-react-app my-app
+$ npx degit user/repo my-project
+
+# 指定包版本
+$ npx typescript@5.0.0 --version
+```
+
+npx 会优先查找 `node_modules/.bin`，若本地没有则临时下载执行。
+
+## 配置管理
+
+### 查看与设置配置
+
+```bash
+# 查看所有配置
+$ npm config list
+
+# 查看单个配置
+$ npm config get registry
+
+# 设置配置
+$ npm config set registry https://registry.npmmirror.com
+
+# 删除配置
+$ npm config delete registry
+```
+
+### 常用配置项
+
+| 配置项           | 用途           | 示例值                     |
+| ---------------- | -------------- | -------------------------- |
+| registry         | npm 源地址     | https://registry.npmjs.org |
+| prefix           | 全局包安装路径 | /usr/local                 |
+| cache            | 缓存目录       | ~/.npm                     |
+| init-author-name | 默认作者名     | Your Name                  |
+
+### .npmrc 文件
+
+配置也可写入 `.npmrc` 文件，支持项目级、用户级、全局级三个层级：
+
+```bash
+# 项目级 .npmrc（项目根目录）
+registry=https://registry.npmmirror.com
+
+# 用户级 ~/.npmrc
+//registry.npmjs.org/:_authToken=npm_xxxx
+
+# 全局级 /etc/npmrc
+prefix=/usr/local
+```
+
+项目级配置优先级最高，便于团队统一配置。
+
+## 发布包
+
+### 注册与登录
+
+```bash
+# 注册账号（首次使用）
+$ npm adduser
+
+# 登录
+$ npm login
+
+# 查看当前登录用户
+$ npm whoami
+```
+
+### 发布流程
+
+```bash
+# 1. 确保 package.json 配置正确
+# name、version、main/exports、files 等字段
+
+# 2. 发布
+$ npm publish
+
+# 发布 scoped 包为公开
+$ npm publish --access public
+```
+
+### 版本管理
+
+```bash
+# 升级补丁版本 1.0.0 → 1.0.1
+$ npm version patch
+
+# 升级次版本 1.0.1 → 1.1.0
+$ npm version minor
+
+# 升级主版本 1.1.0 → 2.0.0
+$ npm version major
+
+# 自定义版本
+$ npm version 2.0.0-beta.1
+```
+
+`npm version` 会自动更新 `package.json` 和 `package-lock.json`，并创建 git tag。
+
+### 废弃与删除
+
+```bash
+# 废弃指定版本（不推荐使用，但仍可安装）
+$ npm deprecate my-package@1.0.0 "此版本存在安全问题，请升级"
+
+# 取消发布（72小时内可操作）
+$ npm unpublish my-package@1.0.0
+
+# 取消发布整个包
+$ npm unpublish my-package --force
+```
+
+## 私有包与 Scope
+
+npm 支持 scoped 包，格式为 `@scope/package-name`：
+
+```bash
+# 安装 scoped 包
+$ npm install @babel/core
+
+# 创建 scoped 项目
+$ npm init --scope=myorg
+```
+
+组织级私有包需要付费订阅 npm Pro 或使用私有 registry（如 Verdaccio、Nexus）。
+
+## 安全与审计
+
+```bash
+# 检查已知漏洞
+$ npm audit
+
+# 自动修复可修复的漏洞
+$ npm audit fix
+
+# 强制修复（可能引入破坏性更新）
+$ npm audit fix --force
+
+# 仅显示高危及以上漏洞
+$ npm audit --audit-level=high
+```
+
+## 缓存管理
+
+```bash
+# 查看缓存目录
+$ npm config get cache
+
+# 清理缓存
+$ npm cache clean --force
+
+# 验证缓存完整性
+$ npm cache verify
+```
+
+## Workspaces（Monorepo 支持）
+
+npm v7+ 原生支持 workspaces，适用于 monorepo 项目：
+
+```json
+{
+  "name": "my-monorepo",
+  "workspaces": ["packages/*"]
+}
+```
+
+```bash
+# 在根目录安装所有 workspace 依赖
+$ npm install
+
+# 在指定 workspace 执行命令
+$ npm run build -w packages/core
+
+# 在所有 workspace 执行命令
+$ npm run build --workspaces
+```
+
+## 常用命令速查
+
+| 命令                      | 用途           |
+| ------------------------- | -------------- |
+| `npm init -y`             | 快速初始化项目 |
+| `npm install`             | 安装所有依赖   |
+| `npm install <pkg>`       | 安装生产依赖   |
+| `npm install -D <pkg>`    | 安装开发依赖   |
+| `npm install -g <pkg>`    | 全局安装       |
+| `npm uninstall <pkg>`     | 卸载包         |
+| `npm update`              | 更新依赖       |
+| `npm outdated`            | 检查过时包     |
+| `npm run <script>`        | 运行脚本       |
+| `npm publish`             | 发布包         |
+| `npm version <type>`      | 升级版本       |
+| `npm audit`               | 安全审计       |
+| `npm cache clean --force` | 清理缓存       |
+
+## 参考资料
+
+- [npm 官方文档](https://docs.npmjs.com/)
+- [npm CLI 命令参考](https://docs.npmjs.com/cli/v10/commands)
+- [SemVer 语义化版本](https://semver.org/lang/zh-CN/)
+- [package.json 字段说明](https://docs.npmjs.com/cli/v10/configuring-npm/package-json)
