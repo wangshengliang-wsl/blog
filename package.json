@@ -9,7 +9,7 @@
     "sync": "astro sync",
     "dev": "astro dev --open",
     "check": "astro check",
-    "build": "astro build",
+    "build": "./scripts/build.sh",
     "preview": "astro preview",
     "format": "prettier . --check --ignore-unknown",
     "format:write": "prettier . --write --ignore-unknown --cache",
