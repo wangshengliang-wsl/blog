@@ -1,0 +1,556 @@
+---
+title: 运算符的扩展
+description: 掌握 ES6+ 新增运算符，包括链判断运算符、空值合并运算符、逻辑赋值运算符、指数运算符等，提升代码简洁性和可读性
+pubDate: 2025-11-27
+toc: true
+ogImage: true
+category: ES6+
+---
+
+ES6 及后续版本引入了多个新运算符，解决了长期以来困扰开发者的痛点问题。链判断运算符消除了繁琐的空值检查，空值合并运算符提供了更精确的默认值处理，逻辑赋值运算符则简化了条件赋值的语法。
+
+## 链判断运算符（?.）
+
+ES2020 引入的可选链运算符 `?.`，用于安全地访问深层嵌套的属性。
+
+### 问题场景
+
+访问深层嵌套的属性时，需要逐层检查是否存在：
+
+```javascript
+const user = {
+  profile: {
+    address: {
+      city: '北京',
+    },
+  },
+}
+
+// ES5 写法：繁琐
+const city =
+  user && user.profile && user.profile.address && user.profile.address.city
+
+// 或者用 try-catch
+let city2
+try {
+  city2 = user.profile.address.city
+} catch (e) {
+  city2 = undefined
+}
+```
+
+### 基本用法
+
+```javascript
+const city = user?.profile?.address?.city
+console.log(city) // '北京'
+
+// 如果中间任何一层是 null 或 undefined，返回 undefined
+const user2 = { profile: null }
+console.log(user2?.profile?.address?.city) // undefined，不会报错
+```
+
+### 短路特性
+
+如果 `?.` 左侧的值是 `null` 或 `undefined`，表达式立即返回 `undefined`，不再继续执行：
+
+```javascript
+let count = 0
+const obj = null
+
+obj?.foo(count++)
+console.log(count) // 0，foo 没有被调用
+```
+
+### 三种用法
+
+```javascript
+// 1. 对象属性访问
+obj?.prop
+
+// 2. 方括号属性访问
+obj?.[expr]
+
+// 3. 函数调用
+func?.()
+```
+
+示例：
+
+```javascript
+const obj = {
+  method: () => 'called',
+  nested: {
+    prop: 'value',
+  },
+}
+
+// 属性访问
+console.log(obj?.nested?.prop) // 'value'
+
+// 方括号语法
+const key = 'nested'
+console.log(obj?.[key]?.prop) // 'value'
+
+// 函数调用
+console.log(obj?.method?.()) // 'called'
+console.log(obj?.nonExistent?.()) // undefined
+
+// 数组元素
+const arr = [1, 2, 3]
+console.log(arr?.[0]) // 1
+console.log(arr?.[10]) // undefined
+```
+
+### 与 delete 运算符结合
+
+```javascript
+delete obj?.property
+// 等价于
+obj != null && delete obj.property
+```
+
+### 注意事项
+
+```javascript
+// 只检查 null 和 undefined
+const obj = { prop: 0 }
+console.log(obj?.prop) // 0，0 不触发短路
+
+// 不能用于赋值操作的左侧
+// obj?.prop = 1; // SyntaxError
+
+// 不能用于 super
+// super?.method(); // SyntaxError
+
+// 不能用于模板字符串标签
+// tag?.`string`; // SyntaxError
+
+// 不能用于构造函数
+// new obj?.constructor(); // SyntaxError
+```
+
+## 空值合并运算符（??）
+
+ES2020 引入的 `??` 运算符，当左侧值为 `null` 或 `undefined` 时返回右侧值。
+
+### 与 || 的区别
+
+`||` 在左侧值为假值时返回右侧值，而 `??` 只在左侧为 `null` 或 `undefined` 时返回右侧值：
+
+```javascript
+// || 的问题：0、空字符串、false 都会触发默认值
+const value1 = 0 || 'default'
+const value2 = '' || 'default'
+const value3 = false || 'default'
+
+console.log(value1) // 'default'（非预期）
+console.log(value2) // 'default'（非预期）
+console.log(value3) // 'default'（非预期）
+
+// ?? 更精确
+const value4 = 0 ?? 'default'
+const value5 = '' ?? 'default'
+const value6 = false ?? 'default'
+const value7 = null ?? 'default'
+const value8 = undefined ?? 'default'
+
+console.log(value4) // 0
+console.log(value5) // ''
+console.log(value6) // false
+console.log(value7) // 'default'
+console.log(value8) // 'default'
+```
+
+### 实际应用
+
+```javascript
+// 配置默认值
+function createConfig(options) {
+  return {
+    timeout: options.timeout ?? 3000,
+    retries: options.retries ?? 3,
+    debug: options.debug ?? false,
+  }
+}
+
+const config = createConfig({ timeout: 0, debug: false })
+console.log(config)
+// { timeout: 0, retries: 3, debug: false }
+// 使用 || 的话 timeout 会变成 3000
+
+// 用户输入处理
+const userInput = ''
+const displayValue = userInput ?? '未填写'
+console.log(displayValue) // ''（保留空字符串）
+```
+
+### 短路特性
+
+```javascript
+let x = 0
+null ?? (x = 1)
+console.log(x) // 1
+
+let y = 0
+'value' ?? (y = 1)
+console.log(y) // 0，右侧没有执行
+```
+
+### 与 ?. 配合使用
+
+```javascript
+const user = {
+  settings: {
+    theme: null,
+  },
+}
+
+// 链判断 + 空值合并
+const theme = user?.settings?.theme ?? 'light'
+console.log(theme) // 'light'
+
+const fontSize = user?.settings?.fontSize ?? 14
+console.log(fontSize) // 14
+```
+
+### 优先级和括号
+
+`??` 不能直接与 `&&` 或 `||` 混用，必须加括号明确优先级：
+
+```javascript
+// 错误
+// a ?? b || c; // SyntaxError
+// a || b ?? c; // SyntaxError
+
+// 正确：加括号
+;(a ?? b) || c
+a ?? (b || c)
+a || (b ?? c)
+```
+
+## 逻辑赋值运算符
+
+ES2021 引入了三个逻辑赋值运算符：`||=`、`&&=`、`??=`。
+
+### ||= （逻辑或赋值）
+
+当左侧为假值时，将右侧值赋给左侧：
+
+```javascript
+let a = ''
+a ||= 'default'
+console.log(a) // 'default'
+
+let b = 'existing'
+b ||= 'default'
+console.log(b) // 'existing'
+
+// 等价于
+// a = a || 'default';
+// 但更精确地说是
+// a || (a = 'default');
+```
+
+### &&= （逻辑与赋值）
+
+当左侧为真值时，将右侧值赋给左侧：
+
+```javascript
+let a = 1
+a &&= 2
+console.log(a) // 2
+
+let b = 0
+b &&= 2
+console.log(b) // 0
+
+// 等价于
+// a && (a = 2);
+```
+
+### ??= （空值合并赋值）
+
+当左侧为 `null` 或 `undefined` 时，将右侧值赋给左侧：
+
+```javascript
+let a = null
+a ??= 'default'
+console.log(a) // 'default'
+
+let b = 0
+b ??= 'default'
+console.log(b) // 0
+
+let c = ''
+c ??= 'default'
+console.log(c) // ''
+
+// 等价于
+// a ?? (a = 'default');
+```
+
+### 实际应用
+
+```javascript
+// 初始化对象属性
+const obj = {
+  name: null,
+  count: 0,
+}
+
+obj.name ??= 'Anonymous'
+obj.count ||= 10
+obj.items ??= []
+
+console.log(obj)
+// { name: 'Anonymous', count: 10, items: [] }
+
+// 懒初始化
+class Cache {
+  get(key) {
+    return (this._cache[key] ??= this._compute(key))
+  }
+
+  _compute(key) {
+    console.log(`Computing ${key}`)
+    return key.toUpperCase()
+  }
+
+  _cache = {}
+}
+
+const cache = new Cache()
+console.log(cache.get('hello')) // 'Computing hello', 'HELLO'
+console.log(cache.get('hello')) // 'HELLO'（不再计算）
+```
+
+### 短路特性
+
+这些运算符都有短路特性，如果不需要赋值则不会触发 setter：
+
+```javascript
+const obj = {
+  _value: 1,
+  get value() {
+    console.log('getting')
+    return this._value
+  },
+  set value(v) {
+    console.log('setting', v)
+    this._value = v
+  },
+}
+
+obj.value ||= 2
+// 输出 'getting'，不输出 'setting'
+// 因为 obj.value 是 1（真值），不需要赋值
+
+obj.value &&= 2
+// 输出 'getting'，然后输出 'setting 2'
+```
+
+## 指数运算符（\*\*）
+
+ES2016 引入的指数运算符，替代 `Math.pow()`。
+
+### 基本用法
+
+```javascript
+console.log(2 ** 3) // 8
+console.log(2 ** 10) // 1024
+console.log(10 ** -1) // 0.1
+
+// 等价于
+console.log(Math.pow(2, 3)) // 8
+```
+
+### 右结合
+
+指数运算符是右结合的：
+
+```javascript
+console.log(2 ** (3 ** 2))
+// 等价于 2 ** (3 ** 2) = 2 ** 9 = 512
+// 而非 (2 ** 3) ** 2 = 8 ** 2 = 64
+```
+
+### 赋值运算符
+
+```javascript
+let a = 2
+a **= 3
+console.log(a) // 8
+```
+
+### 注意事项
+
+```javascript
+// 负数基数需要加括号
+// -2 ** 2; // SyntaxError
+;(-2) ** 2 // 4
+;-(2 ** 2) // -4
+
+// 与 BigInt 一起使用
+console.log(2n ** 10n) // 1024n
+```
+
+## in 运算符的私有字段检查
+
+ES2022 扩展了 `in` 运算符，可以检查私有字段：
+
+```javascript
+class Person {
+  #name
+  #age
+
+  constructor(name, age) {
+    this.#name = name
+    this.#age = age
+  }
+
+  static hasName(obj) {
+    return #name in obj
+  }
+
+  static hasAge(obj) {
+    return #age in obj
+  }
+}
+
+const person = new Person('张三', 25)
+console.log(Person.hasName(person)) // true
+console.log(Person.hasAge(person)) // true
+console.log(Person.hasName({})) // false
+```
+
+## 实战应用
+
+### 安全访问 API 响应
+
+```javascript
+async function fetchUser(id) {
+  const response = await fetch(`/api/users/${id}`)
+  const data = await response.json()
+
+  return {
+    name: data?.user?.profile?.name ?? 'Unknown',
+    avatar: data?.user?.profile?.avatar ?? '/default-avatar.png',
+    email: data?.user?.email ?? '',
+    preferences: data?.user?.preferences ?? {},
+  }
+}
+```
+
+### 配置合并
+
+```javascript
+function createServer(userConfig) {
+  const defaultConfig = {
+    port: 3000,
+    host: 'localhost',
+    timeout: 5000,
+    retries: 3,
+    debug: false,
+  }
+
+  return {
+    port: userConfig?.port ?? defaultConfig.port,
+    host: userConfig?.host ?? defaultConfig.host,
+    timeout: userConfig?.timeout ?? defaultConfig.timeout,
+    retries: userConfig?.retries ?? defaultConfig.retries,
+    debug: userConfig?.debug ?? defaultConfig.debug,
+  }
+}
+
+const config = createServer({ port: 8080, timeout: 0 })
+console.log(config)
+// { port: 8080, host: 'localhost', timeout: 0, retries: 3, debug: false }
+```
+
+### 条件调用
+
+```javascript
+const eventHandlers = {
+  onClick: () => console.log('clicked'),
+  // onHover 未定义
+}
+
+// 安全调用
+eventHandlers.onClick?.() // 'clicked'
+eventHandlers.onHover?.() // undefined，不报错
+
+// DOM 事件处理
+document.querySelector('.btn')?.addEventListener('click', handler)
+```
+
+### 默认值链
+
+```javascript
+function getConfig(key) {
+  const envValue = process.env[key]
+  const fileValue = configFile?.[key]
+  const defaultValue = defaults[key]
+
+  return envValue ?? fileValue ?? defaultValue
+}
+```
+
+### 累加器模式
+
+```javascript
+const stats = {}
+
+function recordVisit(page) {
+  stats[page] ??= 0
+  stats[page]++
+}
+
+recordVisit('/home')
+recordVisit('/home')
+recordVisit('/about')
+console.log(stats) // { '/home': 2, '/about': 1 }
+```
+
+### 对象属性懒初始化
+
+```javascript
+class DataStore {
+  _data = {}
+
+  get(key) {
+    return (this._data[key] ??= this._load(key))
+  }
+
+  set(key, value) {
+    this._data[key] = value
+  }
+
+  _load(key) {
+    console.log(`Loading ${key} from storage`)
+    return localStorage.getItem(key)
+  }
+}
+```
+
+## 运算符优先级总结
+
+```javascript
+// 从高到低（部分）
+// ()                  分组
+// ?.                  可选链
+// **                  指数（右结合）
+// * / %               乘除取余
+// + -                 加减
+// < > <= >= in        比较
+// == != === !==       相等
+// &&                  逻辑与
+// ||                  逻辑或
+// ??                  空值合并
+// ? :                 三元
+// = += -= **= ||= &&= ??=  赋值
+```
+
+---
+
+ES6+ 新增的运算符解决了 JavaScript 长期存在的痛点。链判断运算符 `?.` 消除了冗长的空值检查，空值合并运算符 `??` 提供了比 `||` 更精确的默认值处理，逻辑赋值运算符则进一步简化了条件赋值。这些运算符组合使用，能让代码更加简洁、安全且易读。

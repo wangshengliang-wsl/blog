@@ -1,0 +1,594 @@
+---
+title: async/await 异步编程
+description: 深入掌握 ES2017 async/await 语法，理解其与 Promise 的关系，掌握错误处理、并发控制等实战模式
+pubDate: 2025-11-27
+toc: true
+ogImage: true
+category: ES6+
+---
+
+async/await 是 ES2017 引入的异步编程语法糖，建立在 Promise 之上，让异步代码像同步代码一样清晰易读。它是目前最推荐的异步编程方式。
+
+## async 函数基础
+
+### 声明 async 函数
+
+```javascript
+// 函数声明
+async function fetchData() {
+  return 'data'
+}
+
+// 函数表达式
+const fetchData = async function () {
+  return 'data'
+}
+
+// 箭头函数
+const fetchData = async () => {
+  return 'data'
+}
+
+// 对象方法
+const obj = {
+  async getData() {
+    return 'data'
+  },
+}
+
+// 类方法
+class Api {
+  async fetchData() {
+    return 'data'
+  }
+}
+```
+
+### async 函数的返回值
+
+async 函数总是返回一个 Promise：
+
+```javascript
+async function fn() {
+  return 'hello'
+}
+
+fn().then((value) => console.log(value)) // 'hello'
+
+// 等价于
+function fn() {
+  return Promise.resolve('hello')
+}
+```
+
+如果返回值已经是 Promise，则直接返回该 Promise：
+
+```javascript
+async function fn() {
+  return Promise.resolve('hello')
+}
+
+fn().then((value) => console.log(value)) // 'hello'
+```
+
+抛出错误会导致 Promise rejected：
+
+```javascript
+async function fn() {
+  throw new Error('出错了')
+}
+
+fn().catch((error) => console.log(error.message)) // '出错了'
+```
+
+## await 表达式
+
+### 基本用法
+
+`await` 只能在 async 函数内部使用，它会暂停函数执行，等待 Promise 解决：
+
+```javascript
+async function example() {
+  console.log('开始')
+
+  const result = await Promise.resolve('完成')
+  console.log(result)
+
+  console.log('结束')
+}
+
+example()
+// '开始'
+// '完成'
+// '结束'
+```
+
+### await 的求值
+
+`await` 后面可以是任何值：
+
+```javascript
+async function fn() {
+  // Promise
+  const a = await Promise.resolve(1)
+  console.log(a) // 1
+
+  // 普通值（会被包装成 Promise）
+  const b = await 2
+  console.log(b) // 2
+
+  // thenable 对象
+  const c = await {
+    then(resolve) {
+      resolve(3)
+    },
+  }
+  console.log(c) // 3
+}
+```
+
+### await 与 Promise.reject
+
+`await` 一个 rejected 的 Promise 会抛出错误：
+
+```javascript
+async function fn() {
+  await Promise.reject(new Error('出错了'))
+  console.log('不会执行')
+}
+
+fn().catch((error) => console.log(error.message)) // '出错了'
+```
+
+### 顺序执行 vs 并发执行
+
+```javascript
+// 顺序执行（慢）
+async function sequential() {
+  const result1 = await fetchData1() // 等待完成
+  const result2 = await fetchData2() // 再等待完成
+  return [result1, result2]
+}
+
+// 并发执行（快）
+async function concurrent() {
+  const promise1 = fetchData1()
+  const promise2 = fetchData2()
+  const [result1, result2] = await Promise.all([promise1, promise2])
+  return [result1, result2]
+}
+```
+
+## 错误处理
+
+### try...catch
+
+```javascript
+async function fetchData() {
+  try {
+    const response = await fetch('/api/data')
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+    const data = await response.json()
+    return data
+  } catch (error) {
+    console.error('请求失败:', error.message)
+    throw error // 可以重新抛出
+  }
+}
+```
+
+### 多个 await 的错误处理
+
+```javascript
+async function example() {
+  try {
+    const user = await fetchUser()
+    const posts = await fetchPosts(user.id)
+    const comments = await fetchComments(posts[0].id)
+    return { user, posts, comments }
+  } catch (error) {
+    // 任何一步失败都会被捕获
+    console.error('操作失败:', error)
+  }
+}
+```
+
+### .catch() 处理单个 await
+
+```javascript
+async function example() {
+  // 单独处理某个可能失败的操作
+  const user = await fetchUser().catch((error) => {
+    console.log('获取用户失败，使用默认值')
+    return { id: 0, name: 'Guest' }
+  })
+
+  const posts = await fetchPosts(user.id)
+  return { user, posts }
+}
+```
+
+### 错误处理工具函数
+
+```javascript
+// 返回 [error, result] 元组
+async function to(promise) {
+  try {
+    const result = await promise
+    return [null, result]
+  } catch (error) {
+    return [error, null]
+  }
+}
+
+// 使用
+async function example() {
+  const [error, user] = await to(fetchUser())
+  if (error) {
+    console.log('获取用户失败')
+    return
+  }
+  console.log('用户:', user)
+}
+```
+
+## 循环中的 async/await
+
+### for 循环（串行）
+
+```javascript
+async function processItems(items) {
+  const results = []
+  for (const item of items) {
+    const result = await processItem(item)
+    results.push(result)
+  }
+  return results
+}
+```
+
+### for...of 循环（串行）
+
+```javascript
+async function sequential(urls) {
+  for (const url of urls) {
+    const response = await fetch(url)
+    const data = await response.json()
+    console.log(data)
+  }
+}
+```
+
+### Promise.all（并行）
+
+```javascript
+async function parallel(urls) {
+  const promises = urls.map((url) => fetch(url).then((r) => r.json()))
+  const results = await Promise.all(promises)
+  return results
+}
+```
+
+### forEach 的陷阱
+
+`forEach` 中的 async/await 不会按预期工作：
+
+```javascript
+// 错误：forEach 不会等待
+async function wrong(items) {
+  items.forEach(async (item) => {
+    await processItem(item) // 这些会并行执行
+  })
+  console.log('完成') // 在所有操作完成前就输出了
+}
+
+// 正确：使用 for...of
+async function correct(items) {
+  for (const item of items) {
+    await processItem(item)
+  }
+  console.log('完成')
+}
+
+// 或者使用 Promise.all + map
+async function correctParallel(items) {
+  await Promise.all(items.map((item) => processItem(item)))
+  console.log('完成')
+}
+```
+
+### map 配合 Promise.all
+
+```javascript
+async function example(ids) {
+  // 并行获取所有用户
+  const users = await Promise.all(ids.map((id) => fetchUser(id)))
+  return users
+}
+```
+
+### reduce 实现串行
+
+```javascript
+async function serial(tasks) {
+  return tasks.reduce(async (previousPromise, task) => {
+    const results = await previousPromise
+    const result = await task()
+    return [...results, result]
+  }, Promise.resolve([]))
+}
+```
+
+## 并发控制
+
+### 限制并发数
+
+```javascript
+async function limitConcurrency(tasks, limit) {
+  const results = []
+  const executing = []
+
+  for (const task of tasks) {
+    const p = Promise.resolve().then(task)
+    results.push(p)
+
+    if (limit <= tasks.length) {
+      const e = p.then(() => executing.splice(executing.indexOf(e), 1))
+      executing.push(e)
+
+      if (executing.length >= limit) {
+        await Promise.race(executing)
+      }
+    }
+  }
+
+  return Promise.all(results)
+}
+
+// 使用
+const tasks = urls.map((url) => () => fetch(url))
+const results = await limitConcurrency(tasks, 3)
+```
+
+### 使用第三方库
+
+```javascript
+// p-limit
+import pLimit from 'p-limit'
+
+const limit = pLimit(3)
+
+const tasks = urls.map((url) => limit(() => fetch(url)))
+const results = await Promise.all(tasks)
+```
+
+## 顶层 await
+
+ES2022 允许在模块顶层使用 `await`：
+
+```javascript
+// module.js
+const response = await fetch('/api/config')
+export const config = await response.json()
+
+// main.js
+import { config } from './module.js'
+console.log(config)
+```
+
+注意：顶层 await 只能在 ES 模块中使用，不能在 CommonJS 中使用。
+
+## 实战模式
+
+### 超时处理
+
+```javascript
+async function fetchWithTimeout(url, timeout = 5000) {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), timeout)
+
+  try {
+    const response = await fetch(url, { signal: controller.signal })
+    return await response.json()
+  } finally {
+    clearTimeout(timeoutId)
+  }
+}
+
+// 或者使用 Promise.race
+async function fetchWithTimeout(url, timeout = 5000) {
+  const fetchPromise = fetch(url).then((r) => r.json())
+  const timeoutPromise = new Promise((_, reject) => {
+    setTimeout(() => reject(new Error('Timeout')), timeout)
+  })
+  return Promise.race([fetchPromise, timeoutPromise])
+}
+```
+
+### 重试机制
+
+```javascript
+async function retry(fn, retries = 3, delay = 1000) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await fn()
+    } catch (error) {
+      if (i === retries - 1) throw error
+      console.log(`重试 ${i + 1}/${retries}`)
+      await new Promise((r) => setTimeout(r, delay))
+    }
+  }
+}
+
+// 使用
+const data = await retry(() => fetchData(), 3, 2000)
+```
+
+### 指数退避
+
+```javascript
+async function retryWithBackoff(fn, retries = 3, baseDelay = 1000) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await fn()
+    } catch (error) {
+      if (i === retries - 1) throw error
+      const delay = baseDelay * Math.pow(2, i)
+      console.log(`等待 ${delay}ms 后重试`)
+      await new Promise((r) => setTimeout(r, delay))
+    }
+  }
+}
+```
+
+### 轮询
+
+```javascript
+async function poll(fn, interval = 1000, maxAttempts = 10) {
+  for (let i = 0; i < maxAttempts; i++) {
+    const result = await fn()
+    if (result.done) {
+      return result.data
+    }
+    await new Promise((r) => setTimeout(r, interval))
+  }
+  throw new Error('Polling timeout')
+}
+
+// 使用
+const result = await poll(async () => {
+  const response = await fetch('/api/status')
+  const data = await response.json()
+  return { done: data.status === 'complete', data }
+})
+```
+
+### 缓存
+
+```javascript
+function memoize(fn) {
+  const cache = new Map()
+
+  return async function (...args) {
+    const key = JSON.stringify(args)
+
+    if (cache.has(key)) {
+      return cache.get(key)
+    }
+
+    const result = await fn.apply(this, args)
+    cache.set(key, result)
+    return result
+  }
+}
+
+const cachedFetch = memoize(async (url) => {
+  const response = await fetch(url)
+  return response.json()
+})
+```
+
+### 竞态条件处理
+
+```javascript
+function createLatestOnly() {
+  let latestId = 0
+
+  return async function (fn) {
+    const id = ++latestId
+    const result = await fn()
+
+    // 只有最新的请求才返回结果
+    if (id === latestId) {
+      return result
+    }
+    throw new Error('Stale request')
+  }
+}
+
+const latestOnly = createLatestOnly()
+
+// 使用：快速连续调用时，只有最后一次会返回结果
+async function search(query) {
+  try {
+    return await latestOnly(() => fetch(`/api/search?q=${query}`))
+  } catch (error) {
+    if (error.message === 'Stale request') {
+      return null // 忽略过期的请求
+    }
+    throw error
+  }
+}
+```
+
+### 批量请求
+
+```javascript
+function createBatcher(fn, delay = 50) {
+  let batch = []
+  let timeout = null
+
+  return function (item) {
+    return new Promise((resolve, reject) => {
+      batch.push({ item, resolve, reject })
+
+      if (!timeout) {
+        timeout = setTimeout(async () => {
+          const currentBatch = batch
+          batch = []
+          timeout = null
+
+          try {
+            const results = await fn(currentBatch.map((b) => b.item))
+            currentBatch.forEach((b, i) => b.resolve(results[i]))
+          } catch (error) {
+            currentBatch.forEach((b) => b.reject(error))
+          }
+        }, delay)
+      }
+    })
+  }
+}
+
+// 使用
+const batchedFetch = createBatcher(async (ids) => {
+  const response = await fetch('/api/users', {
+    method: 'POST',
+    body: JSON.stringify({ ids }),
+  })
+  return response.json()
+})
+
+// 这些会被合并成一个请求
+const [user1, user2, user3] = await Promise.all([
+  batchedFetch(1),
+  batchedFetch(2),
+  batchedFetch(3),
+])
+```
+
+## async/await vs Promise
+
+```javascript
+// Promise 链
+function fetchUserPosts() {
+  return fetchUser()
+    .then((user) => fetchPosts(user.id))
+    .then((posts) => fetchComments(posts[0].id))
+    .then((comments) => ({ comments }))
+}
+
+// async/await（更清晰）
+async function fetchUserPosts() {
+  const user = await fetchUser()
+  const posts = await fetchPosts(user.id)
+  const comments = await fetchComments(posts[0].id)
+  return { comments }
+}
+```
+
+---
+
+async/await 让异步代码的编写变得更加直观和易于维护。它保留了 Promise 的强大功能，同时提供了类似同步代码的编写体验。掌握错误处理、并发控制和各种实战模式，能够让你写出更加健壮的异步代码。

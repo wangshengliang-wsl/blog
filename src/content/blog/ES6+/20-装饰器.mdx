@@ -1,0 +1,1090 @@
+---
+title: 装饰器（Decorator）
+description: 深入掌握 JavaScript 装饰器提案，理解类装饰器、方法装饰器、访问器装饰器、字段装饰器的使用，以及装饰器的实战应用模式
+pubDate: 2025-11-27
+toc: true
+ogImage: true
+category: ES6+
+---
+
+装饰器（Decorator）是一种用于修改类及其成员的语法。它提供了一种声明式的方式来添加元数据、修改行为或实现横切关注点。JavaScript 装饰器提案经历了多次修改，目前处于 Stage 3 阶段，本文将介绍最新的装饰器语法规范。
+
+## 装饰器基础
+
+### 什么是装饰器
+
+装饰器是一种特殊的函数，以 `@` 符号为前缀，可以附加到类声明、方法、访问器、字段或参数上。装饰器在类定义时执行，而非实例化时。
+
+```javascript
+// 装饰器是一个函数
+function logged(value, context) {
+  // value: 被装饰的值
+  // context: 包含元数据的上下文对象
+}
+
+// 使用装饰器
+@logged
+class MyClass {}
+```
+
+### 装饰器的上下文对象
+
+每个装饰器都会接收一个上下文对象，包含：
+
+```typescript
+interface DecoratorContext {
+  kind: 'class' | 'method' | 'getter' | 'setter' | 'field' | 'accessor'
+  name: string | symbol
+  access?: {
+    get?(): unknown
+    set?(value: unknown): void
+  }
+  private?: boolean
+  static?: boolean
+  addInitializer?(initializer: () => void): void
+  metadata: object
+}
+```
+
+### 启用装饰器
+
+装饰器目前需要通过编译器支持：
+
+```json
+// TypeScript tsconfig.json
+{
+  "compilerOptions": {
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true
+  }
+}
+
+// Babel babel.config.json
+{
+  "plugins": [
+    ["@babel/plugin-proposal-decorators", { "version": "2023-11" }]
+  ]
+}
+```
+
+## 类装饰器
+
+### 基本用法
+
+类装饰器应用于类构造函数，可以用来修改或替换类定义：
+
+```javascript
+function sealed(value, context) {
+  if (context.kind === 'class') {
+    Object.seal(value)
+    Object.seal(value.prototype)
+  }
+}
+
+@sealed
+class MyClass {
+  method() {}
+}
+
+// 类和原型都被密封
+// Object.isSealed(MyClass); // true
+// Object.isSealed(MyClass.prototype); // true
+```
+
+### 返回新类
+
+类装饰器可以返回一个新的类来替换原类：
+
+```javascript
+function withTimestamp(value, context) {
+  if (context.kind === 'class') {
+    return class extends value {
+      constructor(...args) {
+        super(...args)
+        this.createdAt = new Date()
+      }
+    }
+  }
+}
+
+@withTimestamp
+class User {
+  constructor(name) {
+    this.name = name
+  }
+}
+
+const user = new User('张三')
+console.log(user.name) // '张三'
+console.log(user.createdAt) // Date 对象
+```
+
+### 类装饰器工厂
+
+装饰器工厂是返回装饰器的函数，允许传入参数：
+
+```javascript
+function entity(tableName) {
+  return function (value, context) {
+    if (context.kind === 'class') {
+      value.tableName = tableName
+      return value
+    }
+  }
+}
+
+@entity('users')
+class User {
+  constructor(name) {
+    this.name = name
+  }
+}
+
+console.log(User.tableName) // 'users'
+```
+
+### 添加初始化逻辑
+
+使用 `addInitializer` 添加类初始化逻辑：
+
+```javascript
+const registry = new Map()
+
+function register(value, context) {
+  if (context.kind === 'class') {
+    context.addInitializer(function () {
+      registry.set(context.name, value)
+    })
+  }
+}
+
+@register
+class ServiceA {}
+
+@register
+class ServiceB {}
+
+console.log(registry.get('ServiceA')) // ServiceA
+console.log(registry.get('ServiceB')) // ServiceB
+```
+
+## 方法装饰器
+
+### 基本用法
+
+方法装饰器用于修改类的方法：
+
+```javascript
+function log(value, context) {
+  if (context.kind === 'method') {
+    return function (...args) {
+      console.log(`Calling ${context.name} with:`, args)
+      const result = value.apply(this, args)
+      console.log(`${context.name} returned:`, result)
+      return result
+    }
+  }
+}
+
+class Calculator {
+  @log
+  add(a, b) {
+    return a + b
+  }
+}
+
+const calc = new Calculator()
+calc.add(2, 3)
+// 'Calling add with: [2, 3]'
+// 'add returned: 5'
+```
+
+### 方法装饰器工厂
+
+```javascript
+function throttle(delay) {
+  return function (value, context) {
+    if (context.kind === 'method') {
+      let lastCall = 0
+
+      return function (...args) {
+        const now = Date.now()
+        if (now - lastCall >= delay) {
+          lastCall = now
+          return value.apply(this, args)
+        }
+      }
+    }
+  }
+}
+
+function debounce(delay) {
+  return function (value, context) {
+    if (context.kind === 'method') {
+      let timeoutId
+
+      return function (...args) {
+        clearTimeout(timeoutId)
+        timeoutId = setTimeout(() => {
+          value.apply(this, args)
+        }, delay)
+      }
+    }
+  }
+}
+
+class SearchBox {
+  @debounce(300)
+  search(query) {
+    console.log('Searching for:', query)
+  }
+
+  @throttle(1000)
+  scroll() {
+    console.log('Scrolling...')
+  }
+}
+```
+
+### 异步方法装饰器
+
+```javascript
+function retry(times, delay = 1000) {
+  return function (value, context) {
+    if (context.kind === 'method') {
+      return async function (...args) {
+        let lastError
+
+        for (let i = 0; i < times; i++) {
+          try {
+            return await value.apply(this, args)
+          } catch (error) {
+            lastError = error
+            console.log(`Attempt ${i + 1} failed, retrying in ${delay}ms...`)
+            await new Promise((r) => setTimeout(r, delay))
+          }
+        }
+
+        throw lastError
+      }
+    }
+  }
+}
+
+class Api {
+  @retry(3, 1000)
+  async fetchData(url) {
+    const response = await fetch(url)
+    if (!response.ok) throw new Error('Request failed')
+    return response.json()
+  }
+}
+```
+
+### 访问控制
+
+```javascript
+function bound(value, context) {
+  if (context.kind === 'method') {
+    context.addInitializer(function () {
+      this[context.name] = value.bind(this)
+    })
+  }
+}
+
+class Button {
+  text = 'Click me'
+
+  @bound
+  handleClick() {
+    console.log(this.text)
+  }
+}
+
+const btn = new Button()
+const { handleClick } = btn
+handleClick() // 'Click me'（this 正确绑定）
+```
+
+## 访问器装饰器
+
+### getter/setter 装饰器
+
+```javascript
+function lazy(value, context) {
+  if (context.kind === 'getter') {
+    return function () {
+      const result = value.call(this)
+      Object.defineProperty(this, context.name, {
+        value: result,
+        writable: false,
+      })
+      return result
+    }
+  }
+}
+
+class DataService {
+  @lazy
+  get expensiveData() {
+    console.log('Computing expensive data...')
+    return Array.from({ length: 1000000 }, (_, i) => i)
+  }
+}
+
+const service = new DataService()
+service.expensiveData // 'Computing expensive data...'
+service.expensiveData // 无输出（使用缓存值）
+```
+
+### 验证 setter
+
+```javascript
+function validate(validator) {
+  return function (value, context) {
+    if (context.kind === 'setter') {
+      return function (newValue) {
+        if (!validator(newValue)) {
+          throw new Error(`Invalid value for ${context.name}`)
+        }
+        value.call(this, newValue)
+      }
+    }
+  }
+}
+
+class User {
+  #age
+
+  get age() {
+    return this.#age
+  }
+
+  @validate((v) => typeof v === 'number' && v >= 0 && v <= 150)
+  set age(value) {
+    this.#age = value
+  }
+}
+
+const user = new User()
+user.age = 25 // OK
+// user.age = -5; // Error: Invalid value for age
+```
+
+## 自动访问器装饰器
+
+### accessor 关键字
+
+ES2022 引入了 `accessor` 关键字，自动生成 getter 和 setter：
+
+```javascript
+class Person {
+  accessor name = ''
+  accessor age = 0
+}
+
+// 等价于
+class Person {
+  #name = ''
+  #age = 0
+
+  get name() {
+    return this.#name
+  }
+  set name(value) {
+    this.#name = value
+  }
+
+  get age() {
+    return this.#age
+  }
+  set age(value) {
+    this.#age = value
+  }
+}
+```
+
+### 装饰自动访问器
+
+```javascript
+function tracked(value, context) {
+  if (context.kind === 'accessor') {
+    let { get, set } = value
+
+    return {
+      get() {
+        console.log(`Getting ${context.name}`)
+        return get.call(this)
+      },
+      set(newValue) {
+        console.log(`Setting ${context.name} to ${newValue}`)
+        set.call(this, newValue)
+      },
+      init(initialValue) {
+        console.log(`Initializing ${context.name} to ${initialValue}`)
+        return initialValue
+      },
+    }
+  }
+}
+
+class Model {
+  @tracked
+  accessor value = 0
+}
+
+const model = new Model()
+// 'Initializing value to 0'
+model.value = 42
+// 'Setting value to 42'
+console.log(model.value)
+// 'Getting value'
+// 42
+```
+
+### 响应式系统
+
+```javascript
+function reactive(value, context) {
+  if (context.kind === 'accessor') {
+    const { get, set } = value
+    const listeners = new Set()
+
+    return {
+      get() {
+        // 依赖收集（简化版）
+        return get.call(this)
+      },
+      set(newValue) {
+        const oldValue = get.call(this)
+        if (oldValue !== newValue) {
+          set.call(this, newValue)
+          // 触发更新
+          listeners.forEach((fn) => fn(newValue, oldValue))
+        }
+      },
+      init(initialValue) {
+        return initialValue
+      },
+    }
+  }
+}
+
+class Store {
+  @reactive
+  accessor count = 0
+}
+```
+
+## 字段装饰器
+
+### 基本用法
+
+字段装饰器用于修改类字段的初始值：
+
+```javascript
+function defaultValue(value) {
+  return function (_, context) {
+    if (context.kind === 'field') {
+      return function (initialValue) {
+        return initialValue ?? value
+      }
+    }
+  }
+}
+
+class Config {
+  @defaultValue('localhost')
+  host
+
+  @defaultValue(3000)
+  port
+
+  @defaultValue('development')
+  env = process.env.NODE_ENV
+}
+
+const config = new Config()
+console.log(config.host) // 'localhost'
+console.log(config.port) // 3000
+console.log(config.env) // 取决于环境变量
+```
+
+### 字段验证
+
+```javascript
+function type(expectedType) {
+  return function (_, context) {
+    if (context.kind === 'field') {
+      return function (initialValue) {
+        if (
+          initialValue !== undefined &&
+          typeof initialValue !== expectedType
+        ) {
+          throw new TypeError(
+            `${context.name} must be ${expectedType}, got ${typeof initialValue}`
+          )
+        }
+        return initialValue
+      }
+    }
+  }
+}
+
+class Person {
+  @type('string')
+  name = '张三'
+
+  @type('number')
+  age = 25
+}
+```
+
+### 只读字段
+
+```javascript
+function readonly(_, context) {
+  if (context.kind === 'field') {
+    return function (initialValue) {
+      context.addInitializer(function () {
+        Object.defineProperty(this, context.name, {
+          value: initialValue,
+          writable: false,
+          configurable: false,
+        })
+      })
+      return initialValue
+    }
+  }
+}
+
+class Constants {
+  @readonly
+  PI = 3.14159
+
+  @readonly
+  E = 2.71828
+}
+
+const constants = new Constants()
+// constants.PI = 3; // TypeError in strict mode
+```
+
+## 装饰器组合
+
+### 多个装饰器
+
+装饰器可以叠加使用，从下到上执行（类似函数组合）：
+
+```javascript
+function first(value, context) {
+  console.log('first decorator')
+  return value
+}
+
+function second(value, context) {
+  console.log('second decorator')
+  return value
+}
+
+class Example {
+  @first
+  @second
+  method() {}
+}
+
+// 输出顺序：
+// 'second decorator'（先执行）
+// 'first decorator'（后执行）
+```
+
+### 装饰器管道
+
+```javascript
+function compose(...decorators) {
+  return function (value, context) {
+    return decorators.reduceRight((acc, decorator) => {
+      return decorator(acc, context) ?? acc
+    }, value)
+  }
+}
+
+// 使用
+class Api {
+  @compose(log, retry(3), throttle(1000))
+  async fetchData() {
+    // ...
+  }
+}
+```
+
+## 元数据
+
+### 使用 metadata
+
+装饰器可以通过 `context.metadata` 存储和共享元数据：
+
+```javascript
+function meta(key, value) {
+  return function (_, context) {
+    context.metadata[key] = value
+  }
+}
+
+function getMeta(cls) {
+  return cls[Symbol.metadata]
+}
+
+@meta('version', '1.0.0')
+@meta('author', '张三')
+class MyClass {
+  @meta('required', true)
+  name
+
+  @meta('deprecated', true)
+  oldMethod() {}
+}
+
+const metadata = getMeta(MyClass)
+console.log(metadata)
+// { version: '1.0.0', author: '张三', ... }
+```
+
+### 反射元数据
+
+```javascript
+const TYPE_KEY = Symbol('type')
+const REQUIRED_KEY = Symbol('required')
+
+function Type(type) {
+  return function (_, context) {
+    if (context.kind === 'field') {
+      context.metadata[TYPE_KEY] ??= {}
+      context.metadata[TYPE_KEY][context.name] = type
+    }
+  }
+}
+
+function Required(_, context) {
+  if (context.kind === 'field') {
+    context.metadata[REQUIRED_KEY] ??= []
+    context.metadata[REQUIRED_KEY].push(context.name)
+  }
+}
+
+class User {
+  @Type(String)
+  @Required
+  name
+
+  @Type(Number)
+  @Required
+  age
+
+  @Type(String)
+  email
+}
+
+function validate(instance) {
+  const metadata = instance.constructor[Symbol.metadata]
+  const required = metadata[REQUIRED_KEY] || []
+  const types = metadata[TYPE_KEY] || {}
+
+  for (const field of required) {
+    if (instance[field] === undefined) {
+      throw new Error(`${field} is required`)
+    }
+  }
+
+  for (const [field, type] of Object.entries(types)) {
+    const value = instance[field]
+    if (value !== undefined && value.constructor !== type) {
+      throw new Error(`${field} must be ${type.name}`)
+    }
+  }
+
+  return true
+}
+```
+
+## 实战应用
+
+### 依赖注入
+
+```javascript
+const container = new Map()
+
+function Injectable(_, context) {
+  if (context.kind === 'class') {
+    context.addInitializer(function () {
+      container.set(context.name, this)
+    })
+  }
+}
+
+function Inject(serviceName) {
+  return function (_, context) {
+    if (context.kind === 'field') {
+      return function () {
+        return container.get(serviceName)
+      }
+    }
+  }
+}
+
+@Injectable
+class Logger {
+  log(message) {
+    console.log(`[LOG] ${message}`)
+  }
+}
+
+@Injectable
+class Database {
+  query(sql) {
+    console.log(`[DB] Executing: ${sql}`)
+  }
+}
+
+class UserService {
+  @Inject('Logger')
+  logger
+
+  @Inject('Database')
+  db
+
+  createUser(name) {
+    this.logger.log(`Creating user: ${name}`)
+    this.db.query(`INSERT INTO users (name) VALUES ('${name}')`)
+  }
+}
+
+// 初始化服务
+new Logger()
+new Database()
+
+const userService = new UserService()
+userService.createUser('张三')
+// '[LOG] Creating user: 张三'
+// '[DB] Executing: INSERT INTO users (name) VALUES ('张三')'
+```
+
+### API 路由装饰器
+
+```javascript
+const routes = []
+
+function Controller(basePath) {
+  return function (value, context) {
+    if (context.kind === 'class') {
+      context.addInitializer(function () {
+        const metadata = context.metadata.routes || []
+        metadata.forEach((route) => {
+          routes.push({
+            ...route,
+            path: basePath + route.path,
+            handler: route.handler.bind(new value()),
+          })
+        })
+      })
+    }
+  }
+}
+
+function Route(method, path) {
+  return function (value, context) {
+    if (context.kind === 'method') {
+      context.metadata.routes ??= []
+      context.metadata.routes.push({
+        method,
+        path,
+        handler: value,
+      })
+    }
+  }
+}
+
+const Get = (path) => Route('GET', path)
+const Post = (path) => Route('POST', path)
+const Put = (path) => Route('PUT', path)
+const Delete = (path) => Route('DELETE', path)
+
+@Controller('/api/users')
+class UserController {
+  @Get('/')
+  getAll() {
+    return { users: [] }
+  }
+
+  @Get('/:id')
+  getById(id) {
+    return { user: { id } }
+  }
+
+  @Post('/')
+  create(data) {
+    return { created: data }
+  }
+
+  @Delete('/:id')
+  delete(id) {
+    return { deleted: id }
+  }
+}
+
+// 初始化
+new UserController()
+
+console.log(routes)
+// [
+//   { method: 'GET', path: '/api/users/', handler: [Function] },
+//   { method: 'GET', path: '/api/users/:id', handler: [Function] },
+//   { method: 'POST', path: '/api/users/', handler: [Function] },
+//   { method: 'DELETE', path: '/api/users/:id', handler: [Function] }
+// ]
+```
+
+### 缓存装饰器
+
+```javascript
+function Cached(ttl = 60000) {
+  return function (value, context) {
+    if (context.kind === 'method') {
+      const cache = new Map()
+
+      return function (...args) {
+        const key = JSON.stringify(args)
+        const cached = cache.get(key)
+
+        if (cached && Date.now() - cached.timestamp < ttl) {
+          return cached.value
+        }
+
+        const result = value.apply(this, args)
+
+        if (result instanceof Promise) {
+          return result.then((resolved) => {
+            cache.set(key, { value: resolved, timestamp: Date.now() })
+            return resolved
+          })
+        }
+
+        cache.set(key, { value: result, timestamp: Date.now() })
+        return result
+      }
+    }
+  }
+}
+
+class DataService {
+  @Cached(5000) // 缓存 5 秒
+  async fetchUser(id) {
+    console.log('Fetching user from API...')
+    const response = await fetch(`/api/users/${id}`)
+    return response.json()
+  }
+
+  @Cached(10000) // 缓存 10 秒
+  computeExpensive(n) {
+    console.log('Computing...')
+    let result = 0
+    for (let i = 0; i < n; i++) {
+      result += Math.sqrt(i)
+    }
+    return result
+  }
+}
+```
+
+### 性能监控
+
+```javascript
+function Measure(value, context) {
+  if (context.kind === 'method') {
+    return function (...args) {
+      const start = performance.now()
+      const result = value.apply(this, args)
+
+      if (result instanceof Promise) {
+        return result.finally(() => {
+          const duration = performance.now() - start
+          console.log(`${context.name} took ${duration.toFixed(2)}ms`)
+        })
+      }
+
+      const duration = performance.now() - start
+      console.log(`${context.name} took ${duration.toFixed(2)}ms`)
+      return result
+    }
+  }
+}
+
+function TrackCalls(value, context) {
+  if (context.kind === 'method') {
+    let callCount = 0
+
+    const wrapper = function (...args) {
+      callCount++
+      console.log(`${context.name} called ${callCount} time(s)`)
+      return value.apply(this, args)
+    }
+
+    wrapper.getCallCount = () => callCount
+    wrapper.resetCallCount = () => {
+      callCount = 0
+    }
+
+    return wrapper
+  }
+}
+
+class Service {
+  @Measure
+  @TrackCalls
+  async processData(data) {
+    // 模拟处理
+    await new Promise((r) => setTimeout(r, 100))
+    return data
+  }
+}
+```
+
+### 表单验证装饰器
+
+```javascript
+const VALIDATORS_KEY = Symbol('validators')
+
+function createValidator(name, validator, message) {
+  return function (_, context) {
+    if (context.kind === 'field') {
+      context.metadata[VALIDATORS_KEY] ??= {}
+      context.metadata[VALIDATORS_KEY][context.name] ??= []
+      context.metadata[VALIDATORS_KEY][context.name].push({
+        name,
+        validator,
+        message,
+      })
+    }
+  }
+}
+
+const Required = (message = 'This field is required') =>
+  createValidator(
+    'required',
+    (v) => v !== null && v !== undefined && v !== '',
+    message
+  )
+
+const MinLength = (min, message = `Minimum length is ${min}`) =>
+  createValidator('minLength', (v) => String(v).length >= min, message)
+
+const MaxLength = (max, message = `Maximum length is ${max}`) =>
+  createValidator('maxLength', (v) => String(v).length <= max, message)
+
+const Email = (message = 'Invalid email format') =>
+  createValidator('email', (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v), message)
+
+const Pattern = (regex, message = 'Invalid format') =>
+  createValidator('pattern', (v) => regex.test(v), message)
+
+class FormData {
+  @Required()
+  @MinLength(2)
+  @MaxLength(50)
+  name
+
+  @Required()
+  @Email()
+  email
+
+  @MinLength(8)
+  @Pattern(/[A-Z]/, 'Must contain uppercase letter')
+  @Pattern(/[0-9]/, 'Must contain number')
+  password
+}
+
+function validateForm(instance) {
+  const metadata = instance.constructor[Symbol.metadata]
+  const validators = metadata[VALIDATORS_KEY] || {}
+  const errors = {}
+
+  for (const [field, rules] of Object.entries(validators)) {
+    const value = instance[field]
+    const fieldErrors = []
+
+    for (const rule of rules) {
+      if (!rule.validator(value)) {
+        fieldErrors.push(rule.message)
+      }
+    }
+
+    if (fieldErrors.length > 0) {
+      errors[field] = fieldErrors
+    }
+  }
+
+  return {
+    valid: Object.keys(errors).length === 0,
+    errors,
+  }
+}
+
+// 使用
+const form = new FormData()
+form.name = '张'
+form.email = 'invalid-email'
+form.password = 'weak'
+
+const result = validateForm(form)
+console.log(result)
+// {
+//   valid: false,
+//   errors: {
+//     name: ['Minimum length is 2'],
+//     email: ['Invalid email format'],
+//     password: ['Must contain uppercase letter', 'Must contain number']
+//   }
+// }
+```
+
+## 遗留装饰器（Stage 2）
+
+TypeScript 和 Babel 中常用的旧版装饰器语法：
+
+```javascript
+// 旧版类装饰器
+function legacyClassDecorator(constructor) {
+  return class extends constructor {
+    newProperty = 'new property'
+  }
+}
+
+// 旧版方法装饰器
+function legacyMethodDecorator(target, propertyKey, descriptor) {
+  const originalMethod = descriptor.value
+
+  descriptor.value = function (...args) {
+    console.log('Before method')
+    const result = originalMethod.apply(this, args)
+    console.log('After method')
+    return result
+  }
+
+  return descriptor
+}
+
+// 旧版属性装饰器
+function legacyPropertyDecorator(target, propertyKey) {
+  // target: 类的原型（实例属性）或类本身（静态属性）
+  // propertyKey: 属性名
+}
+
+// 旧版参数装饰器
+function legacyParameterDecorator(target, propertyKey, parameterIndex) {
+  // parameterIndex: 参数在函数参数列表中的索引
+}
+```
+
+---
+
+装饰器为 JavaScript 提供了一种优雅的元编程方式，能够以声明式的方法修改类的行为。虽然装饰器提案仍在演进中，但它已经被广泛应用于 TypeScript 项目中，特别是在依赖注入、路由定义、验证等场景。理解装饰器的工作原理和应用模式，能够帮助你编写更加简洁和可维护的代码。

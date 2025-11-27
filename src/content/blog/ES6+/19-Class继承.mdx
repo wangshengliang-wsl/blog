@@ -1,0 +1,1136 @@
+---
+title: Class 的继承机制
+description: 深入掌握 ES6 Class 继承语法，理解 extends、super 关键字、原型链继承、静态成员继承，以及 Mixin 模式等高级技巧
+pubDate: 2025-11-27
+toc: true
+ogImage: true
+category: ES6+
+---
+
+ES6 Class 通过 `extends` 关键字实现继承，比 ES5 的原型继承更加清晰和易于理解。本文将深入探讨类继承的各个方面，包括 super 的使用、原型链、静态继承以及多继承的实现方式。
+
+## 基本继承
+
+### extends 关键字
+
+使用 `extends` 创建子类：
+
+```javascript
+class Animal {
+  constructor(name) {
+    this.name = name
+  }
+
+  speak() {
+    console.log(`${this.name} makes a sound.`)
+  }
+
+  eat() {
+    console.log(`${this.name} is eating.`)
+  }
+}
+
+class Dog extends Animal {
+  constructor(name, breed) {
+    super(name) // 调用父类构造函数
+    this.breed = breed
+  }
+
+  speak() {
+    console.log(`${this.name} barks.`)
+  }
+
+  fetch() {
+    console.log(`${this.name} fetches the ball.`)
+  }
+}
+
+const dog = new Dog('Buddy', 'Golden Retriever')
+dog.speak() // 'Buddy barks.'
+dog.eat() // 'Buddy is eating.'（继承自父类）
+dog.fetch() // 'Buddy fetches the ball.'
+```
+
+### 继承关系验证
+
+```javascript
+const dog = new Dog('Buddy', 'Labrador')
+
+console.log(dog instanceof Dog) // true
+console.log(dog instanceof Animal) // true
+console.log(dog instanceof Object) // true
+
+console.log(Dog.prototype instanceof Animal) // true
+```
+
+### 无 constructor 的继承
+
+如果子类没有定义 constructor，会自动生成：
+
+```javascript
+class Cat extends Animal {
+  // 没有 constructor
+  meow() {
+    console.log(`${this.name} meows.`)
+  }
+}
+
+// 等价于
+class Cat extends Animal {
+  constructor(...args) {
+    super(...args)
+  }
+
+  meow() {
+    console.log(`${this.name} meows.`)
+  }
+}
+
+const cat = new Cat('Whiskers')
+cat.speak() // 'Whiskers makes a sound.'
+cat.meow() // 'Whiskers meows.'
+```
+
+## super 关键字
+
+### 作为函数调用
+
+在子类 constructor 中，`super()` 调用父类的构造函数：
+
+```javascript
+class Parent {
+  constructor(value) {
+    this.value = value
+    console.log('Parent constructor called')
+  }
+}
+
+class Child extends Parent {
+  constructor(value, extra) {
+    // 必须在使用 this 之前调用 super()
+    super(value)
+    this.extra = extra
+    console.log('Child constructor called')
+  }
+}
+
+const child = new Child(1, 2)
+// 'Parent constructor called'
+// 'Child constructor called'
+console.log(child.value) // 1
+console.log(child.extra) // 2
+```
+
+### super() 必须先调用
+
+在子类构造函数中，必须在使用 `this` 之前调用 `super()`：
+
+```javascript
+class Parent {
+  constructor() {
+    this.parentProp = 'parent'
+  }
+}
+
+class Child extends Parent {
+  constructor() {
+    // this.childProp = 'child'; // ReferenceError: Must call super first
+    super()
+    this.childProp = 'child'
+  }
+}
+```
+
+### 作为对象使用
+
+在普通方法中，`super` 指向父类的原型对象：
+
+```javascript
+class Parent {
+  greet() {
+    return 'Hello from Parent'
+  }
+
+  getValue() {
+    return 42
+  }
+}
+
+class Child extends Parent {
+  greet() {
+    // super 指向 Parent.prototype
+    const parentGreeting = super.greet()
+    return `${parentGreeting}, and Hello from Child`
+  }
+
+  getDoubleValue() {
+    return super.getValue() * 2
+  }
+}
+
+const child = new Child()
+console.log(child.greet()) // 'Hello from Parent, and Hello from Child'
+console.log(child.getDoubleValue()) // 84
+```
+
+### 静态方法中的 super
+
+在静态方法中，`super` 指向父类：
+
+```javascript
+class Parent {
+  static staticMethod() {
+    return 'Parent static method'
+  }
+
+  static create() {
+    return new this()
+  }
+}
+
+class Child extends Parent {
+  static staticMethod() {
+    return super.staticMethod() + ' + Child static method'
+  }
+
+  static createWithValue(value) {
+    const instance = super.create()
+    instance.value = value
+    return instance
+  }
+}
+
+console.log(Child.staticMethod())
+// 'Parent static method + Child static method'
+
+const child = Child.createWithValue(100)
+console.log(child instanceof Child) // true
+console.log(child.value) // 100
+```
+
+### super 的 this 绑定
+
+通过 `super` 调用父类方法时，`this` 仍然指向当前实例：
+
+```javascript
+class Parent {
+  constructor() {
+    this.name = 'parent'
+  }
+
+  getName() {
+    return this.name
+  }
+}
+
+class Child extends Parent {
+  constructor() {
+    super()
+    this.name = 'child'
+  }
+
+  getParentName() {
+    return super.getName() // this 仍指向 child 实例
+  }
+}
+
+const child = new Child()
+console.log(child.getParentName()) // 'child'（不是 'parent'）
+```
+
+### super 赋值行为
+
+通过 `super.prop = value` 赋值时，赋值给 `this`：
+
+```javascript
+class Parent {
+  constructor() {
+    this.x = 1
+  }
+}
+
+class Child extends Parent {
+  constructor() {
+    super()
+    super.x = 2 // 等价于 this.x = 2
+    console.log(super.x) // undefined（从 Parent.prototype 读取）
+    console.log(this.x) // 2
+  }
+}
+
+new Child()
+```
+
+## 方法重写
+
+### 基本重写
+
+```javascript
+class Shape {
+  getArea() {
+    return 0
+  }
+
+  describe() {
+    return `A shape with area ${this.getArea()}`
+  }
+}
+
+class Rectangle extends Shape {
+  constructor(width, height) {
+    super()
+    this.width = width
+    this.height = height
+  }
+
+  // 重写父类方法
+  getArea() {
+    return this.width * this.height
+  }
+}
+
+class Circle extends Shape {
+  constructor(radius) {
+    super()
+    this.radius = radius
+  }
+
+  getArea() {
+    return Math.PI * this.radius ** 2
+  }
+}
+
+const rect = new Rectangle(10, 5)
+const circle = new Circle(7)
+
+console.log(rect.describe()) // 'A shape with area 50'
+console.log(circle.describe()) // 'A shape with area 153.938...'
+```
+
+### 扩展父类方法
+
+```javascript
+class Logger {
+  log(message) {
+    console.log(`[LOG] ${message}`)
+  }
+}
+
+class TimestampLogger extends Logger {
+  log(message) {
+    const timestamp = new Date().toISOString()
+    super.log(`${timestamp} - ${message}`)
+  }
+}
+
+class PrefixLogger extends Logger {
+  constructor(prefix) {
+    super()
+    this.prefix = prefix
+  }
+
+  log(message) {
+    super.log(`${this.prefix}: ${message}`)
+  }
+}
+
+const tsLogger = new TimestampLogger()
+tsLogger.log('Hello') // '[LOG] 2025-11-27T... - Hello'
+
+const prefixLogger = new PrefixLogger('App')
+prefixLogger.log('Started') // '[LOG] App: Started'
+```
+
+## 继承内置类
+
+### 继承 Array
+
+```javascript
+class MyArray extends Array {
+  // 获取第一个元素
+  first() {
+    return this[0]
+  }
+
+  // 获取最后一个元素
+  last() {
+    return this[this.length - 1]
+  }
+
+  // 求和
+  sum() {
+    return this.reduce((a, b) => a + b, 0)
+  }
+
+  // 去重
+  unique() {
+    return new MyArray(...new Set(this))
+  }
+}
+
+const arr = new MyArray(1, 2, 3, 2, 1)
+console.log(arr.first()) // 1
+console.log(arr.last()) // 1
+console.log(arr.sum()) // 9
+console.log(arr.unique()) // MyArray [1, 2, 3]
+
+// 继承的方法返回 MyArray 实例
+const mapped = arr.map((x) => x * 2)
+console.log(mapped instanceof MyArray) // true
+console.log(mapped.sum()) // 18
+```
+
+### 继承 Error
+
+```javascript
+class ValidationError extends Error {
+  constructor(message, field) {
+    super(message)
+    this.name = 'ValidationError'
+    this.field = field
+
+    // 修复堆栈跟踪
+    if (Error.captureStackTrace) {
+      Error.captureStackTrace(this, ValidationError)
+    }
+  }
+}
+
+class NotFoundError extends Error {
+  constructor(resource, id) {
+    super(`${resource} with id ${id} not found`)
+    this.name = 'NotFoundError'
+    this.resource = resource
+    this.id = id
+  }
+}
+
+function validateUser(user) {
+  if (!user.name) {
+    throw new ValidationError('Name is required', 'name')
+  }
+  if (!user.email) {
+    throw new ValidationError('Email is required', 'email')
+  }
+}
+
+try {
+  validateUser({ name: '张三' })
+} catch (e) {
+  if (e instanceof ValidationError) {
+    console.log(`Validation failed for ${e.field}: ${e.message}`)
+  }
+}
+```
+
+### 继承 Map/Set
+
+```javascript
+class ObservableMap extends Map {
+  #listeners = []
+
+  onChange(listener) {
+    this.#listeners.push(listener)
+    return () => {
+      const index = this.#listeners.indexOf(listener)
+      if (index > -1) this.#listeners.splice(index, 1)
+    }
+  }
+
+  #notify(action, key, value) {
+    for (const listener of this.#listeners) {
+      listener({ action, key, value })
+    }
+  }
+
+  set(key, value) {
+    const result = super.set(key, value)
+    this.#notify('set', key, value)
+    return result
+  }
+
+  delete(key) {
+    const result = super.delete(key)
+    if (result) this.#notify('delete', key)
+    return result
+  }
+
+  clear() {
+    super.clear()
+    this.#notify('clear')
+  }
+}
+
+const map = new ObservableMap()
+
+map.onChange(({ action, key, value }) => {
+  console.log(`Action: ${action}, Key: ${key}, Value: ${value}`)
+})
+
+map.set('name', '张三') // 'Action: set, Key: name, Value: 张三'
+map.set('age', 25) // 'Action: set, Key: age, Value: 25'
+map.delete('name') // 'Action: delete, Key: name, Value: undefined'
+```
+
+### Symbol.species
+
+控制派生类方法返回的实例类型：
+
+```javascript
+class MyArray extends Array {
+  // 让 map/filter 等方法返回普通 Array
+  static get [Symbol.species]() {
+    return Array
+  }
+}
+
+const myArr = new MyArray(1, 2, 3)
+const mapped = myArr.map((x) => x * 2)
+
+console.log(myArr instanceof MyArray) // true
+console.log(mapped instanceof MyArray) // false
+console.log(mapped instanceof Array) // true
+```
+
+## 原型链详解
+
+### 两条继承链
+
+ES6 类继承实际上建立了两条原型链：
+
+```javascript
+class Parent {
+  static staticMethod() {}
+  instanceMethod() {}
+}
+
+class Child extends Parent {}
+
+// 1. 实例原型链（子类实例继承父类原型方法）
+console.log(Child.prototype.__proto__ === Parent.prototype) // true
+
+// 2. 静态原型链（子类继承父类静态方法）
+console.log(Child.__proto__ === Parent) // true
+```
+
+### 完整原型链图
+
+```javascript
+class Animal {
+  speak() {}
+}
+
+class Dog extends Animal {
+  bark() {}
+}
+
+const dog = new Dog()
+
+// 实例 → Dog.prototype → Animal.prototype → Object.prototype → null
+console.log(dog.__proto__ === Dog.prototype) // true
+console.log(Dog.prototype.__proto__ === Animal.prototype) // true
+console.log(Animal.prototype.__proto__ === Object.prototype) // true
+console.log(Object.prototype.__proto__ === null) // true
+
+// Dog → Animal → Function.prototype → Object.prototype
+console.log(Dog.__proto__ === Animal) // true
+console.log(Animal.__proto__ === Function.prototype) // true
+```
+
+### Object.getPrototypeOf
+
+```javascript
+class Parent {}
+class Child extends Parent {}
+
+console.log(Object.getPrototypeOf(Child) === Parent) // true
+console.log(Object.getPrototypeOf(Child.prototype) === Parent.prototype) // true
+```
+
+## 静态成员继承
+
+### 静态属性和方法的继承
+
+```javascript
+class Parent {
+  static count = 0
+
+  static increment() {
+    return ++this.count
+  }
+
+  static describe() {
+    return `Class ${this.name}`
+  }
+}
+
+class Child extends Parent {}
+
+// 继承静态属性
+console.log(Child.count) // 0
+
+// 继承静态方法
+console.log(Child.increment()) // 1
+console.log(Parent.count) // 0（Child 有自己的 count）
+console.log(Child.count) // 1
+
+// this 指向调用的类
+console.log(Parent.describe()) // 'Class Parent'
+console.log(Child.describe()) // 'Class Child'
+```
+
+### 静态私有成员
+
+私有静态成员不会被继承：
+
+```javascript
+class Parent {
+  static #privateStatic = 'parent private'
+
+  static getPrivate() {
+    return this.#privateStatic
+  }
+}
+
+class Child extends Parent {
+  // Child 无法访问 Parent 的 #privateStatic
+}
+
+console.log(Parent.getPrivate()) // 'parent private'
+// Child.getPrivate() 会报错，因为 Child 没有 #privateStatic
+```
+
+## 抽象类模式
+
+JavaScript 没有原生的抽象类，但可以模拟：
+
+```javascript
+class AbstractShape {
+  constructor() {
+    if (new.target === AbstractShape) {
+      throw new Error('Cannot instantiate abstract class')
+    }
+  }
+
+  // 抽象方法
+  getArea() {
+    throw new Error('Method getArea() must be implemented')
+  }
+
+  getPerimeter() {
+    throw new Error('Method getPerimeter() must be implemented')
+  }
+
+  // 具体方法
+  describe() {
+    return `Area: ${this.getArea()}, Perimeter: ${this.getPerimeter()}`
+  }
+}
+
+class Rectangle extends AbstractShape {
+  constructor(width, height) {
+    super()
+    this.width = width
+    this.height = height
+  }
+
+  getArea() {
+    return this.width * this.height
+  }
+
+  getPerimeter() {
+    return 2 * (this.width + this.height)
+  }
+}
+
+// const shape = new AbstractShape(); // Error: Cannot instantiate abstract class
+
+const rect = new Rectangle(10, 5)
+console.log(rect.describe()) // 'Area: 50, Perimeter: 30'
+```
+
+## Mixin 模式
+
+JavaScript 不支持多继承，但可以通过 Mixin 实现类似功能：
+
+### 基本 Mixin
+
+```javascript
+// Mixin 函数
+const Serializable = (Base) =>
+  class extends Base {
+    toJSON() {
+      return JSON.stringify(this)
+    }
+
+    static fromJSON(json) {
+      return Object.assign(new this(), JSON.parse(json))
+    }
+  }
+
+const Timestamped = (Base) =>
+  class extends Base {
+    constructor(...args) {
+      super(...args)
+      this.createdAt = new Date()
+      this.updatedAt = new Date()
+    }
+
+    touch() {
+      this.updatedAt = new Date()
+    }
+  }
+
+const Loggable = (Base) =>
+  class extends Base {
+    log(message) {
+      console.log(`[${this.constructor.name}] ${message}`)
+    }
+  }
+
+// 组合使用
+class User extends Loggable(Timestamped(Serializable(Object))) {
+  constructor(name, email) {
+    super()
+    this.name = name
+    this.email = email
+  }
+}
+
+const user = new User('张三', 'zhangsan@example.com')
+user.log('Created') // '[User] Created'
+console.log(user.toJSON()) // '{"createdAt":"...","updatedAt":"...","name":"张三","email":"..."}'
+console.log(user.createdAt instanceof Date) // true
+```
+
+### Mixin 工厂
+
+```javascript
+function mixin(...mixins) {
+  return function (Base) {
+    return mixins.reduce((acc, mixin) => mixin(acc), Base)
+  }
+}
+
+// 使用
+@mixin(Loggable, Timestamped, Serializable) // 装饰器语法（需要配置）
+class Product {
+  constructor(name, price) {
+    this.name = name
+    this.price = price
+  }
+}
+
+// 或者不用装饰器
+class Product extends mixin(Loggable, Timestamped, Serializable)(Object) {
+  constructor(name, price) {
+    super()
+    this.name = name
+    this.price = price
+  }
+}
+```
+
+### 接口式 Mixin
+
+```javascript
+const Flyable = {
+  fly() {
+    console.log(`${this.name} is flying`)
+  },
+  land() {
+    console.log(`${this.name} has landed`)
+  },
+}
+
+const Swimmable = {
+  swim() {
+    console.log(`${this.name} is swimming`)
+  },
+  dive() {
+    console.log(`${this.name} is diving`)
+  },
+}
+
+function applyMixins(target, ...mixins) {
+  mixins.forEach((mixin) => {
+    Object.getOwnPropertyNames(mixin).forEach((name) => {
+      Object.defineProperty(
+        target.prototype,
+        name,
+        Object.getOwnPropertyDescriptor(mixin, name)
+      )
+    })
+  })
+}
+
+class Duck {
+  constructor(name) {
+    this.name = name
+  }
+
+  quack() {
+    console.log(`${this.name} says quack!`)
+  }
+}
+
+applyMixins(Duck, Flyable, Swimmable)
+
+const duck = new Duck('Donald')
+duck.quack() // 'Donald says quack!'
+duck.fly() // 'Donald is flying'
+duck.swim() // 'Donald is swimming'
+```
+
+## new.target
+
+### 检测构造函数调用
+
+`new.target` 返回被 new 调用的构造函数：
+
+```javascript
+class Parent {
+  constructor() {
+    console.log(new.target.name)
+  }
+}
+
+class Child extends Parent {
+  constructor() {
+    super()
+  }
+}
+
+new Parent() // 'Parent'
+new Child() // 'Child'
+```
+
+### 实现抽象类
+
+```javascript
+class AbstractRepository {
+  constructor() {
+    if (new.target === AbstractRepository) {
+      throw new Error('Cannot instantiate AbstractRepository directly')
+    }
+  }
+
+  async findAll() {
+    throw new Error('findAll must be implemented')
+  }
+
+  async findById(id) {
+    throw new Error('findById must be implemented')
+  }
+
+  async save(entity) {
+    throw new Error('save must be implemented')
+  }
+
+  async delete(id) {
+    throw new Error('delete must be implemented')
+  }
+}
+
+class UserRepository extends AbstractRepository {
+  #users = new Map()
+
+  async findAll() {
+    return [...this.#users.values()]
+  }
+
+  async findById(id) {
+    return this.#users.get(id)
+  }
+
+  async save(user) {
+    this.#users.set(user.id, user)
+    return user
+  }
+
+  async delete(id) {
+    return this.#users.delete(id)
+  }
+}
+
+// const repo = new AbstractRepository(); // Error
+const userRepo = new UserRepository() // OK
+```
+
+## 继承的实战模式
+
+### 模板方法模式
+
+```javascript
+class DataProcessor {
+  // 模板方法
+  async process(data) {
+    const validated = await this.validate(data)
+    const transformed = await this.transform(validated)
+    const result = await this.save(transformed)
+    await this.notify(result)
+    return result
+  }
+
+  // 钩子方法，子类可以重写
+  async validate(data) {
+    return data
+  }
+
+  async transform(data) {
+    return data
+  }
+
+  async save(data) {
+    throw new Error('save must be implemented')
+  }
+
+  async notify(result) {
+    // 默认不做任何事
+  }
+}
+
+class UserDataProcessor extends DataProcessor {
+  async validate(data) {
+    if (!data.email) throw new Error('Email is required')
+    if (!data.name) throw new Error('Name is required')
+    return data
+  }
+
+  async transform(data) {
+    return {
+      ...data,
+      email: data.email.toLowerCase(),
+      createdAt: new Date(),
+    }
+  }
+
+  async save(data) {
+    // 保存到数据库
+    console.log('Saving user:', data)
+    return { id: Date.now(), ...data }
+  }
+
+  async notify(result) {
+    console.log('Sending welcome email to:', result.email)
+  }
+}
+
+const processor = new UserDataProcessor()
+processor.process({ name: '张三', email: 'ZHANGSAN@example.com' })
+```
+
+### 装饰器模式
+
+```javascript
+class Coffee {
+  cost() {
+    return 5
+  }
+
+  description() {
+    return 'Coffee'
+  }
+}
+
+class CoffeeDecorator extends Coffee {
+  constructor(coffee) {
+    super()
+    this.coffee = coffee
+  }
+
+  cost() {
+    return this.coffee.cost()
+  }
+
+  description() {
+    return this.coffee.description()
+  }
+}
+
+class MilkDecorator extends CoffeeDecorator {
+  cost() {
+    return super.cost() + 2
+  }
+
+  description() {
+    return super.description() + ', Milk'
+  }
+}
+
+class SugarDecorator extends CoffeeDecorator {
+  cost() {
+    return super.cost() + 1
+  }
+
+  description() {
+    return super.description() + ', Sugar'
+  }
+}
+
+class WhipDecorator extends CoffeeDecorator {
+  cost() {
+    return super.cost() + 3
+  }
+
+  description() {
+    return super.description() + ', Whip'
+  }
+}
+
+// 使用
+let coffee = new Coffee()
+coffee = new MilkDecorator(coffee)
+coffee = new SugarDecorator(coffee)
+coffee = new WhipDecorator(coffee)
+
+console.log(coffee.description()) // 'Coffee, Milk, Sugar, Whip'
+console.log(coffee.cost()) // 11
+```
+
+### 状态模式
+
+```javascript
+class State {
+  handle(context) {
+    throw new Error('handle must be implemented')
+  }
+}
+
+class IdleState extends State {
+  handle(context) {
+    console.log('Idle: Starting work...')
+    context.setState(new WorkingState())
+  }
+}
+
+class WorkingState extends State {
+  handle(context) {
+    console.log('Working: Taking a break...')
+    context.setState(new BreakState())
+  }
+}
+
+class BreakState extends State {
+  #breakCount = 0
+
+  handle(context) {
+    this.#breakCount++
+    if (this.#breakCount >= 3) {
+      console.log('Break: Going home...')
+      context.setState(new IdleState())
+    } else {
+      console.log('Break: Back to work...')
+      context.setState(new WorkingState())
+    }
+  }
+}
+
+class Worker {
+  #state
+
+  constructor() {
+    this.#state = new IdleState()
+  }
+
+  setState(state) {
+    this.#state = state
+  }
+
+  work() {
+    this.#state.handle(this)
+  }
+}
+
+const worker = new Worker()
+worker.work() // 'Idle: Starting work...'
+worker.work() // 'Working: Taking a break...'
+worker.work() // 'Break: Back to work...'
+worker.work() // 'Working: Taking a break...'
+worker.work() // 'Break: Back to work...'
+worker.work() // 'Working: Taking a break...'
+worker.work() // 'Break: Going home...'
+```
+
+### 组合模式
+
+```javascript
+class Component {
+  constructor(name) {
+    this.name = name
+  }
+
+  add(component) {
+    throw new Error('add not supported')
+  }
+
+  remove(component) {
+    throw new Error('remove not supported')
+  }
+
+  display(depth = 0) {
+    throw new Error('display must be implemented')
+  }
+}
+
+class Leaf extends Component {
+  display(depth = 0) {
+    console.log(`${'  '.repeat(depth)}- ${this.name}`)
+  }
+}
+
+class Composite extends Component {
+  #children = []
+
+  add(component) {
+    this.#children.push(component)
+    return this
+  }
+
+  remove(component) {
+    const index = this.#children.indexOf(component)
+    if (index > -1) {
+      this.#children.splice(index, 1)
+    }
+    return this
+  }
+
+  display(depth = 0) {
+    console.log(`${'  '.repeat(depth)}+ ${this.name}`)
+    for (const child of this.#children) {
+      child.display(depth + 1)
+    }
+  }
+}
+
+// 使用：文件系统结构
+const root = new Composite('root')
+const src = new Composite('src')
+const components = new Composite('components')
+
+root.add(src)
+root.add(new Leaf('package.json'))
+root.add(new Leaf('README.md'))
+
+src.add(components)
+src.add(new Leaf('index.js'))
+src.add(new Leaf('App.js'))
+
+components.add(new Leaf('Button.js'))
+components.add(new Leaf('Modal.js'))
+
+root.display()
+// + root
+//   + src
+//     + components
+//       - Button.js
+//       - Modal.js
+//     - index.js
+//     - App.js
+//   - package.json
+//   - README.md
+```
+
+---
+
+ES6 Class 继承机制让 JavaScript 的面向对象编程变得更加规范和清晰。通过 `extends` 和 `super` 关键字，可以方便地创建类层次结构。理解原型链、静态继承和 Mixin 模式，能够帮助你设计出更加灵活和可维护的代码结构。在下一篇中，我们将探讨 JavaScript 的装饰器特性。

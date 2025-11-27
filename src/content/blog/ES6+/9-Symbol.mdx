@@ -1,0 +1,585 @@
+---
+title: Symbol 类型详解
+description: 深入理解 ES6 Symbol 原始类型，掌握其唯一性特性、内置 Symbol、Symbol.for/keyFor 的使用，以及在元编程中的应用
+pubDate: 2025-11-27
+toc: true
+ogImage: true
+category: ES6+
+---
+
+ES6 引入了第七种原始数据类型 `Symbol`，用于创建唯一的标识符。它主要解决对象属性名冲突的问题，同时为 JavaScript 提供了元编程能力。
+
+## Symbol 的基本概念
+
+### 创建 Symbol
+
+Symbol 通过 `Symbol()` 函数创建，每次调用都会生成一个全新的、唯一的值：
+
+```javascript
+const s1 = Symbol()
+const s2 = Symbol()
+
+console.log(s1 === s2) // false
+
+console.log(typeof s1) // 'symbol'
+```
+
+可以传入描述字符串，用于调试和显示，但不影响唯一性：
+
+```javascript
+const s1 = Symbol('foo')
+const s2 = Symbol('foo')
+
+console.log(s1 === s2) // false，描述相同但仍是不同的 Symbol
+console.log(s1.toString()) // 'Symbol(foo)'
+console.log(s1.description) // 'foo'（ES2019）
+```
+
+### 不能使用 new
+
+Symbol 是原始类型，不能使用 `new` 调用：
+
+```javascript
+new Symbol() // TypeError: Symbol is not a constructor
+```
+
+### 类型转换
+
+Symbol 不能隐式转换为字符串或数字：
+
+```javascript
+const sym = Symbol('test')
+
+// 不能隐式转换
+// console.log('Symbol: ' + sym); // TypeError
+// console.log(sym + 1); // TypeError
+
+// 可以显式转换为字符串
+console.log(String(sym)) // 'Symbol(test)'
+console.log(sym.toString()) // 'Symbol(test)'
+
+// 可以转换为布尔值
+console.log(Boolean(sym)) // true
+console.log(!sym) // false
+
+// 不能转换为数字
+// Number(sym); // TypeError
+```
+
+## Symbol 作为对象属性
+
+Symbol 最主要的用途是作为对象的属性名，确保属性名的唯一性。
+
+### 基本用法
+
+```javascript
+const myKey = Symbol('myKey')
+
+// 方式一：计算属性名
+const obj1 = {
+  [myKey]: 'value1',
+}
+
+// 方式二：Object.defineProperty
+const obj2 = {}
+Object.defineProperty(obj2, myKey, { value: 'value2' })
+
+// 方式三：直接赋值
+const obj3 = {}
+obj3[myKey] = 'value3'
+
+// 访问
+console.log(obj1[myKey]) // 'value1'
+console.log(obj2[myKey]) // 'value2'
+console.log(obj3[myKey]) // 'value3'
+
+// 注意：不能用点运算符
+// obj1.myKey 会访问字符串 'myKey' 属性，而非 Symbol
+```
+
+### 避免属性名冲突
+
+```javascript
+// 场景：扩展第三方对象
+const thirdPartyObj = { name: '第三方对象' }
+
+// 使用字符串可能冲突
+// thirdPartyObj.id = 1; // 可能覆盖原有属性
+
+// 使用 Symbol 确保安全
+const myId = Symbol('id')
+thirdPartyObj[myId] = 1
+
+console.log(thirdPartyObj[myId]) // 1
+console.log(thirdPartyObj.name) // '第三方对象'
+```
+
+### Symbol 属性的遍历
+
+Symbol 属性不会出现在常规遍历中：
+
+```javascript
+const sym = Symbol('sym')
+const obj = {
+  [sym]: 'symbol value',
+  name: '张三',
+  age: 25,
+}
+
+// for...in 不包含 Symbol
+for (const key in obj) {
+  console.log(key) // 'name', 'age'
+}
+
+// Object.keys 不包含 Symbol
+console.log(Object.keys(obj)) // ['name', 'age']
+
+// JSON.stringify 不包含 Symbol
+console.log(JSON.stringify(obj)) // '{"name":"张三","age":25}'
+
+// Object.getOwnPropertyNames 不包含 Symbol
+console.log(Object.getOwnPropertyNames(obj)) // ['name', 'age']
+```
+
+获取 Symbol 属性需要专门的方法：
+
+```javascript
+// Object.getOwnPropertySymbols
+console.log(Object.getOwnPropertySymbols(obj)) // [Symbol(sym)]
+
+// Reflect.ownKeys（获取所有键）
+console.log(Reflect.ownKeys(obj)) // ['name', 'age', Symbol(sym)]
+```
+
+这个特性可以用来定义"私有"属性：
+
+```javascript
+const _count = Symbol('count')
+
+class Counter {
+  constructor() {
+    this[_count] = 0
+  }
+
+  increment() {
+    this[_count]++
+  }
+
+  get count() {
+    return this[_count]
+  }
+}
+
+const counter = new Counter()
+counter.increment()
+console.log(counter.count) // 1
+console.log(Object.keys(counter)) // []，看不到 _count
+```
+
+## Symbol.for() 和 Symbol.keyFor()
+
+### Symbol.for()
+
+`Symbol.for()` 在全局 Symbol 注册表中搜索，如果已存在则返回它，否则创建新的：
+
+```javascript
+const s1 = Symbol.for('foo')
+const s2 = Symbol.for('foo')
+
+console.log(s1 === s2) // true
+
+// 与 Symbol() 不同
+const s3 = Symbol('foo')
+console.log(s1 === s3) // false
+```
+
+`Symbol.for()` 的 key 是全局的，可以在不同的 iframe 或 Worker 中共享：
+
+```javascript
+// main.js
+const sharedSymbol = Symbol.for('shared')
+
+// worker.js 或另一个 iframe
+const sameSymbol = Symbol.for('shared')
+// sharedSymbol === sameSymbol 为 true
+```
+
+### Symbol.keyFor()
+
+返回已登记的 Symbol 的 key：
+
+```javascript
+const s1 = Symbol.for('foo')
+console.log(Symbol.keyFor(s1)) // 'foo'
+
+const s2 = Symbol('bar')
+console.log(Symbol.keyFor(s2)) // undefined，非全局注册
+```
+
+## 内置 Symbol
+
+ES6 定义了多个内置 Symbol，用于暴露语言内部行为。
+
+### Symbol.iterator
+
+定义对象的默认迭代器：
+
+```javascript
+const myIterable = {
+  data: [1, 2, 3],
+  [Symbol.iterator]() {
+    let index = 0
+    const data = this.data
+    return {
+      next() {
+        if (index < data.length) {
+          return { value: data[index++], done: false }
+        }
+        return { value: undefined, done: true }
+      },
+    }
+  },
+}
+
+for (const value of myIterable) {
+  console.log(value) // 1, 2, 3
+}
+
+console.log([...myIterable]) // [1, 2, 3]
+```
+
+### Symbol.toStringTag
+
+自定义 `Object.prototype.toString()` 的返回值：
+
+```javascript
+class MyClass {
+  get [Symbol.toStringTag]() {
+    return 'MyClass'
+  }
+}
+
+const obj = new MyClass()
+console.log(Object.prototype.toString.call(obj)) // '[object MyClass]'
+console.log(obj.toString()) // '[object MyClass]'
+```
+
+### Symbol.toPrimitive
+
+定义对象到原始值的转换行为：
+
+```javascript
+const obj = {
+  [Symbol.toPrimitive](hint) {
+    switch (hint) {
+      case 'number':
+        return 42
+      case 'string':
+        return 'hello'
+      default: // 'default'
+        return true
+    }
+  },
+}
+
+console.log(+obj) // 42（hint: 'number'）
+console.log(`${obj}`) // 'hello'（hint: 'string'）
+console.log(obj + '') // 'true'（hint: 'default'）
+```
+
+### Symbol.hasInstance
+
+自定义 `instanceof` 的行为：
+
+```javascript
+class MyArray {
+  static [Symbol.hasInstance](instance) {
+    return Array.isArray(instance)
+  }
+}
+
+console.log([] instanceof MyArray) // true
+console.log({} instanceof MyArray) // false
+console.log([1, 2] instanceof MyArray) // true
+```
+
+### Symbol.isConcatSpreadable
+
+控制数组在 `concat` 时是否展开：
+
+```javascript
+const arr1 = [1, 2]
+const arr2 = [3, 4]
+arr2[Symbol.isConcatSpreadable] = false
+
+console.log(arr1.concat(arr2)) // [1, 2, [3, 4]]
+
+// 让类数组对象可展开
+const arrayLike = {
+  0: 'a',
+  1: 'b',
+  length: 2,
+  [Symbol.isConcatSpreadable]: true,
+}
+
+console.log(['x'].concat(arrayLike)) // ['x', 'a', 'b']
+```
+
+### Symbol.species
+
+指定创建派生对象时使用的构造函数：
+
+```javascript
+class MyArray extends Array {
+  static get [Symbol.species]() {
+    return Array // map/filter 等方法返回普通 Array
+  }
+}
+
+const myArr = new MyArray(1, 2, 3)
+const mapped = myArr.map((x) => x * 2)
+
+console.log(mapped instanceof MyArray) // false
+console.log(mapped instanceof Array) // true
+```
+
+### Symbol.match、Symbol.replace、Symbol.search、Symbol.split
+
+自定义字符串方法的行为：
+
+```javascript
+class Matcher {
+  constructor(value) {
+    this.value = value
+  }
+
+  [Symbol.match](string) {
+    const index = string.indexOf(this.value)
+    if (index === -1) return null
+    return [this.value]
+  }
+
+  [Symbol.replace](string, replacement) {
+    return string.split(this.value).join(replacement)
+  }
+}
+
+const matcher = new Matcher('o')
+console.log('hello'.match(matcher)) // ['o']
+console.log('hello'.replace(matcher, '0')) // 'hell0'
+```
+
+### Symbol.unscopables
+
+指定使用 `with` 语句时哪些属性会被排除：
+
+```javascript
+const obj = {
+  foo: 1,
+  bar: 2,
+  [Symbol.unscopables]: {
+    bar: true,
+  },
+}
+
+with (obj) {
+  console.log(foo) // 1
+  // console.log(bar); // ReferenceError，bar 被排除
+}
+```
+
+`Array.prototype` 就使用了这个特性：
+
+```javascript
+console.log(Array.prototype[Symbol.unscopables])
+// { at: true, copyWithin: true, entries: true, fill: true, ... }
+```
+
+## 实战应用
+
+### 实现私有属性
+
+```javascript
+const _balance = Symbol('balance')
+const _validate = Symbol('validate')
+
+class BankAccount {
+  constructor(initialBalance) {
+    this[_balance] = initialBalance
+  }
+
+  [_validate](amount) {
+    if (amount <= 0) {
+      throw new Error('Amount must be positive')
+    }
+  }
+
+  deposit(amount) {
+    this[_validate](amount)
+    this[_balance] += amount
+  }
+
+  withdraw(amount) {
+    this[_validate](amount)
+    if (amount > this[_balance]) {
+      throw new Error('Insufficient funds')
+    }
+    this[_balance] -= amount
+  }
+
+  get balance() {
+    return this[_balance]
+  }
+}
+
+const account = new BankAccount(100)
+account.deposit(50)
+console.log(account.balance) // 150
+console.log(Object.keys(account)) // []
+```
+
+### 实现枚举
+
+```javascript
+const Color = Object.freeze({
+  RED: Symbol('RED'),
+  GREEN: Symbol('GREEN'),
+  BLUE: Symbol('BLUE'),
+})
+
+function getColorName(color) {
+  switch (color) {
+    case Color.RED:
+      return '红色'
+    case Color.GREEN:
+      return '绿色'
+    case Color.BLUE:
+      return '蓝色'
+    default:
+      throw new Error('Unknown color')
+  }
+}
+
+console.log(getColorName(Color.RED)) // '红色'
+
+// 不会与其他值冲突
+console.log(Color.RED === 'RED') // false
+console.log(Color.RED === Symbol('RED')) // false
+```
+
+### 消除魔术字符串
+
+```javascript
+// 不好的做法
+function handleShape(shape) {
+  if (shape === 'triangle') {
+    // ...
+  } else if (shape === 'circle') {
+    // ...
+  }
+}
+
+// 使用 Symbol
+const ShapeType = {
+  TRIANGLE: Symbol('triangle'),
+  CIRCLE: Symbol('circle'),
+  SQUARE: Symbol('square'),
+}
+
+function handleShape(shape) {
+  switch (shape) {
+    case ShapeType.TRIANGLE:
+      return 'Triangle'
+    case ShapeType.CIRCLE:
+      return 'Circle'
+    case ShapeType.SQUARE:
+      return 'Square'
+  }
+}
+```
+
+### 实现单例模式
+
+```javascript
+const INSTANCE = Symbol('instance')
+
+class Singleton {
+  static [INSTANCE] = null
+
+  static getInstance() {
+    if (!this[INSTANCE]) {
+      this[INSTANCE] = new Singleton()
+    }
+    return this[INSTANCE]
+  }
+
+  constructor() {
+    if (Singleton[INSTANCE]) {
+      throw new Error('Use Singleton.getInstance()')
+    }
+  }
+}
+
+const s1 = Singleton.getInstance()
+const s2 = Singleton.getInstance()
+console.log(s1 === s2) // true
+```
+
+### 自定义类型检查
+
+```javascript
+const TYPE = Symbol('type')
+
+class Point {
+  static [TYPE] = 'Point'
+
+  constructor(x, y) {
+    this.x = x
+    this.y = y
+  }
+
+  static isPoint(obj) {
+    return obj && obj.constructor[TYPE] === 'Point'
+  }
+}
+
+class ColorPoint extends Point {
+  static [TYPE] = 'ColorPoint'
+}
+
+const p = new Point(1, 2)
+const cp = new ColorPoint(1, 2)
+
+console.log(Point.isPoint(p)) // true
+console.log(Point.isPoint(cp)) // false
+console.log(Point.isPoint({})) // false
+```
+
+### 元编程：自定义迭代行为
+
+```javascript
+class Range {
+  constructor(start, end, step = 1) {
+    this.start = start
+    this.end = end
+    this.step = step
+  }
+
+  *[Symbol.iterator]() {
+    for (let i = this.start; i <= this.end; i += this.step) {
+      yield i
+    }
+  }
+}
+
+const range = new Range(1, 10, 2)
+console.log([...range]) // [1, 3, 5, 7, 9]
+
+for (const n of new Range(0, 5)) {
+  console.log(n) // 0, 1, 2, 3, 4, 5
+}
+```
+
+---
+
+Symbol 为 JavaScript 带来了真正的唯一性和元编程能力。它解决了属性名冲突的问题，内置 Symbol 则让开发者可以自定义语言的内部行为。虽然 Symbol 的使用场景相对特殊，但在库开发、框架设计和需要确保唯一性的场景中非常有价值。
