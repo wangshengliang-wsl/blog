@@ -108,7 +108,7 @@ html.dark .prose {
 /* Toc */
 .toc-desktop {
   position: fixed;
-  top: 8.875rem;
+  top: 5.5rem;
   bottom: 0;
   left: 2.05rem;
 
@@ -124,19 +124,39 @@ html.dark .prose {
   font-size: 0.875em;
 }
 
+/* 返回列表按钮 */
+.back-to-list-link {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 0;
+  margin-bottom: 0.5rem;
+  font-size: 0.875rem;
+  color: inherit;
+  text-decoration: none;
+  opacity: 0.8;
+  transition: opacity 0.2s;
+  border-bottom: 1px solid rgba(125, 125, 125, 0.15);
+}
+
+.back-to-list-link:hover {
+  opacity: 1;
+  border-bottom-color: rgba(125, 125, 125, 0.15);
+}
+
 .toc-desktop-anchor {
   display: flex;
   align-items: center;
 
   font-size: 1rem;
-  opacity: 0.3;
+  opacity: 0.6;
   transition: all 700ms;
 }
 
 .toc-desktop-on > .toc-desktop-anchor,
 .prose:hover .toc-desktop-content > .toc-desktop-anchor,
 .toc-desktop:hover > .toc-desktop-anchor {
-  opacity: 0.6;
+  opacity: 0.8;
 }
 
 .toc-desktop > ul {
@@ -145,14 +165,14 @@ html.dark .prose {
   height: 100%;
   margin-top: 0.25rem;
 
-  opacity: 0;
+  opacity: 0.7;
   transition: all 700ms;
 }
 
 .toc-desktop-on > ul,
 .prose:hover .toc-desktop-content > ul,
 .toc-desktop:hover > ul {
-  opacity: 0.6;
+  opacity: 0.9;
 }
 
 .toc-desktop ul > li::before,

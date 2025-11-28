@@ -3,31 +3,18 @@ import { render } from 'astro:content'
 
 import Categorizer from '~/components/base/Categorizer.astro'
 import ListItem from '~/components/views/ListItem.astro'
-// import Toc from '~/components/toc/Toc.astro'
 import Warning from '~/components/base/Warning.astro'
 
-import { FEATURES } from '~/config'
 import { getFilteredPosts, getPostsByCategory } from '~/utils/data'
-import { slug } from '~/utils/toc'
 
 import type { CollectionEntry } from 'astro:content'
 
-interface Props {
-  pageToc: boolean
-}
-
-const { pageToc } = Astro.props
-
 const WARNING = `No content available for display.`
-
-/* Toc */
-const { toc } = FEATURES
-const tocEnabled = Array.isArray(toc) && toc[0] && pageToc
 
 /* Posts */
 const blogItems = await getFilteredPosts('blog')
 const categorizedBlogItems = getPostsByCategory(blogItems)
-const sortedBlogItems = categorizedBlogItems.flatMap(([_, posts]) => posts)
+const sortedBlogItems = categorizedBlogItems.flatMap(([_, p]) => p)
 
 const categories = categorizedBlogItems.map(([category]) => category)
 const isEmpty = sortedBlogItems.length === 0
@@ -80,58 +67,125 @@ for (const [category, posts] of categorizedBlogItems) {
       data-categories={JSON.stringify(categories)}
       data-posts={JSON.stringify(tocPostsData)}
     >
-      {/* TOC - 动态更新 */}
-      {tocEnabled && (
-        <aside>
-          <nav class="toc-desktop toc-desktop-content" id="blog-filter-toc">
-            <div class="toc-desktop-anchor i-ri-menu-2-fill" />
-            <ul id="blog-filter-toc-list">
-              {categories.map((cat) => (
-                <li>
-                  <a
-                    href={`#${slug(cat)}`}
-                    aria-label={`Scroll to ${cat}`}
-                    class="border-b-none!"
-                  >
-                    {cat}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </nav>
-        </aside>
-      )}
-
-      {/* 筛选器标签栏 */}
-      <div class="blog-filter-container mt-4 mb-6">
-        <div class="blog-filter-tags-wrapper relative overflow-hidden">
-          <div
-            class="blog-filter-tags flex flex-wrap gap-2 transition-all duration-300"
-            id="filter-tags"
-          >
-            {/* 全部标签 */}
-            <button type="button" class="filter-tag" data-category="all">
-              全部
-              <span class="tag-count">({sortedBlogItems.length})</span>
-            </button>
-            {/* 分类标签 */}
-            {categorizedBlogItems.map(([category, posts]) => (
-              <button type="button" class="filter-tag" data-category={category}>
-                {category}
-                <span class="tag-count">({posts.length})</span>
+      {/* 左侧分类导航 - 桌面端 */}
+      <aside class="category-sidebar lt-lgp:hidden">
+        <nav class="toc-desktop toc-desktop-content" id="blog-filter-toc">
+          <a href="/" class="back-home-link" title="返回首页">
+            <span class="i-ri-arrow-left-line" />
+            <span>返回首页</span>
+          </a>
+          <ul id="blog-filter-toc-list" class="category-nav">
+            {/* 全部分类选项 */}
+            <li class="category-group">
+              <button
+                type="button"
+                class="category-header active"
+                data-category="all"
+              >
+                <span class="category-name">全部</span>
+                <span class="category-count">({sortedBlogItems.length})</span>
               </button>
+            </li>
+            {/* 各分类及其文章 */}
+            {categorizedBlogItems.map(([category, posts]) => (
+              <li class="category-group">
+                <button
+                  type="button"
+                  class="category-header"
+                  data-category={category}
+                >
+                  <span class="expand-icon i-ri-arrow-right-s-line" />
+                  <span class="category-name">{category}</span>
+                  <span class="category-count">({posts.length})</span>
+                </button>
+                <ul class="category-posts">
+                  {posts.map((post) => (
+                    <li>
+                      <a
+                        href={`/blog/${post.id}/`}
+                        class="post-link"
+                        title={post.data.title}
+                      >
+                        {post.data.title}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </li>
             ))}
+          </ul>
+        </nav>
+      </aside>
+
+      {/* 移动端分类抽屉触发按钮 */}
+      <button
+        type="button"
+        class="category-drawer-trigger hidden lt-lgp:flex"
+        id="category-drawer-trigger"
+        aria-label="打开分类导航"
+      >
+        <span class="i-ri-menu-fold-line text-xl" />
+      </button>
+
+      {/* 移动端抽屉 */}
+      <div class="category-drawer hidden lt-lgp:block" id="category-drawer">
+        <div class="drawer-overlay" id="drawer-overlay" />
+        <div class="drawer-content">
+          <div class="drawer-header">
+            <a href="/" class="back-home-link-mobile" title="返回首页">
+              <span class="i-ri-arrow-left-line" />
+              <span>返回首页</span>
+            </a>
+            <button
+              type="button"
+              class="drawer-close"
+              id="drawer-close"
+              aria-label="关闭"
+            >
+              <span class="i-ri-close-line text-xl" />
+            </button>
           </div>
+          <ul class="category-nav mobile-nav">
+            {/* 全部分类选项 */}
+            <li class="category-group">
+              <button
+                type="button"
+                class="category-header active"
+                data-category="all"
+              >
+                <span class="category-name">全部</span>
+                <span class="category-count">({sortedBlogItems.length})</span>
+              </button>
+            </li>
+            {/* 各分类及其文章 */}
+            {categorizedBlogItems.map(([category, posts]) => (
+              <li class="category-group">
+                <button
+                  type="button"
+                  class="category-header"
+                  data-category={category}
+                >
+                  <span class="expand-icon i-ri-arrow-right-s-line" />
+                  <span class="category-name">{category}</span>
+                  <span class="category-count">({posts.length})</span>
+                </button>
+                <ul class="category-posts">
+                  {posts.map((post) => (
+                    <li>
+                      <a
+                        href={`/blog/${post.id}/`}
+                        class="post-link"
+                        title={post.data.title}
+                      >
+                        {post.data.title}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </li>
+            ))}
+          </ul>
         </div>
-        {/* 展开/收起按钮 */}
-        <button
-          type="button"
-          class="expand-btn mt-2 text-sm op-60 hover:op-100 transition-opacity hidden"
-          id="expand-btn"
-        >
-          <span class="expand-text">展开更多</span>
-          <span class="i-ri-arrow-down-s-line align-middle ml-1" />
-        </button>
       </div>
 
       {/* 文章列表 */}
@@ -145,11 +199,7 @@ for (const [category, posts] of categorizedBlogItems) {
             return (
               <div class="post-item" data-category={category}>
                 {isFirstInCategory && (
-                  <Categorizer
-                    idx={globalIdx}
-                    needId={tocEnabled}
-                    text={category}
-                  />
+                  <Categorizer idx={globalIdx} needId={true} text={category} />
                 )}
                 <ListItem
                   idx={globalIdx}
@@ -174,142 +224,317 @@ for (const [category, posts] of categorizedBlogItems) {
 }
 
 <style>
-  .filter-tag {
-    padding: 0.375rem 0.75rem;
-    border-radius: 9999px;
-    font-size: 0.875rem;
-    border: none;
-    background: rgba(0, 0, 0, 0.03);
-    cursor: pointer;
-    transition: all 0.2s ease;
-    white-space: nowrap;
-  }
-
-  .filter-tag:hover {
-    background: rgba(0, 0, 0, 0.06);
-  }
-
-  .filter-tag.active {
-    background: rgba(0, 0, 0, 0.09);
-    font-weight: 500;
-  }
-
-  :global(.dark) .filter-tag {
-    background: rgba(255, 255, 255, 0.08);
-  }
-
-  :global(.dark) .filter-tag:hover {
-    background: rgba(255, 255, 255, 0.15);
-  }
-
-  :global(.dark) .filter-tag.active {
-    background: rgba(255, 255, 255, 0.2);
-  }
-
-  .filter-tag .tag-count {
-    opacity: 0.5;
-    font-size: 0.75rem;
-    margin-left: 0.25rem;
-  }
-
-  .blog-filter-tags-wrapper.collapsed .blog-filter-tags {
-    max-height: 2.5rem;
-    overflow: hidden;
-  }
-
-  .expand-btn {
-    display: inline-flex;
+  /* 返回首页按钮 */
+  .back-home-link {
+    display: flex;
     align-items: center;
+    gap: 0.375rem;
+    padding: 0.5rem 0;
+    margin-bottom: 0.75rem;
+    font-size: 0.875rem;
+    color: inherit;
+    text-decoration: none;
+    opacity: 0.8;
+    transition: opacity 0.2s;
+    border-bottom: 1px solid rgba(125, 125, 125, 0.15);
+  }
+
+  .back-home-link:hover {
+    opacity: 1;
+  }
+
+  .back-home-link-mobile {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: inherit;
+    text-decoration: none;
+    opacity: 0.8;
+    transition: opacity 0.2s;
+  }
+
+  .back-home-link-mobile:hover {
+    opacity: 1;
+  }
+
+  /* 分类导航样式 */
+  .category-nav {
+    list-style: none;
+    padding: 0;
+    padding-right: 0.5rem;
+    margin: 0;
+  }
+
+  .category-group {
+    margin-bottom: 0.25rem;
+  }
+
+  .category-header {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    width: 100%;
+    padding: 0.375rem 0;
     background: none;
     border: none;
     cursor: pointer;
+    font-size: 0.875rem;
     color: inherit;
+    opacity: 0.85;
+    transition: opacity 0.2s;
+    text-align: left;
   }
 
-  .expand-btn.expanded .i-ri-arrow-down-s-line {
-    transform: rotate(180deg);
+  .category-header:hover {
+    opacity: 1;
   }
 
+  .category-header.active {
+    opacity: 1;
+    font-weight: 500;
+  }
+
+  .expand-icon {
+    transition: transform 0.2s;
+    font-size: 1rem;
+    flex-shrink: 0;
+  }
+
+  .category-header.expanded .expand-icon {
+    transform: rotate(90deg);
+  }
+
+  .category-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .category-count {
+    opacity: 0.7;
+    font-size: 0.75rem;
+    flex-shrink: 0;
+    padding-right: 0.5rem;
+  }
+
+  /* 文章列表缩进 */
+  .category-posts {
+    list-style: none;
+    padding-left: 1.25rem;
+    margin: 0;
+    overflow: hidden;
+    max-height: 0;
+    transition: max-height 0.3s ease;
+  }
+
+  .category-posts.expanded {
+    max-height: 2000px;
+  }
+
+  .category-posts li {
+    padding: 0.2rem 0;
+  }
+
+  .category-posts .post-link {
+    font-size: 0.8125rem;
+    opacity: 0.75;
+    transition: opacity 0.2s;
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: inherit;
+    text-decoration: none;
+    border-bottom: none !important;
+  }
+
+  .category-posts .post-link:hover {
+    opacity: 1;
+  }
+
+  /* 移动端抽屉触发按钮 */
+  .category-drawer-trigger {
+    position: fixed;
+    bottom: 1.5rem;
+    left: 1.5rem;
+    z-index: 40;
+    width: 3rem;
+    height: 3rem;
+    border-radius: 50%;
+    background: var(--c-bg);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+    border: 1px solid rgba(125, 125, 125, 0.2);
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .category-drawer-trigger:hover {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+    transform: scale(1.05);
+  }
+
+  /* 抽屉遮罩 */
+  .drawer-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+    z-index: 200;
+  }
+
+  /* 抽屉内容 */
+  .drawer-content {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 80%;
+    max-width: 300px;
+    background: var(--c-bg);
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+    overflow-y: auto;
+    padding: 1rem;
+    z-index: 201;
+    box-shadow: 2px 0 12px rgba(0, 0, 0, 0.1);
+  }
+
+  .category-drawer.open .drawer-overlay {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .category-drawer.open .drawer-content {
+    transform: translateX(0);
+  }
+
+  .drawer-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 1rem;
+    margin-bottom: 0.5rem;
+    border-bottom: 1px solid rgba(125, 125, 125, 0.2);
+  }
+
+  .drawer-close {
+    background: none;
+    border: none;
+    cursor: pointer;
+    opacity: 0.6;
+    transition: opacity 0.2s;
+    padding: 0.25rem;
+  }
+
+  .drawer-close:hover {
+    opacity: 1;
+  }
+
+  /* 移动端导航样式调整 */
+  .mobile-nav .category-header {
+    padding: 0.5rem 0;
+  }
+
+  .mobile-nav .category-posts .post-link {
+    padding: 0.375rem 0;
+  }
+
+  /* 文章列表项隐藏 */
   .post-item.hidden {
-    display: none;
-  }
-
-  /* TOC 隐藏的分类链接 */
-  #blog-filter-toc li.hidden {
     display: none;
   }
 </style>
 
 <script>
-  interface TocPostData {
-    title: string
-    slug: string
-    category: string
-  }
-
   class BlogFilterView extends HTMLElement {
     private categories: string[] = []
-    private posts: TocPostData[] = []
-    private isExpanded = false
+    private expandedCategories: Set<string> = new Set<string>()
 
     connectedCallback() {
       this.categories = JSON.parse(this.dataset.categories || '[]')
-      this.posts = JSON.parse(this.dataset.posts || '[]')
       this.init()
     }
 
     private init() {
-      this.setupFilterTags()
-      this.setupExpandButton()
-      // 先恢复分类状态（避免跳动）
+      this.setupCategoryHeaders()
+      this.setupDrawer()
       this.restoreCategoryFromStorage()
-      // 再检查是否需要展开按钮和自动展开
-      this.checkNeedExpandAndAutoExpand()
+      this.restoreExpandedFromStorage()
     }
 
-    private setupFilterTags() {
-      const tags = this.querySelectorAll('.filter-tag')
-      tags.forEach((tag) => {
-        tag.addEventListener('click', () => {
-          const category = (tag as HTMLElement).dataset.category || 'all'
+    private setupCategoryHeaders() {
+      // 桌面端和移动端的分类头部
+      const headers = this.querySelectorAll('.category-header')
+      headers.forEach((header) => {
+        header.addEventListener('click', () => {
+          const category = (header as HTMLElement).dataset.category || 'all'
+          const hasExpandIcon = header.querySelector('.expand-icon')
+
+          // 如果有展开图标（非"全部"选项），切换展开状态
+          if (hasExpandIcon) {
+            this.toggleCategoryExpand(category, header as HTMLElement)
+          }
+
+          // 筛选文章
           this.filterByCategory(category)
-          this.updateActivetag(tag as HTMLElement)
+          this.updateActiveCategory(category)
         })
       })
     }
 
-    private setupExpandButton() {
-      const expandBtn = this.querySelector('#expand-btn') as HTMLButtonElement
-      if (!expandBtn) return
+    private setupDrawer() {
+      const trigger = document.querySelector('#category-drawer-trigger')
+      const drawer = document.querySelector('#category-drawer')
+      const overlay = document.querySelector('#drawer-overlay')
+      const closeBtn = document.querySelector('#drawer-close')
 
-      expandBtn.addEventListener('click', () => {
-        this.toggleExpand()
+      trigger?.addEventListener('click', () => {
+        drawer?.classList.add('open')
       })
+
+      const closeDrawer = () => {
+        drawer?.classList.remove('open')
+      }
+
+      overlay?.addEventListener('click', closeDrawer)
+      closeBtn?.addEventListener('click', closeDrawer)
     }
 
-    private checkNeedExpandAndAutoExpand() {
-      const tagsWrapper = this.querySelector(
-        '.blog-filter-tags-wrapper'
-      ) as HTMLElement
-      const tags = this.querySelector('.blog-filter-tags') as HTMLElement
-      const expandBtn = this.querySelector('#expand-btn') as HTMLButtonElement
+    private toggleCategoryExpand(category: string, header: HTMLElement) {
+      const postsContainer = header.nextElementSibling as HTMLElement
+      if (!postsContainer) return
 
-      if (!tagsWrapper || !tags || !expandBtn) return
+      const isExpanded = postsContainer.classList.contains('expanded')
 
-      // 检查是否需要展开按钮
-      requestAnimationFrame(() => {
-        const singleLineHeight = 40 // 单行高度约 40px
-        if (tags.scrollHeight > singleLineHeight) {
-          tagsWrapper.classList.add('collapsed')
-          expandBtn.classList.remove('hidden')
+      if (isExpanded) {
+        postsContainer.classList.remove('expanded')
+        header.classList.remove('expanded')
+        this.expandedCategories.delete(category)
+      } else {
+        postsContainer.classList.add('expanded')
+        header.classList.add('expanded')
+        this.expandedCategories.add(category)
+      }
 
-          // 检查当前激活的标签是否在折叠区域
-          const activeTag = this.querySelector(
-            '.filter-tag.active'
-          ) as HTMLElement
-          if (activeTag) {
-            this.expandIfTagHidden(activeTag)
-          }
+      this.saveExpandedToStorage()
+    }
+
+    private updateActiveCategory(category: string) {
+      // 更新桌面端和移动端的激活状态
+      const allHeaders = this.querySelectorAll('.category-header')
+      allHeaders.forEach((header) => {
+        const headerCategory = (header as HTMLElement).dataset.category || 'all'
+        if (headerCategory === category) {
+          header.classList.add('active')
+        } else {
+          header.classList.remove('active')
         }
       })
     }
@@ -322,58 +547,43 @@ for (const [category, posts] of categorizedBlogItems) {
           ? savedCategory
           : 'all'
 
-      const targetTag = this.querySelector(
-        `.filter-tag[data-category="${categoryToRestore}"]`
-      ) as HTMLElement
+      if (categoryToRestore !== 'all') {
+        this.filterByCategory(categoryToRestore)
+      }
+      this.updateActiveCategory(categoryToRestore)
+    }
 
-      if (targetTag) {
-        if (categoryToRestore !== 'all') {
-          this.filterByCategory(categoryToRestore)
+    private restoreExpandedFromStorage() {
+      try {
+        const saved = localStorage.getItem('blog-filter-expanded')
+        if (saved) {
+          const expandedArray = JSON.parse(saved) as string[]
+          this.expandedCategories = new Set(expandedArray)
+
+          // 恢复展开状态
+          expandedArray.forEach((category) => {
+            const headers = this.querySelectorAll(
+              `.category-header[data-category="${category}"]`
+            )
+            headers.forEach((header) => {
+              const postsContainer = header.nextElementSibling as HTMLElement
+              if (postsContainer?.classList.contains('category-posts')) {
+                postsContainer.classList.add('expanded')
+                header.classList.add('expanded')
+              }
+            })
+          })
         }
-        this.updateActivetag(targetTag)
+      } catch {
+        // ignore
       }
     }
 
-    private expandIfTagHidden(tag: HTMLElement) {
-      const tagsWrapper = this.querySelector(
-        '.blog-filter-tags-wrapper'
-      ) as HTMLElement
-      if (!tagsWrapper || !tagsWrapper.classList.contains('collapsed')) return
-
-      // 检查标签是否超出可见区域（单行高度约 40px）
-      const singleLineHeight = 40
-      if (tag.offsetTop >= singleLineHeight) {
-        // 标签在折叠区域，自动展开
-        this.toggleExpand()
-      }
-    }
-
-    private toggleExpand() {
-      const tagsWrapper = this.querySelector(
-        '.blog-filter-tags-wrapper'
-      ) as HTMLElement
-      const expandBtn = this.querySelector('#expand-btn') as HTMLButtonElement
-      const expandText = expandBtn?.querySelector('.expand-text')
-
-      if (!tagsWrapper || !expandBtn || !expandText) return
-
-      this.isExpanded = !this.isExpanded
-
-      if (this.isExpanded) {
-        tagsWrapper.classList.remove('collapsed')
-        expandBtn.classList.add('expanded')
-        expandText.textContent = '收起'
-      } else {
-        tagsWrapper.classList.add('collapsed')
-        expandBtn.classList.remove('expanded')
-        expandText.textContent = '展开更多'
-      }
-    }
-
-    private updateActivetag(activeTag: HTMLElement) {
-      const tags = this.querySelectorAll('.filter-tag')
-      tags.forEach((tag) => tag.classList.remove('active'))
-      activeTag.classList.add('active')
+    private saveExpandedToStorage() {
+      localStorage.setItem(
+        'blog-filter-expanded',
+        JSON.stringify([...this.expandedCategories])
+      )
     }
 
     private filterByCategory(category: string) {
@@ -402,9 +612,12 @@ for (const [category, posts] of categorizedBlogItems) {
           // 筛选特定分类
           if (itemCategory === category) {
             item.classList.remove('hidden')
-            // 隐藏分类标题（因为已经通过筛选器选中了分类）
+            // 显示分类标题（如果是该分类的第一篇）
             if (categorizer) {
-              ;(categorizer as HTMLElement).style.display = 'none'
+              if (!categoryFirstPost.has(itemCategory!)) {
+                categoryFirstPost.set(itemCategory!, true)
+                ;(categorizer as HTMLElement).style.display = ''
+              }
             }
           } else {
             item.classList.add('hidden')
@@ -414,48 +627,6 @@ for (const [category, posts] of categorizedBlogItems) {
           }
         }
       })
-
-      // 更新 TOC
-      this.updateToc(category)
-    }
-
-    private updateToc(category: string) {
-      const tocList = document.querySelector('#blog-filter-toc-list')
-      if (!tocList) return
-
-      // 清空现有内容
-      tocList.innerHTML = ''
-
-      if (category === 'all') {
-        // 显示所有分类
-        this.categories.forEach((cat) => {
-          const li = document.createElement('li')
-          const a = document.createElement('a')
-          a.href = `#${this.slugify(cat)}`
-          a.setAttribute('aria-label', `Scroll to ${cat}`)
-          a.className = 'border-b-none!'
-          a.textContent = cat
-          li.appendChild(a)
-          tocList.appendChild(li)
-        })
-      } else {
-        // 显示该分类下的文章标题
-        const categoryPosts = this.posts.filter((p) => p.category === category)
-        categoryPosts.forEach((post) => {
-          const li = document.createElement('li')
-          const a = document.createElement('a')
-          a.href = `/blog/${post.slug}/`
-          a.setAttribute('aria-label', `Go to ${post.title}`)
-          a.className = 'border-b-none!'
-          a.textContent = post.title
-          li.appendChild(a)
-          tocList.appendChild(li)
-        })
-      }
-    }
-
-    private slugify(text: string): string {
-      return text.toLowerCase().replace(/[\s\\/]+/g, '-')
     }
   }
 
