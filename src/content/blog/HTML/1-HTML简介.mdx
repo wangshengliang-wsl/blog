@@ -1,0 +1,290 @@
+---
+title: HTML 简介
+description: 了解 HTML 的定义、发展历史以及它与 CSS、JavaScript 的关系，为前端开发打下坚实基础
+pubDate: 2025-11-28
+toc: true
+ogImage: true
+category: HTML
+---
+
+HTML，全称 **HyperText Markup Language**（超文本标记语言），是构建网页的基础。打开任何一个网站，右键查看源代码，看到的那些被尖括号包裹的内容就是 HTML。
+
+## 什么是 HTML
+
+HTML 不是编程语言，而是一种**标记��言**。编程语言有逻辑判断、循环、函数等概念，而 HTML 只是用来描述网页内容的结构。
+
+一个最简单的 HTML 片段：
+
+```html
+<p>这是一段文字</p>
+```
+
+这里的 `<p>` 叫做**开始标签**，`</p>` 叫做**结束标签**，中间的文字是**内容**，整体叫做一个 **HTML 元素**。
+
+| 术语              | 说明                       | 示例                |
+| ----------------- | -------------------------- | ------------------- |
+| 标签（Tag）       | 用尖括号包裹的标识符       | `<p>`、`</p>`       |
+| 元素（Element）   | 开始标签 + 内容 + 结束标签 | `<p>文字</p>`       |
+| 属性（Attribute） | 写在开始标签里的附加信息   | `<p class="intro">` |
+
+HTML 的核心工作就是告诉浏览器：这是标题、这是段落、这是图片、这是链接……浏览器根据这些标记来渲染页面。
+
+### "超文本"是什么意思
+
+"超文本"这个词听起来有点抽象。简单说，普通文本只能从头读到尾，而超文本可以通过**链接**跳转到其他文档。点击一个链接就能跳到另一个页面，这就是"超"的含义——超越了线性阅读的限制。
+
+```html
+<a href="https://example.com">点击跳转</a>
+```
+
+这个 `<a>` 标签创建了一个超链接，`href` 属性指定了跳转目标。正是这种链接��力让互联网形成了一张巨大的信息网络。
+
+## HTML 的发展历史
+
+了解 HTML 的演进过程有助于理解为什么某些标签已经过时，而某些写法成为了最佳实践。
+
+### 起源（1989-1991）
+
+HTML 由 Tim Berners-Lee（蒂姆·伯纳斯-李）在 CERN（欧洲核子研究组织）发明。他最初的目的是让科学家们能够方便地共享和浏览文档。1991 年，第一个网页上线，HTML 正式诞生。
+
+那时候的 HTML 非常简陋，只有 18 个标签，主要用于文本展示和简单的链接。
+
+### HTML 2.0 到 4.01（1995-1999）
+
+随着互联网的发展，HTML 不断增加新功能：
+
+- **HTML 2.0（1995）**：第一个正式标准，加入了表单功能
+- **HTML 3.2（1997）**：支持表格、脚本、样式
+- **HTML 4.0/4.01（1997-1999）**：引入 CSS 分离样式、增强国际化支持
+
+这个时期出现了很多今天看来是"坏习惯"的写法，比如用 `<font>` 标签设置字体颜色、用 `<table>` 做页面布局。这些做法把结构和样式混在一起，维护起来非常痛苦。
+
+### XHTML（2000-2006）
+
+XHTML 尝试用 XML 的严格语法来规范 HTML。它要求所有标签必须闭合、属性值必须用引号包裹、标签名必须小写。
+
+```html
+<!-- XHTML 的严格写法 -->
+<br />
+<img src="photo.jpg" alt="照片" />
+
+<!-- HTML4 的宽松写法 -->
+<br />
+<img src="photo.jpg" alt="照片" />
+```
+
+XHTML 的出发点是好的，但过于严格的语法要求让很多开发者感到不便。浏览器也没有严格执行这些规则，导致 XHTML 2.0 最终被放弃。
+
+### HTML5（2014 至今）
+
+HTML5 是一次重大革新，由 WHATWG（Web Hypertext Application Technology Working Group）主导开发。它的设计理念是：
+
+1. **向后兼容**：旧的 HTML 代码依然能正常工作
+2. **容错性**：浏览器会尽量解析不规范的代码
+3. **语义化**：增加新的语义标签如 `<header>`、`<article>`、`<nav>`
+4. **多媒体支持**：原生支持音频、视频，无需插件
+5. **API 扩展**：Canvas 绑图、本地存储、地理定位等
+
+```html
+<!-- HTML5 的文档声明非常简洁 -->
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>页面标题</title>
+  </head>
+  <body>
+    <header>头部</header>
+    <main>主要内容</main>
+    <footer>底部</footer>
+  </body>
+</html>
+```
+
+2019 年，WHATWG 发布的 HTML Living Standard 成为了唯一的官方标准，HTML 不再有版本号，而是持续更新的"活标准"。
+
+## HTML 与 CSS、JavaScript 的关系
+
+前端开发的三大核心技术——HTML、CSS、JavaScript——各自承担不同的职责：
+
+| 技术       | 职责                 | 类比             |
+| ---------- | -------------------- | ---------------- |
+| HTML       | 结构（内容是什么）   | 房屋的框架和墙体 |
+| CSS        | 表现（内容长什么样） | 装修和家具       |
+| JavaScript | 行为（内容怎么交互） | 电器和智能设备   |
+
+### HTML 负责结构
+
+HTML 定义了页面有哪些内容：标题、段落、图片、表格、表单……它回答的是"是什么"的问题。
+
+```html
+<article>
+  <h1>文章标题</h1>
+  <p>这是第一段内容。</p>
+  <img src="cover.jpg" alt="封面图" />
+</article>
+```
+
+这段代码描述了一篇文章的结构：有标题、有段落、有图片。但它没有说标题应该是红色还是蓝色，也没有说图片应该多大。
+
+### CSS 负责表现
+
+CSS（Cascading Style Sheets，层叠样式表）控制元素的视觉效果：颜色、大小、位置、动画……
+
+```css
+h1 {
+  color: #333;
+  font-size: 24px;
+}
+
+img {
+  width: 100%;
+  border-radius: 8px;
+}
+```
+
+把 CSS 和 HTML 分开的好处是显而易见的：想改网站风格时只需要修改 CSS，HTML 结构可以保持不变。
+
+### JavaScript 负责行为
+
+JavaScript 让页面"动"起来：响应用户点击、验证表单输入、动态加载数据、创建动画效果……
+
+```javascript
+const button = document.querySelector('button')
+button.addEventListener('click', () => {
+  alert('你点击了按钮！')
+})
+```
+
+没有 JavaScript，网页就像一本静态的书；有了 JavaScript，网页变成了可以交互的应用程序。
+
+### 三者如何协作
+
+一个完整的网页通常是这样组织的：
+
+```html
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>三者协作示例</title>
+    <!-- CSS：外部样式表 -->
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <!-- HTML：页面结构 -->
+    <button id="myBtn">点击我</button>
+
+    <!-- JavaScript：交互逻辑 -->
+    <script src="script.js"></script>
+  </body>
+</html>
+```
+
+CSS 通常放在 `<head>` 中，让浏览器在渲染页面前就加载好样式；JavaScript 通常放在 `</body>` 前，避免阻塞页面渲染。
+
+## 为什么要学好 HTML
+
+有些人觉得 HTML 太简单，不值得深入学习。这是一个误区。
+
+### HTML 是所有前端技术的基础
+
+不管用什么框架——React、Vue、Angular——最终生成的都是 HTML。不了解 HTML 的语义和结构，写出来的代码可能：
+
+- 对搜索引擎不友好（影响 SEO）
+- 对屏幕阅读器不友好（影响无障碍访问）
+- 浏览器渲染效率低
+- 难以维护和扩展
+
+### 语义化 HTML 很重要
+
+```html
+<!-- 不好的写法 -->
+<div class="title">这是标题</div>
+<div class="content">这是内容</div>
+
+<!-- 好的写法 -->
+<h1>这是标题</h1>
+<p>这是内容</p>
+```
+
+两种写法在视觉上可能一样（通过 CSS），但语义完全不同。`<h1>` 明确告诉浏览器和搜索引擎"这是一级标题"，而 `<div>` 什么都没说。
+
+### 无障碍访问（Accessibility）
+
+全球有超过 10 亿人存在某种形式的残障。正确使用 HTML 可以让网站对这些用户更友好：
+
+```html
+<!-- 图片一定要有 alt 属性 -->
+<img src="chart.png" alt="2024年销售数据图表，显示Q4增长30%" />
+
+<!-- 表单控件要关联 label -->
+<label for="email">邮箱地址</label>
+<input type="email" id="email" name="email" />
+```
+
+屏幕阅读器会朗读 `alt` 文本和 `label` 内容，让视障用户也能理解页面信息。
+
+## 开发环境准备
+
+学习 HTML 只需要两样东西：一个文本编辑器和一个浏览器。
+
+### 文本编辑器
+
+推荐使用 **Visual Studio Code**（简称 VS Code），免费且功能强大：
+
+- 语法高亮
+- 自动补全
+- 错误提示
+- 丰富的插件生态
+
+安装完成后，可以再安装几个实用插件：
+
+- **Live Server**：保存文件后自动刷新浏览器
+- **Auto Rename Tag**：修改开始标签时自动修改结束标签
+- **Prettier**：代码格式化
+
+### 浏览器
+
+现代浏览器（Chrome、Firefox、Edge、Safari）都支持 HTML5。推荐使用 **Chrome**，它的开发者工具功能最全面。
+
+按 `F12` 或右键选择"检查"可以打开开发者工具，里面的"Elements"面板可以查看和修改页面的 HTML 结构。
+
+### 创建第一个 HTML 文件
+
+1. 新建一个文件夹，比如 `html-learning`
+2. 用 VS Code 打开���个文件夹
+3. 新建文件 `index.html`
+4. 输入以下内容：
+
+```html
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>我的第一个网页</title>
+  </head>
+  <body>
+    <h1>Hello, HTML!</h1>
+    <p>这是我的第一个网页。</p>
+  </body>
+</html>
+```
+
+5. 右键点击文件，选择"Open with Live Server"
+6. 浏览器会自动打开并显示这个页面
+
+每次修改并保存文件后，浏览器都会自动刷新。
+
+## 小结
+
+这篇文章介绍了 HTML 的基本概念：
+
+- HTML 是超文本标记语言，用于描述网页结构
+- HTML 经历了从 1.0 到 5（Living Standard）的演进
+- HTML、CSS、JavaScript 分别负责结构、表现和行为
+- 学好 HTML 对 SEO、无障碍访问和代码维护都很重要
+- VS Code + Chrome 是推荐的开发环境
+
+下一篇文章会详细讲解 HTML 文档的完整结构，包括 DOCTYPE、html、head、body 这些基础元素。

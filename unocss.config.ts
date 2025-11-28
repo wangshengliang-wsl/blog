@@ -143,6 +143,8 @@ export default defineConfig({
           purple: 'purple',
           pink: 'pink',
           indigo: 'indigo',
+          cancel: 'gray',
+          confirm: 'blue',
         }
         const mappedColor = colorMap[color] || color
         return `px-2.5 py-1 border border-[#8884]! rounded op-50 transition-all duration-200 ease-out no-underline! hover:op-100 hover:text-${mappedColor} hover:bg-${mappedColor}/10`
@@ -175,6 +177,11 @@ export default defineConfig({
         sans: 'Inter:400,600,800',
         mono: 'DM Mono:400,600',
         condensed: 'Roboto Condensed',
+      },
+      provider: 'google',
+      timeouts: {
+        warning: 8000, // 警告超时时间 8 秒
+        failure: 15000, // 失败超时时间 15 秒
       },
     }),
   ],
@@ -230,5 +237,9 @@ export default defineConfig({
     'hover:bg-pink/10',
     'hover:text-indigo',
     'hover:bg-indigo/10',
+    'hover:text-cancel',
+    'hover:bg-cancel/10',
+    'hover:text-confirm',
+    'hover:bg-confirm/10',
   ],
 })

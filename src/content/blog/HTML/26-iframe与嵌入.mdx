@@ -1,0 +1,622 @@
+---
+title: iframe 与嵌入
+description: 了解 HTML 中的 iframe 元素和其他嵌入内容的方式，包括安全设置、跨域通信和常见嵌入场景
+pubDate: 2025-11-28
+toc: true
+ogImage: true
+category: HTML
+---
+
+iframe 允许在当前页面中嵌入另一个 HTML 页面。虽然有一些安全问题需要注意，但在很多场景下仍然是不可替代的方案。
+
+## iframe 基础
+
+### 基本语法
+
+```html
+<iframe src="https://example.com" title="示例网站"></iframe>
+```
+
+### 常用属性
+
+```html
+<iframe
+  src="page.html"
+  title="页面标题"
+  width="600"
+  height="400"
+  name="myframe"
+  loading="lazy"
+  sandbox
+  allow="fullscreen"
+></iframe>
+```
+
+| 属性             | 说明                                     |
+| ---------------- | ---------------------------------------- |
+| `src`            | 嵌入页面的 URL                           |
+| `title`          | 框架的标题（无障碍必需）                 |
+| `width`          | 宽度                                     |
+| `height`         | 高度                                     |
+| `name`           | 框架名称，用于链接 target                |
+| `loading`        | 加载方式：eager（立即）或 lazy（懒加载） |
+| `sandbox`        | 安全沙箱限制                             |
+| `allow`          | 功能策略                                 |
+| `srcdoc`         | 直接嵌入 HTML 内容                       |
+| `referrerpolicy` | 引用策略                                 |
+
+### srcdoc 属性
+
+直接嵌入 HTML 内容，不需要外部文件：
+
+```html
+<iframe srcdoc="<h1>Hello</h1><p>这是嵌入的内容</p>" title="内嵌内容"></iframe>
+
+<!-- 更复杂的内容 -->
+<iframe
+  srcdoc="
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { font-family: sans-serif; padding: 20px; }
+        h1 { color: blue; }
+      </style>
+    </head>
+    <body>
+      <h1>标题</h1>
+      <p>内容</p>
+    </body>
+    </html>
+  "
+  title="完整页面"
+></iframe>
+```
+
+## iframe 安全
+
+### sandbox 属性
+
+sandbox 限制 iframe 的能力：
+
+```html
+<!-- 最严格：禁止所有功能 -->
+<iframe src="untrusted.html" sandbox></iframe>
+
+<!-- 允许特定功能 -->
+<iframe src="page.html" sandbox="allow-scripts allow-forms"></iframe>
+```
+
+sandbox 的值：
+
+| 值                     | 允许的功能       |
+| ---------------------- | ---------------- |
+| (空)                   | 应用所有限制     |
+| `allow-scripts`        | 允许运行脚本     |
+| `allow-forms`          | 允许提交表单     |
+| `allow-same-origin`    | 允许被视为同源   |
+| `allow-popups`         | 允许弹出窗口     |
+| `allow-modals`         | 允许模态对话框   |
+| `allow-top-navigation` | 允许导航顶级窗口 |
+| `allow-downloads`      | 允许下载文件     |
+
+### 常见安全配置
+
+```html
+<!-- 完全不信任的内容 -->
+<iframe src="untrusted.html" sandbox title="不信任的内容"></iframe>
+
+<!-- 需要执行脚本但不访问 Cookie -->
+<iframe src="widget.html" sandbox="allow-scripts" title="小部件"></iframe>
+
+<!-- 需要提交表单 -->
+<iframe
+  src="form.html"
+  sandbox="allow-scripts allow-forms allow-same-origin"
+  title="表单"
+></iframe>
+
+<!-- 第三方嵌入（如 YouTube） -->
+<iframe
+  src="https://www.youtube.com/embed/xxx"
+  sandbox="allow-scripts allow-same-origin allow-presentation"
+  title="视频"
+></iframe>
+```
+
+### allow 属性
+
+控制 iframe 能使用的功能：
+
+```html
+<iframe
+  src="video.html"
+  allow="
+    fullscreen;
+    camera;
+    microphone;
+    geolocation;
+    autoplay
+  "
+  title="视频页面"
+></iframe>
+```
+
+常用功能策略：
+
+| 策略              | 说明             |
+| ----------------- | ---------------- |
+| `fullscreen`      | 允许全屏         |
+| `camera`          | 允许访问摄像头   |
+| `microphone`      | 允许访问麦克风   |
+| `geolocation`     | 允许获取地理位置 |
+| `autoplay`        | 允许自动播放     |
+| `payment`         | 允许支付请求     |
+| `clipboard-write` | 允许写入剪贴板   |
+
+### referrerpolicy 属性
+
+控制发送给 iframe 的 Referer 信息：
+
+```html
+<!-- 不发送 Referer -->
+<iframe src="https://other-site.com" referrerpolicy="no-referrer"></iframe>
+
+<!-- 只发送源（不含路径） -->
+<iframe src="https://other-site.com" referrerpolicy="origin"></iframe>
+
+<!-- 同源发送完整 URL，跨源发送源 -->
+<iframe
+  src="https://other-site.com"
+  referrerpolicy="strict-origin-when-cross-origin"
+></iframe>
+```
+
+## 跨域通信
+
+### postMessage API
+
+父页面和 iframe 之间的安全通信：
+
+```html
+<!-- 父页面 -->
+<iframe id="myframe" src="https://other-site.com/page.html"></iframe>
+
+<script>
+  const iframe = document.getElementById('myframe')
+
+  // 发送消息到 iframe
+  iframe.addEventListener('load', () => {
+    iframe.contentWindow.postMessage(
+      { type: 'greeting', data: 'Hello from parent' },
+      'https://other-site.com' // 指定目标源
+    )
+  })
+
+  // 接收来自 iframe 的消息
+  window.addEventListener('message', (event) => {
+    // 验证消息来源
+    if (event.origin !== 'https://other-site.com') {
+      return
+    }
+
+    console.log('收到消息:', event.data)
+  })
+</script>
+```
+
+```html
+<!-- iframe 页面 -->
+<script>
+  // 接收来自父页面的消息
+  window.addEventListener('message', (event) => {
+    // 验证消息来源
+    if (event.origin !== 'https://parent-site.com') {
+      return
+    }
+
+    console.log('收到消息:', event.data)
+
+    // 回复消息
+    event.source.postMessage(
+      { type: 'reply', data: 'Hello from iframe' },
+      event.origin
+    )
+  })
+</script>
+```
+
+### 安全的消息处理
+
+```javascript
+// 定义允许的消息类型
+const messageHandlers = {
+  updateTheme: (data) => {
+    document.body.classList.toggle('dark', data.dark)
+  },
+  resize: (data) => {
+    // 处理尺寸变化
+  },
+}
+
+window.addEventListener('message', (event) => {
+  // 验证来源
+  const allowedOrigins = ['https://trusted-site.com']
+  if (!allowedOrigins.includes(event.origin)) {
+    return
+  }
+
+  // 验证消息格式
+  const { type, data } = event.data
+  if (!type || !messageHandlers[type]) {
+    return
+  }
+
+  // 处理消息
+  messageHandlers[type](data)
+})
+```
+
+## 常见嵌入场景
+
+### 嵌入视频
+
+```html
+<!-- YouTube -->
+<iframe
+  width="560"
+  height="315"
+  src="https://www.youtube.com/embed/VIDEO_ID"
+  title="YouTube video"
+  frameborder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowfullscreen
+></iframe>
+
+<!-- Bilibili -->
+<iframe
+  src="//player.bilibili.com/player.html?bvid=BV1xx411c7mD"
+  width="640"
+  height="360"
+  scrolling="no"
+  border="0"
+  frameborder="no"
+  framespacing="0"
+  allowfullscreen
+  title="Bilibili 视频"
+></iframe>
+
+<!-- 响应式视频容器 -->
+<style>
+  .video-container {
+    position: relative;
+    width: 100%;
+    padding-bottom: 56.25%; /* 16:9 */
+  }
+
+  .video-container iframe {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+  }
+</style>
+
+<div class="video-container">
+  <iframe src="..." title="视频"></iframe>
+</div>
+```
+
+### 嵌入地图
+
+```html
+<!-- 高德地图 -->
+<iframe
+  width="600"
+  height="400"
+  frameborder="0"
+  src="https://uri.amap.com/marker?position=116.473195,39.993253"
+  title="高德地图"
+></iframe>
+
+<!-- Google 地图 -->
+<iframe
+  width="600"
+  height="450"
+  style="border:0"
+  loading="lazy"
+  allowfullscreen
+  referrerpolicy="no-referrer-when-downgrade"
+  src="https://www.google.com/maps/embed?pb=..."
+  title="Google 地图"
+></iframe>
+```
+
+### 嵌入代码演示
+
+```html
+<!-- CodePen -->
+<iframe
+  height="400"
+  style="width: 100%;"
+  scrolling="no"
+  title="CodePen 示例"
+  src="https://codepen.io/username/embed/pen-id?default-tab=html%2Cresult"
+  frameborder="no"
+  loading="lazy"
+  allowtransparency="true"
+  allowfullscreen="true"
+></iframe>
+
+<!-- CodeSandbox -->
+<iframe
+  src="https://codesandbox.io/embed/sandbox-id?fontsize=14&hidenavigation=1&theme=dark"
+  style="width:100%; height:500px; border:0; border-radius: 4px; overflow:hidden;"
+  title="CodeSandbox 示例"
+  allow="accelerometer; ambient-light-sensor; camera; encrypted-media; geolocation; gyroscope; hid; microphone; midi; payment; usb; vr; xr-spatial-tracking"
+  sandbox="allow-forms allow-modals allow-popups allow-presentation allow-same-origin allow-scripts"
+></iframe>
+```
+
+### 嵌入社交媒体
+
+```html
+<!-- Twitter/X 时间线 -->
+<iframe
+  src="https://platform.twitter.com/widgets/timeline..."
+  width="400"
+  height="600"
+  title="Twitter Timeline"
+  sandbox="allow-scripts allow-same-origin allow-popups"
+></iframe>
+
+<!-- 微博 -->
+<iframe
+  src="https://widget.weibo.com/..."
+  width="400"
+  height="600"
+  frameborder="0"
+  title="微博小组件"
+></iframe>
+```
+
+## 其他嵌入方式
+
+### object 元素
+
+嵌入各种类型的内容：
+
+```html
+<!-- PDF -->
+<object data="document.pdf" type="application/pdf" width="600" height="400">
+  <p>您的浏览器不支持 PDF 预览，<a href="document.pdf">点击下载</a></p>
+</object>
+
+<!-- SVG -->
+<object data="image.svg" type="image/svg+xml" width="200" height="200">
+  <img src="fallback.png" alt="备用图片" />
+</object>
+
+<!-- Flash（已弃用） -->
+<object
+  data="movie.swf"
+  type="application/x-shockwave-flash"
+  width="600"
+  height="400"
+>
+  <param name="movie" value="movie.swf" />
+  <p>需要 Flash 播放器</p>
+</object>
+```
+
+### embed 元素
+
+```html
+<!-- PDF -->
+<embed src="document.pdf" type="application/pdf" width="600" height="400" />
+
+<!-- SVG -->
+<embed src="image.svg" type="image/svg+xml" width="200" height="200" />
+```
+
+### object vs embed vs iframe
+
+| 特性     | object     | embed    | iframe      |
+| -------- | ---------- | -------- | ----------- |
+| 备用内容 | 支持       | 不支持   | 不支持      |
+| 参数传递 | param 元素 | 属性     | URL 参数    |
+| 脚本访问 | 受限       | 受限     | postMessage |
+| 使用场景 | 插件内容   | 简单嵌入 | 网页嵌入    |
+
+## iframe 自适应高度
+
+### 同源情况
+
+```html
+<!-- 父页面 -->
+<iframe id="myframe" src="page.html" onload="resizeFrame()"></iframe>
+
+<script>
+  function resizeFrame() {
+    const iframe = document.getElementById('myframe')
+    iframe.style.height = iframe.contentWindow.document.body.scrollHeight + 'px'
+  }
+</script>
+```
+
+### 跨域情况
+
+```html
+<!-- 父页面 -->
+<iframe id="myframe" src="https://other-site.com/page.html"></iframe>
+
+<script>
+  window.addEventListener('message', (event) => {
+    if (event.origin !== 'https://other-site.com') return
+
+    if (event.data.type === 'resize') {
+      document.getElementById('myframe').style.height = event.data.height + 'px'
+    }
+  })
+</script>
+```
+
+```html
+<!-- iframe 页面 -->
+<script>
+  // 监听内容变化并通知父页面
+  const resizeObserver = new ResizeObserver(() => {
+    window.parent.postMessage(
+      {
+        type: 'resize',
+        height: document.body.scrollHeight,
+      },
+      '*'
+    )
+  })
+
+  resizeObserver.observe(document.body)
+</script>
+```
+
+## 无障碍考虑
+
+### 必须有 title 属性
+
+```html
+<!-- 必须提供有意义的标题 -->
+<iframe src="form.html" title="用户注册表单"></iframe>
+
+<iframe src="video.html" title="产品介绍视频"></iframe>
+
+<iframe src="map.html" title="公司位置地图"></iframe>
+```
+
+### 提供替代内容
+
+```html
+<iframe src="video.html" title="教程视频">
+  <p>您的浏览器不支持 iframe，<a href="video.html">点击观看视频</a></p>
+</iframe>
+```
+
+### 键盘导航
+
+```html
+<!-- 确保 iframe 可以通过键盘访问 -->
+<iframe src="page.html" title="页面" tabindex="0"></iframe>
+```
+
+## 性能优化
+
+### 懒加载
+
+```html
+<!-- 使用 loading="lazy" -->
+<iframe src="heavy-content.html" loading="lazy" title="内容"></iframe>
+```
+
+### 延迟加载
+
+```html
+<div id="iframe-placeholder">
+  <button onclick="loadIframe()">加载内容</button>
+</div>
+
+<script>
+  function loadIframe() {
+    const placeholder = document.getElementById('iframe-placeholder')
+    placeholder.innerHTML =
+      '<iframe src="heavy-content.html" title="内容"></iframe>'
+  }
+</script>
+```
+
+### 使用 Intersection Observer
+
+```html
+<div class="iframe-container" data-src="https://example.com">
+  <p>滚动到此处加载内容</p>
+</div>
+
+<script>
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (entry.isIntersecting) {
+        const container = entry.target
+        const src = container.dataset.src
+        container.innerHTML = `<iframe src="${src}" title="嵌入内容"></iframe>`
+        observer.unobserve(container)
+      }
+    })
+  })
+
+  document.querySelectorAll('.iframe-container').forEach((container) => {
+    observer.observe(container)
+  })
+</script>
+```
+
+## 常见问题
+
+### X-Frame-Options
+
+如果目标网站设置了 X-Frame-Options，可能无法嵌入：
+
+```
+X-Frame-Options: DENY          // 禁止所有嵌入
+X-Frame-Options: SAMEORIGIN    // 只允许同源嵌入
+```
+
+### CSP frame-ancestors
+
+更现代的方式是使用 Content-Security-Policy：
+
+```
+Content-Security-Policy: frame-ancestors 'self' https://trusted-site.com
+```
+
+### 解决方案
+
+如果无法直接嵌入：
+
+1. 使用官方提供的嵌入代码
+2. 使用 API 获取数据自己渲染
+3. 使用后端代理
+
+## 小结
+
+iframe 和嵌入内容的要点：
+
+**iframe 基础**：
+
+- `src` 指定嵌入的 URL
+- `title` 是无障碍必需属性
+- `srcdoc` 可以直接嵌入 HTML
+
+**安全配置**：
+
+- `sandbox` 限制 iframe 能力
+- `allow` 控制功能策略
+- 验证 postMessage 来源
+
+**跨域通信**：
+
+- 使用 postMessage API
+- 始终验证消息来源
+- 定义允许的消息类型
+
+**性能优化**：
+
+- 使用 `loading="lazy"`
+- 延迟加载非关键 iframe
+- 使用 Intersection Observer
+
+**无障碍**：
+
+- 必须有 `title` 属性
+- 提供替代内容
+- 确保键盘可访问
+
+下一篇会介绍 HTML 性能优化。

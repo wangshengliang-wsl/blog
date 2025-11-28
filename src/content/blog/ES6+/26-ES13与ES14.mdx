@@ -1,0 +1,633 @@
+---
+title: ES13 与 ES14 新特性
+description: ES2022 带来顶层 await、类增强和 at 方法，ES2023 引入数组不可变方法 toSorted/toReversed 等
+pubDate: 2025-11-28
+toc: true
+ogImage: true
+category: ES6+
+---
+
+ES13 (2022) 和 ES14 (2023) 对类和数组做了重要增强。顶层 await 简化了模块初始化，数组的不可变方法让函数式编程更加顺手。
+
+## ES13 (ES2022)
+
+### 顶层 await
+
+ES2022 允许在模块的顶层直接使用 `await`，不需要包裹在 async 函数中：
+
+```javascript
+// config.js
+const response = await fetch('/api/config')
+export const config = await response.json()
+
+// main.js
+import { config } from './config.js'
+console.log(config) // 配置已加载完成
+```
+
+在此之前，模块初始化时的异步操作很麻烦：
+
+```javascript
+// ES2022 之前的变通方案
+let config
+
+export const configPromise = (async () => {
+  const response = await fetch('/api/config')
+  config = await response.json()
+})()
+
+export { config }
+
+// 使用方需要
+import { config, configPromise } from './config.js'
+await configPromise // 必须等待
+```
+
+顶层 await 的使用场景：
+
+```javascript
+// 动态依赖导入
+const strings = await import(`./i18n/${navigator.language}.js`)
+
+// 资源初始化
+const connection = await createDatabaseConnection()
+export { connection }
+
+// 条件模块加载
+let module
+if (someCondition) {
+  module = await import('./moduleA.js')
+} else {
+  module = await import('./moduleB.js')
+}
+export default module
+
+// 回退加载
+let jQuery
+try {
+  jQuery = await import('https://cdn1.example.com/jquery.js')
+} catch {
+  jQuery = await import('https://cdn2.example.com/jquery.js')
+}
+```
+
+注意事项：
+
+```javascript
+// 顶层 await 会阻塞模块执行
+// 依赖此模块的其他模块会等待
+
+// a.js
+await sleep(1000)
+export const a = 1
+
+// b.js
+import { a } from './a.js' // 会等待 a.js 的 await 完成
+console.log(a) // 1 秒后执行
+```
+
+### Class 静态初始化块
+
+静态初始化块用于在类定义时执行复杂的静态属性初始化：
+
+```javascript
+class Database {
+  static connection
+  static {
+    // 静态初始化块
+    try {
+      this.connection = connectToDatabase()
+    } catch {
+      this.connection = connectToFallbackDatabase()
+    }
+  }
+}
+```
+
+在此之前，复杂的静态初始化需要在类外部处理：
+
+```javascript
+// ES2022 之前
+class Database {
+  static connection
+}
+try {
+  Database.connection = connectToDatabase()
+} catch {
+  Database.connection = connectToFallbackDatabase()
+}
+```
+
+静态初始化块的特点：
+
+```javascript
+class Example {
+  static x = 1
+  static {
+    // 可以访问私有静态成员
+    console.log(this.#privateStatic)
+  }
+  static #privateStatic = 'private'
+
+  static {
+    // 可以有多个静态块，按顺序执行
+    this.x += 1
+  }
+
+  static {
+    this.x += 1
+  }
+}
+
+console.log(Example.x) // 3
+```
+
+访问私有字段的友元模式：
+
+```javascript
+let getPrivate
+
+class MyClass {
+  #privateField = 'secret'
+
+  static {
+    // 将访问私有字段的能力"导出"给外部
+    getPrivate = (instance) => instance.#privateField
+  }
+}
+
+const obj = new MyClass()
+getPrivate(obj) // 'secret'
+```
+
+### 私有属性检查 (in)
+
+`in` 运算符可以检查对象是否有私有字段：
+
+```javascript
+class Person {
+  #name
+
+  constructor(name) {
+    this.#name = name
+  }
+
+  static isPerson(obj) {
+    return #name in obj
+  }
+}
+
+const p = new Person('张三')
+Person.isPerson(p) // true
+Person.isPerson({}) // false
+```
+
+这解决了之前无法安全检查私有字段的问题：
+
+```javascript
+class BrandCheck {
+  #brand
+
+  static check(obj) {
+    // ES2022 之前只能 try-catch
+    try {
+      obj.#brand
+      return true
+    } catch {
+      return false
+    }
+
+    // ES2022：更简洁
+    return #brand in obj
+  }
+}
+```
+
+### Array.prototype.at() / String.prototype.at()
+
+`at()` 方法支持负索引访问数组或字符串元素：
+
+```javascript
+const arr = ['a', 'b', 'c', 'd', 'e']
+
+// 正索引
+arr.at(0) // 'a'
+arr.at(2) // 'c'
+
+// 负索引：从末尾计算
+arr.at(-1) // 'e'（最后一个）
+arr.at(-2) // 'd'（倒数第二个）
+
+// 等价于
+arr[arr.length - 1] // 'e'
+arr.slice(-1)[0] // 'e'
+```
+
+字符串同样支持：
+
+```javascript
+const str = 'hello'
+
+str.at(0) // 'h'
+str.at(-1) // 'o'
+str.at(-2) // 'l'
+```
+
+TypedArray 也支持 `at()`：
+
+```javascript
+const typedArr = new Uint8Array([1, 2, 3, 4, 5])
+typedArr.at(-1) // 5
+```
+
+索引越界返回 `undefined`：
+
+```javascript
+const arr = [1, 2, 3]
+arr.at(10) // undefined
+arr.at(-10) // undefined
+```
+
+### Object.hasOwn()
+
+`Object.hasOwn()` 是 `Object.prototype.hasOwnProperty` 的改进版：
+
+```javascript
+const obj = { name: '张三' }
+
+// 旧方式
+Object.prototype.hasOwnProperty.call(obj, 'name') // true
+obj.hasOwnProperty('name') // true（但不安全）
+
+// 新方式
+Object.hasOwn(obj, 'name') // true
+```
+
+为什么需要 `Object.hasOwn()`：
+
+```javascript
+// 问题 1：hasOwnProperty 可能被覆盖
+const obj = {
+  hasOwnProperty: () => false,
+  name: '张三',
+}
+obj.hasOwnProperty('name') // false（错误结果）
+Object.hasOwn(obj, 'name') // true（正确）
+
+// 问题 2：Object.create(null) 创建的对象没有原型
+const nullProto = Object.create(null)
+nullProto.name = '张三'
+// nullProto.hasOwnProperty('name') // TypeError
+Object.hasOwn(nullProto, 'name') // true
+```
+
+常见用途：
+
+```javascript
+// 遍历自有属性
+for (const key in obj) {
+  if (Object.hasOwn(obj, key)) {
+    console.log(key, obj[key])
+  }
+}
+
+// 检查属性存在性
+function getProperty(obj, key) {
+  return Object.hasOwn(obj, key) ? obj[key] : undefined
+}
+```
+
+### Error.cause
+
+错误对象新增 `cause` 属性，用于建立错误链：
+
+```javascript
+async function fetchData() {
+  try {
+    const response = await fetch('/api/data')
+    return await response.json()
+  } catch (err) {
+    throw new Error('获取数据失败', { cause: err })
+  }
+}
+
+try {
+  await fetchData()
+} catch (err) {
+  console.log(err.message) // '获取数据失败'
+  console.log(err.cause) // 原始的 fetch 错误
+}
+```
+
+错误链追踪：
+
+```javascript
+function readConfig() {
+  try {
+    return JSON.parse(fs.readFileSync('config.json'))
+  } catch (err) {
+    throw new Error('配置文件读取失败', { cause: err })
+  }
+}
+
+function initApp() {
+  try {
+    const config = readConfig()
+  } catch (err) {
+    throw new Error('应用初始化失败', { cause: err })
+  }
+}
+
+try {
+  initApp()
+} catch (err) {
+  // 打印完整错误链
+  let e = err
+  while (e) {
+    console.log(e.message)
+    e = e.cause
+  }
+  // 应用初始化失败
+  // 配置文件读取失败
+  // ENOENT: no such file or directory
+}
+```
+
+### 正则表达式 /d 标志
+
+`d` 标志让匹配结果包含每个捕获组的起止索引：
+
+```javascript
+const str = 'hello world'
+const regex = /(?<greeting>\w+) (?<target>\w+)/d
+
+const match = regex.exec(str)
+
+// 匹配结果
+match[0] // 'hello world'
+match.groups // { greeting: 'hello', target: 'world' }
+
+// 索引信息（新增）
+match.indices
+// [[0, 11], [0, 5], [6, 11]]
+// 对应：完整匹配、第一个捕获组、第二个捕获组
+
+match.indices.groups
+// { greeting: [0, 5], target: [6, 11] }
+```
+
+实际应用——语法高亮：
+
+```javascript
+const code = 'const x = 42'
+const regex = /(?<keyword>const|let|var)|(?<number>\d+)|(?<ident>\w+)/dg
+
+let match
+while ((match = regex.exec(code)) !== null) {
+  const { groups } = match.indices
+  if (groups.keyword) {
+    console.log(`关键字 at [${groups.keyword}]`)
+  } else if (groups.number) {
+    console.log(`数字 at [${groups.number}]`)
+  } else if (groups.ident) {
+    console.log(`标识符 at [${groups.ident}]`)
+  }
+}
+// 关键字 at [0,5]
+// 标识符 at [6,7]
+// 数字 at [10,12]
+```
+
+检查正则是否启用了 `d` 标志：
+
+```javascript
+const regex = /./d
+regex.hasIndices // true
+```
+
+## ES14 (ES2023)
+
+### 数组不可变方法
+
+ES2023 为数组添加了四个返回新数组的方法，不修改原数组：
+
+**toSorted()**
+
+```javascript
+const arr = [3, 1, 2]
+
+// sort() 修改原数组
+arr.sort() // [1, 2, 3]
+console.log(arr) // [1, 2, 3]（原数组被修改）
+
+// toSorted() 返回新数组
+const arr2 = [3, 1, 2]
+const sorted = arr2.toSorted()
+console.log(sorted) // [1, 2, 3]
+console.log(arr2) // [3, 1, 2]（原数组不变）
+
+// 支持比较函数
+const nums = [10, 2, 30]
+nums.toSorted((a, b) => a - b) // [2, 10, 30]
+```
+
+**toReversed()**
+
+```javascript
+const arr = [1, 2, 3]
+
+// reverse() 修改原数组
+arr.reverse() // [3, 2, 1]
+
+// toReversed() 返回新数组
+const arr2 = [1, 2, 3]
+const reversed = arr2.toReversed()
+console.log(reversed) // [3, 2, 1]
+console.log(arr2) // [1, 2, 3]（原数组不变）
+```
+
+**toSpliced()**
+
+```javascript
+const arr = [1, 2, 3, 4, 5]
+
+// splice() 修改原数组
+// arr.splice(1, 2, 'a', 'b') // 删除 2 个，插入 'a', 'b'
+
+// toSpliced() 返回新数组
+const result = arr.toSpliced(1, 2, 'a', 'b')
+console.log(result) // [1, 'a', 'b', 4, 5]
+console
+  .log(arr) // [1, 2, 3, 4, 5]（原数组不变）
+
+  [
+    // 删除元素
+    (1, 2, 3, 4)
+  ].toSpliced(1, 2) // [1, 4]
+
+  [
+    // 插入元素
+    (1, 2, 3)
+  ].toSpliced(1, 0, 'new') // [1, 'new', 2, 3]
+```
+
+**with()**
+
+```javascript
+const arr = ['a', 'b', 'c']
+
+// 直接赋值修改原数组
+// arr[1] = 'B'
+
+// with() 返回新数组
+const result = arr.with(1, 'B')
+console.log(result) // ['a', 'B', 'c']
+console.log(arr) // ['a', 'b', 'c']（原数组不变）
+
+// 支持负索引
+arr.with(-1, 'C') // ['a', 'b', 'C']
+```
+
+这些方法在函数式编程和 React/Vue 状态管理中很有用：
+
+```javascript
+// React 状态更新
+const [items, setItems] = useState([1, 2, 3])
+
+// 不可变更新
+setItems((prev) => prev.toSorted())
+setItems((prev) => prev.with(0, 100))
+setItems((prev) => prev.toSpliced(1, 1))
+```
+
+### findLast() / findLastIndex()
+
+从数组末尾开始查找：
+
+```javascript
+const arr = [1, 2, 3, 4, 5, 4, 3]
+
+// find/findIndex 从前往后
+arr.find((n) => n > 3) // 4（第一个）
+arr.findIndex((n) => n > 3) // 3（第一个的索引）
+
+// findLast/findLastIndex 从后往前
+arr.findLast((n) => n > 3) // 4（最后一个）
+arr.findLastIndex((n) => n > 3) // 5（最后一个的索引）
+```
+
+实际应用：
+
+```javascript
+// 查找最后一个活跃用户
+const users = [
+  { name: 'A', active: true },
+  { name: 'B', active: false },
+  { name: 'C', active: true },
+]
+users.findLast((u) => u.active) // { name: 'C', active: true }
+
+// 查找最后一个错误日志
+const logs = [
+  { level: 'info', msg: '...' },
+  { level: 'error', msg: 'first error' },
+  { level: 'info', msg: '...' },
+  { level: 'error', msg: 'last error' },
+]
+logs.findLast((log) => log.level === 'error')
+// { level: 'error', msg: 'last error' }
+```
+
+找不到时返回 `undefined` / `-1`：
+
+```javascript
+const arr = [1, 2, 3]
+arr.findLast((n) => n > 10) // undefined
+arr.findLastIndex((n) => n > 10) // -1
+```
+
+### Hashbang 语法
+
+ES2023 正式支持在脚本开头使用 `#!`（hashbang/shebang）：
+
+```javascript
+#!/usr/bin/env node
+console.log('Hello from script')
+```
+
+这让 JavaScript 文件可以直接在 Unix 系统中作为可执行脚本运行：
+
+```bash
+chmod +x script.js
+./script.js  # 直接运行
+```
+
+规则：
+
+- `#!` 必须在文件的最开头（之前不能有空格或空行）
+- 只有第一行的 `#!` 会被解释器忽略
+- 模块和脚本都支持
+
+```javascript
+#!/usr/bin/env node
+// 这是 Node.js 脚本
+
+import fs from 'fs'
+// ...
+```
+
+### Symbol 作为 WeakMap 键
+
+ES2023 允许非注册的 Symbol 作为 WeakMap 和 WeakSet 的键：
+
+```javascript
+const weak = new WeakMap()
+
+// 对象作为键（一直支持）
+const objKey = {}
+weak.set(objKey, 'value1')
+
+// Symbol 作为键（ES2023 新增）
+const symKey = Symbol('key')
+weak.set(symKey, 'value2')
+
+weak.get(symKey) // 'value2'
+```
+
+限制：注册的 Symbol（通过 `Symbol.for()` 创建的）不能作为弱引用键：
+
+```javascript
+const weak = new WeakMap()
+
+// 非注册 Symbol：可以
+const localSym = Symbol('local')
+weak.set(localSym, 'ok')
+
+// 注册 Symbol：不行
+const globalSym = Symbol.for('global')
+weak.set(globalSym, 'value') // TypeError
+```
+
+这是因为注册的 Symbol 不会被垃圾回收，与 WeakMap 的设计初衷冲突。
+
+使用场景——给 Symbol 关联私有数据：
+
+```javascript
+const metadata = new WeakMap()
+
+function setMetadata(sym, data) {
+  metadata.set(sym, data)
+}
+
+function getMetadata(sym) {
+  return metadata.get(sym)
+}
+
+const mySym = Symbol('my')
+setMetadata(mySym, { created: Date.now() })
+getMetadata(mySym) // { created: ... }
+```
+
+---
+
+ES13 和 ES14 的更新让 JavaScript 在类的静态初始化、错误处理、数组操作方面更加完善。数组的不可变方法 `toSorted/toReversed/toSpliced/with` 填补了函数式编程中的空白，`findLast/findLastIndex` 让查找操作更加灵活。这些特性都是现代 JavaScript 应用中的常用工具。

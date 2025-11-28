@@ -1,0 +1,518 @@
+---
+title: Canvas 基础
+description: 学习 HTML5 Canvas 的基础知识，包括画布创建、绑图上下文、绑制基本图形、颜色样式和文本渲染
+pubDate: 2025-11-28
+toc: true
+ogImage: true
+category: HTML
+---
+
+Canvas 是 HTML5 引入的绘图 API，通过 JavaScript 在网页上绑制图形、动画和游戏。它提供了像素级别的控制能力，适合实现图表、游戏、图像处理等功能。
+
+## Canvas 基础
+
+### 创建画布
+
+```html
+<canvas id="myCanvas" width="400" height="300">
+  您的浏览器不支持 Canvas
+</canvas>
+```
+
+注意：width 和 height 是画布的实际像素尺寸，不要用 CSS 设置（会导致拉伸变形）。
+
+```html
+<!-- 正确：用属性设置尺寸 -->
+<canvas width="400" height="300"></canvas>
+
+<!-- 不推荐：用 CSS 设置会导致拉伸 -->
+<canvas style="width: 400px; height: 300px;"></canvas>
+```
+
+### 获取绑图上下文
+
+```javascript
+const canvas = document.getElementById('myCanvas')
+const ctx = canvas.getContext('2d')
+```
+
+`getContext('2d')` 返回 2D 绑图上下文，这是最常用的。还有 `webgl` 用于 3D 绑图。
+
+### 坐标系统
+
+Canvas 的坐标原点 (0, 0) 在左上角：
+
+```
+(0,0) ────────> x
+  │
+  │
+  │
+  ▼
+  y
+```
+
+## 绘制基本图形
+
+### 矩形
+
+Canvas 提供三个矩形相关的方法：
+
+```javascript
+const canvas = document.getElementById('myCanvas')
+const ctx = canvas.getContext('2d')
+
+// 填充矩形
+ctx.fillStyle = 'blue'
+ctx.fillRect(10, 10, 100, 80) // x, y, width, height
+
+// 描边矩形
+ctx.strokeStyle = 'red'
+ctx.lineWidth = 2
+ctx.strokeRect(130, 10, 100, 80)
+
+// 清除矩形区域
+ctx.clearRect(50, 30, 40, 40)
+```
+
+### 路径
+
+路径是 Canvas 绑制复杂图形的基础：
+
+```javascript
+// 开始新路径
+ctx.beginPath()
+
+// 移动画笔（不绘制）
+ctx.moveTo(50, 50)
+
+// 画直线
+ctx.lineTo(150, 50)
+ctx.lineTo(100, 120)
+
+// 闭合路径
+ctx.closePath()
+
+// 描边
+ctx.stroke()
+
+// 或者填充
+// ctx.fill()
+```
+
+### 圆形和弧线
+
+```javascript
+// arc(x, y, radius, startAngle, endAngle, anticlockwise)
+// 角度使用弧度制
+
+// 完整的圆
+ctx.beginPath()
+ctx.arc(100, 100, 50, 0, Math.PI * 2)
+ctx.fill()
+
+// 半圆
+ctx.beginPath()
+ctx.arc(250, 100, 50, 0, Math.PI)
+ctx.stroke()
+
+// 扇形
+ctx.beginPath()
+ctx.moveTo(100, 250) // 移动到圆心
+ctx.arc(100, 250, 50, 0, Math.PI / 2)
+ctx.closePath()
+ctx.fill()
+```
+
+弧度转换：`弧度 = 角度 × Math.PI / 180`
+
+### 贝塞尔曲线
+
+```javascript
+// 二次贝塞尔曲线
+ctx.beginPath()
+ctx.moveTo(50, 200)
+ctx.quadraticCurveTo(100, 100, 150, 200) // 控制点, 终点
+ctx.stroke()
+
+// 三次贝塞尔曲线
+ctx.beginPath()
+ctx.moveTo(200, 200)
+ctx.bezierCurveTo(220, 100, 280, 100, 300, 200) // 控制点1, 控制点2, 终点
+ctx.stroke()
+```
+
+## 颜色和样式
+
+### 填充和描边颜色
+
+```javascript
+// 颜色名
+ctx.fillStyle = 'red'
+ctx.strokeStyle = 'blue'
+
+// 十六进制
+ctx.fillStyle = '#ff0000'
+ctx.strokeStyle = '#0000ff'
+
+// RGB
+ctx.fillStyle = 'rgb(255, 0, 0)'
+ctx.strokeStyle = 'rgb(0, 0, 255)'
+
+// RGBA（带透明度）
+ctx.fillStyle = 'rgba(255, 0, 0, 0.5)'
+```
+
+### 线条样式
+
+```javascript
+// 线条宽度
+ctx.lineWidth = 5
+
+// 线条端点样式
+ctx.lineCap = 'butt' // 默认，平直
+ctx.lineCap = 'round' // 圆形
+ctx.lineCap = 'square' // 方形
+
+// 线条连接样式
+ctx.lineJoin = 'miter' // 默认，尖角
+ctx.lineJoin = 'round' // 圆角
+ctx.lineJoin = 'bevel' // 斜角
+
+// 虚线
+ctx.setLineDash([5, 3]) // 5像素实线，3像素空白
+ctx.lineDashOffset = 0 // 虚线偏移
+```
+
+### 渐变
+
+#### 线性渐变
+
+```javascript
+// 创建线性渐变
+const gradient = ctx.createLinearGradient(0, 0, 200, 0) // x0, y0, x1, y1
+gradient.addColorStop(0, 'red')
+gradient.addColorStop(0.5, 'yellow')
+gradient.addColorStop(1, 'green')
+
+ctx.fillStyle = gradient
+ctx.fillRect(10, 10, 200, 100)
+```
+
+#### 径向渐变
+
+```javascript
+// 创建径向渐变
+const gradient = ctx.createRadialGradient(100, 100, 20, 100, 100, 80)
+// 内圆心x, 内圆心y, 内半径, 外圆心x, 外圆心y, 外半径
+gradient.addColorStop(0, 'white')
+gradient.addColorStop(1, 'blue')
+
+ctx.fillStyle = gradient
+ctx.fillRect(20, 20, 160, 160)
+```
+
+### 图案填充
+
+```javascript
+const img = new Image()
+img.src = 'pattern.png'
+img.onload = () => {
+  const pattern = ctx.createPattern(img, 'repeat')
+  // repeat, repeat-x, repeat-y, no-repeat
+  ctx.fillStyle = pattern
+  ctx.fillRect(0, 0, 300, 200)
+}
+```
+
+### 阴影
+
+```javascript
+ctx.shadowColor = 'rgba(0, 0, 0, 0.5)'
+ctx.shadowBlur = 10
+ctx.shadowOffsetX = 5
+ctx.shadowOffsetY = 5
+
+ctx.fillStyle = 'blue'
+ctx.fillRect(50, 50, 100, 100)
+```
+
+## 文本渲染
+
+### 绘制文本
+
+```javascript
+ctx.font = '24px Arial'
+ctx.fillStyle = 'black'
+
+// 填充文本
+ctx.fillText('Hello Canvas!', 50, 50)
+
+// 描边文本
+ctx.strokeText('Hello Canvas!', 50, 100)
+
+// 限制最大宽度
+ctx.fillText('Very long text...', 50, 150, 100) // maxWidth: 100
+```
+
+### 文本样式
+
+```javascript
+// 字体
+ctx.font = 'bold 24px "Microsoft YaHei", Arial, sans-serif'
+
+// 对齐方式
+ctx.textAlign = 'left' // left, right, center, start, end
+ctx.textBaseline = 'top' // top, hanging, middle, alphabetic, ideographic, bottom
+
+// 测量文本宽度
+const metrics = ctx.measureText('Hello')
+console.log(metrics.width)
+```
+
+### 文本换行
+
+Canvas 不支持自动换行，需要手动处理：
+
+```javascript
+function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
+  const words = text.split('')
+  let line = ''
+
+  for (let i = 0; i < words.length; i++) {
+    const testLine = line + words[i]
+    const metrics = ctx.measureText(testLine)
+
+    if (metrics.width > maxWidth && i > 0) {
+      ctx.fillText(line, x, y)
+      line = words[i]
+      y += lineHeight
+    } else {
+      line = testLine
+    }
+  }
+  ctx.fillText(line, x, y)
+}
+
+wrapText(ctx, '这是一段很长的文本，需要自动换行显示。', 10, 30, 150, 24)
+```
+
+## 图像操作
+
+### 绘制图像
+
+```javascript
+const img = new Image()
+img.src = 'image.jpg'
+
+img.onload = () => {
+  // 基本绘制
+  ctx.drawImage(img, 10, 10)
+
+  // 指定尺寸
+  ctx.drawImage(img, 10, 100, 100, 80) // x, y, width, height
+
+  // 裁剪并绘制
+  ctx.drawImage(
+    img,
+    0,
+    0,
+    100,
+    100, // 源图像的裁剪区域
+    10,
+    200,
+    150,
+    150 // 绘制位置和尺寸
+  )
+}
+```
+
+### 像素操作
+
+```javascript
+// 获取像素数据
+const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+const data = imageData.data // Uint8ClampedArray [r, g, b, a, r, g, b, a, ...]
+
+// 修改像素（例如：灰度化）
+for (let i = 0; i < data.length; i += 4) {
+  const gray = (data[i] + data[i + 1] + data[i + 2]) / 3
+  data[i] = gray // R
+  data[i + 1] = gray // G
+  data[i + 2] = gray // B
+  // data[i + 3] 是 Alpha，保持不变
+}
+
+// 写回像素数据
+ctx.putImageData(imageData, 0, 0)
+```
+
+### 导出图像
+
+```javascript
+// 导出为 Data URL
+const dataURL = canvas.toDataURL('image/png')
+// 或 canvas.toDataURL('image/jpeg', 0.8)  // 质量 0-1
+
+// 用于下载
+const link = document.createElement('a')
+link.download = 'canvas-image.png'
+link.href = dataURL
+link.click()
+
+// 导出为 Blob
+canvas.toBlob((blob) => {
+  const url = URL.createObjectURL(blob)
+  // 使用 blob...
+}, 'image/png')
+```
+
+## 变换
+
+### 平移
+
+```javascript
+ctx.translate(100, 50) // 移动坐标原点
+
+ctx.fillRect(0, 0, 50, 50) // 实际绘制在 (100, 50)
+```
+
+### 旋转
+
+```javascript
+ctx.translate(100, 100) // 移动到旋转中心
+ctx.rotate(Math.PI / 4) // 旋转 45 度
+ctx.fillRect(-25, -25, 50, 50) // 以中心绘制
+```
+
+### 缩放
+
+```javascript
+ctx.scale(2, 2) // x, y 方向各放大 2 倍
+ctx.fillRect(10, 10, 50, 50) // 实际是 100x100
+```
+
+### 保存和恢复状态
+
+```javascript
+ctx.fillStyle = 'blue'
+
+ctx.save() // 保存当前状态
+
+ctx.fillStyle = 'red'
+ctx.translate(50, 50)
+ctx.fillRect(0, 0, 30, 30) // 红色，位置偏移
+
+ctx.restore() // 恢复之前的状态
+
+ctx.fillRect(0, 0, 30, 30) // 蓝色，原始位置
+```
+
+`save()` 和 `restore()` 保存/恢复的内容包括：
+
+- 变换矩阵
+- 裁剪区域
+- 样式属性（fillStyle, strokeStyle, lineWidth 等）
+- 合成属性
+
+### 变换矩阵
+
+```javascript
+// 设置变换矩阵
+ctx.setTransform(1, 0, 0, 1, 0, 0) // 重置为单位矩阵
+
+// 叠加变换
+ctx.transform(a, b, c, d, e, f)
+// a: 水平缩放
+// b: 水平倾斜
+// c: 垂直倾斜
+// d: 垂直缩放
+// e: 水平移动
+// f: 垂直移动
+```
+
+## 合成与裁剪
+
+### 全局合成操作
+
+```javascript
+ctx.globalCompositeOperation = 'source-over' // 默认：新图形覆盖旧图形
+```
+
+常用值：
+
+| 值                 | 效果                   |
+| ------------------ | ---------------------- |
+| `source-over`      | 新图形在上（默认）     |
+| `destination-over` | 新图形在下             |
+| `source-in`        | 只显示重叠部分的新图形 |
+| `destination-in`   | 只显示重叠部分的旧图形 |
+| `source-out`       | 只显示不重叠的新图形   |
+| `xor`              | 重叠部分透明           |
+| `lighter`          | 颜色叠加               |
+
+### 裁剪
+
+```javascript
+// 定义裁剪区域
+ctx.beginPath()
+ctx.arc(100, 100, 50, 0, Math.PI * 2)
+ctx.clip()
+
+// 后续绑制只在裁剪区域内可见
+ctx.fillStyle = 'blue'
+ctx.fillRect(0, 0, 200, 200) // 只显示圆形区域内的部分
+```
+
+### 全局透明度
+
+```javascript
+ctx.globalAlpha = 0.5 // 0（完全透明）到 1（完全不透明）
+```
+
+## 实例：绘制图表
+
+```javascript
+function drawBarChart(ctx, data, x, y, width, height) {
+  const barWidth = width / data.length
+  const maxValue = Math.max(...data.map((d) => d.value))
+
+  data.forEach((item, i) => {
+    const barHeight = (item.value / maxValue) * height
+    const barX = x + i * barWidth
+
+    // 绘制柱子
+    ctx.fillStyle = item.color || '#4a90d9'
+    ctx.fillRect(barX + 5, y + height - barHeight, barWidth - 10, barHeight)
+
+    // 绘制标签
+    ctx.fillStyle = '#333'
+    ctx.textAlign = 'center'
+    ctx.fillText(item.label, barX + barWidth / 2, y + height + 20)
+    ctx.fillText(item.value, barX + barWidth / 2, y + height - barHeight - 10)
+  })
+}
+
+const data = [
+  { label: '1月', value: 120 },
+  { label: '2月', value: 200 },
+  { label: '3月', value: 150 },
+  { label: '4月', value: 300 },
+]
+
+drawBarChart(ctx, data, 50, 50, 300, 200)
+```
+
+## 小结
+
+这篇文章介绍了 Canvas 的基础知识：
+
+- **画布创建**：通过 width/height 属性设置尺寸
+- **绘图上下文**：`getContext('2d')`
+- **基本图形**：矩形、路径、圆弧、贝塞尔曲线
+- **样式**：颜色、渐变、图案、阴影、线条样式
+- **文本**：绘制文本、字体设置、对齐方式
+- **图像**：绘制图像、像素操作、导出
+- **变换**：平移、旋转、缩放、状态保存
+- **合成**：混合模式、裁剪、透明度
+
+下一篇会介绍 Canvas 的动画和进阶技巧。

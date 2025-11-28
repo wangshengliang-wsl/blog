@@ -1,0 +1,575 @@
+---
+title: HTML5 概述
+description: 全面了解 HTML5 带来的新特性，包括语义化标签、多媒体支持、Canvas 绑图、Web API 等现代 Web 开发的基础
+pubDate: 2025-11-28
+toc: true
+ogImage: true
+category: HTML
+---
+
+HTML5 是 HTML 的重大升级版本，它不仅仅是新标签的集合，更是一整套现代 Web 开发技术的基础。这篇文章概述 HTML5 的主要新特性。
+
+## HTML5 的诞生
+
+HTML5 的发展历程颇为曲折。2004 年，WHATWG（Web Hypertext Application Technology Working Group）开始独立开发下一代 HTML，因为当时 W3C 正专注于 XHTML 2.0，而后者过于激进，脱离了实际需求。
+
+2007 年，W3C 接受了 WHATWG 的工作成果，开始共同开发 HTML5。2014 年 10 月 28 日，HTML5 正式成为 W3C 推荐标准。
+
+2019 年，WHATWG 发布的 HTML Living Standard 成为唯一的官方标准，HTML 不再有固定版本号，而是持续更新的"活标准"。
+
+## HTML5 的设计原则
+
+HTML5 的设计遵循几个核心原则：
+
+### 1. 兼容性
+
+```html
+<!-- HTML5 向后兼容，旧代码依然有效 -->
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>标题</title>
+  </head>
+  <body>
+    <p>内容</p>
+  </body>
+</html>
+```
+
+### 2. 实用性
+
+```html
+<!-- 更简洁的语法 -->
+<!DOCTYPE html>
+<meta charset="UTF-8" />
+```
+
+### 3. 互操作性
+
+所有浏览器都应该以相同的方式处理相同的代码，���括错误处理。
+
+### 4. 通用访问
+
+支持各种设备、各种能力的用户。
+
+## 新增语义化标签
+
+HTML5 引入了大量语义化标签，让页面结构更清晰：
+
+### 页面结构标签
+
+```html
+<header>页头</header>
+<nav>导航</nav>
+<main>主要内容</main>
+<article>独立文章</article>
+<section>章节</section>
+<aside>侧边栏</aside>
+<footer>页脚</footer>
+```
+
+### 文本语义标签
+
+```html
+<mark>高亮文本</mark>
+<time datetime="2024-01-15">2024年1月15日</time>
+<figure>
+  <img src="photo.jpg" alt="照片" />
+  <figcaption>图片说明</figcaption>
+</figure>
+<details>
+  <summary>点击展开</summary>
+  <p>详细内容</p>
+</details>
+```
+
+### 与 div 的对比
+
+```html
+<!-- 旧的写法 -->
+<div class="header">...</div>
+<div class="nav">...</div>
+<div class="content">...</div>
+<div class="footer">...</div>
+
+<!-- HTML5 写法 -->
+<header>...</header>
+<nav>...</nav>
+<main>...</main>
+<footer>...</footer>
+```
+
+语义化标签的好处：
+
+- 代码更易读
+- SEO 更友好
+- 无障碍访问更好
+- 便于维护
+
+## 多媒体支持
+
+HTML5 之前，网页播放音视频需要 Flash 等插件。HTML5 原生支持多媒体：
+
+### 视频
+
+```html
+<video src="movie.mp4" controls width="640" height="360">
+  您的浏览器不支持 video 标签
+</video>
+
+<!-- 多格式支持 -->
+<video controls>
+  <source src="movie.webm" type="video/webm" />
+  <source src="movie.mp4" type="video/mp4" />
+  <p>您的浏览器不支持 HTML5 视频</p>
+</video>
+```
+
+常用属性：
+
+- `controls`：显示控制条
+- `autoplay`：自动播放
+- `muted`：静音
+- `loop`：循环播放
+- `poster`：封面图
+
+### 音频
+
+```html
+<audio src="music.mp3" controls>您的浏览器不支持 audio 标签</audio>
+
+<audio controls>
+  <source src="music.ogg" type="audio/ogg" />
+  <source src="music.mp3" type="audio/mpeg" />
+</audio>
+```
+
+### 字幕支持
+
+```html
+<video controls>
+  <source src="movie.mp4" type="video/mp4" />
+  <track kind="subtitles" src="subs_cn.vtt" srclang="zh" label="中文" />
+  <track kind="subtitles" src="subs_en.vtt" srclang="en" label="English" />
+</video>
+```
+
+## Canvas 绑图
+
+`<canvas>` 提供了 JavaScript 绑图的画布：
+
+```html
+<canvas id="myCanvas" width="400" height="300"></canvas>
+
+<script>
+  const canvas = document.getElementById('myCanvas')
+  const ctx = canvas.getContext('2d')
+
+  // 绘制矩形
+  ctx.fillStyle = 'blue'
+  ctx.fillRect(10, 10, 100, 80)
+
+  // 绘制圆形
+  ctx.beginPath()
+  ctx.arc(200, 150, 50, 0, Math.PI * 2)
+  ctx.fillStyle = 'red'
+  ctx.fill()
+
+  // 绘制文���
+  ctx.font = '24px Arial'
+  ctx.fillStyle = 'black'
+  ctx.fillText('Hello Canvas!', 100, 250)
+</script>
+```
+
+Canvas 适用于：
+
+- 游戏开发
+- 数据可视化
+- 图像处理
+- 动画效果
+
+## SVG 支持
+
+HTML5 可以直接嵌入 SVG：
+
+```html
+<svg width="200" height="200">
+  <circle cx="100" cy="100" r="50" fill="blue" />
+  <rect x="20" y="20" width="60" height="40" fill="red" />
+  <text x="100" y="150" text-anchor="middle">SVG</text>
+</svg>
+```
+
+SVG vs Canvas：
+
+| 特性 | SVG          | Canvas         |
+| ---- | ------------ | -------------- |
+| 类型 | 矢量图       | 位图           |
+| 缩放 | 无损         | 可能模糊       |
+| DOM  | 有，可操作   | 无             |
+| 事件 | 支持元素事件 | 需要自己计算   |
+| 适用 | 图标、图表   | 游戏、图像处理 |
+
+## 新的表单特性
+
+HTML5 大幅增强了表单功能：
+
+### 新增 input 类型
+
+```html
+<input type="email" />
+<input type="url" />
+<input type="tel" />
+<input type="number" />
+<input type="range" />
+<input type="date" />
+<input type="time" />
+<input type="datetime-local" />
+<input type="month" />
+<input type="week" />
+<input type="color" />
+<input type="search" />
+```
+
+### 新增属性
+
+```html
+<input type="text" placeholder="提示文字" />
+<input type="text" required />
+<input type="text" pattern="[A-Za-z]+" />
+<input type="text" autofocus />
+<input type="text" autocomplete="name" />
+```
+
+### 表单验证
+
+```html
+<form>
+  <input type="email" required />
+  <input type="text" pattern="[0-9]{6}" title="请输入6位数字" />
+  <button type="submit">提交</button>
+</form>
+```
+
+### datalist
+
+```html
+<input list="browsers" />
+<datalist id="browsers">
+  <option value="Chrome"></option>
+  <option value="Firefox"></option>
+  <option value="Safari"></option>
+</datalist>
+```
+
+## Web 存储
+
+HTML5 提供了更强大的客户端存储方案：
+
+### localStorage
+
+```javascript
+// 存储
+localStorage.setItem('username', '张三')
+
+// 读取
+const name = localStorage.getItem('username')
+
+// 删除
+localStorage.removeItem('username')
+
+// 清空
+localStorage.clear()
+```
+
+特点：
+
+- 永久存储（除非手动清除）
+- 容量约 5MB
+- 同源策略
+
+### sessionStorage
+
+```javascript
+// 用法与 localStorage 相同
+sessionStorage.setItem('token', 'abc123')
+```
+
+特点：
+
+- 会话级存储（关闭标签页就清除）
+- 容量约 5MB
+
+### Web Storage vs Cookie
+
+| 特性         | Cookie   | localStorage | sessionStorage |
+| ------------ | -------- | ------------ | -------------- |
+| 容量         | ~4KB     | ~5MB         | ~5MB           |
+| 发送到服务器 | 每次请求 | 否           | 否             |
+| 有效期       | 可设置   | 永久         | 会话           |
+| API          | 复杂     | 简单         | 简单           |
+
+## 地理定位
+
+Geolocation API 获取用户位置：
+
+```javascript
+if ('geolocation' in navigator) {
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      console.log('纬度:', position.coords.latitude)
+      console.log('经度:', position.coords.longitude)
+    },
+    (error) => {
+      console.error('定位失败:', error.message)
+    }
+  )
+}
+```
+
+需要用户授权，主要用于地图、本地服务等场景。
+
+## Web Workers
+
+Web Workers 让 JavaScript 在后台线程运行：
+
+```javascript
+// main.js
+const worker = new Worker('worker.js')
+
+worker.postMessage({ data: [1, 2, 3, 4, 5] })
+
+worker.onmessage = (e) => {
+  console.log('计算结果:', e.data)
+}
+
+// worker.js
+self.onmessage = (e) => {
+  const sum = e.data.data.reduce((a, b) => a + b, 0)
+  self.postMessage(sum)
+}
+```
+
+适用于：
+
+- 复杂计算
+- 大数据处理
+- 避免阻塞 UI
+
+## WebSocket
+
+WebSocket 提供全双工通信：
+
+```javascript
+const socket = new WebSocket('wss://example.com/socket')
+
+socket.onopen = () => {
+  console.log('连接已建立')
+  socket.send('Hello Server!')
+}
+
+socket.onmessage = (event) => {
+  console.log('收到消息:', event.data)
+}
+
+socket.onclose = () => {
+  console.log('连接已关闭')
+}
+```
+
+适用于：
+
+- 实时聊天
+- 在线游戏
+- 实时数据推送
+
+## 拖放 API
+
+HTML5 原生支持拖放：
+
+```html
+<div id="drag" draggable="true">拖动我</div>
+<div id="drop">放到这里</div>
+
+<script>
+  const drag = document.getElementById('drag')
+  const drop = document.getElementById('drop')
+
+  drag.addEventListener('dragstart', (e) => {
+    e.dataTransfer.setData('text/plain', drag.id)
+  })
+
+  drop.addEventListener('dragover', (e) => {
+    e.preventDefault()
+  })
+
+  drop.addEventListener('drop', (e) => {
+    e.preventDefault()
+    const id = e.dataTransfer.getData('text/plain')
+    drop.appendChild(document.getElementById(id))
+  })
+</script>
+```
+
+## History API
+
+History API 让单页应用可以操作浏览历史：
+
+```javascript
+// 添加历史记录
+history.pushState({ page: 1 }, 'Title', '/page1')
+
+// 替换当前记录
+history.replaceState({ page: 2 }, 'Title', '/page2')
+
+// 监听前进/后退
+window.addEventListener('popstate', (e) => {
+  console.log('状态:', e.state)
+})
+```
+
+这是 SPA（单页应用）路由的基础。
+
+## 其他重要 API
+
+### File API
+
+```javascript
+const input = document.querySelector('input[type="file"]')
+input.addEventListener('change', (e) => {
+  const file = e.target.files[0]
+  console.log('文件名:', file.name)
+  console.log('大小:', file.size)
+  console.log('类型:', file.type)
+
+  const reader = new FileReader()
+  reader.onload = () => {
+    console.log('内容:', reader.result)
+  }
+  reader.readAsText(file)
+})
+```
+
+### Fullscreen API
+
+```javascript
+// 进入全屏
+document.documentElement.requestFullscreen()
+
+// 退出全屏
+document.exitFullscreen()
+```
+
+### Notification API
+
+```javascript
+Notification.requestPermission().then((permission) => {
+  if (permission === 'granted') {
+    new Notification('标题', {
+      body: '通知内容',
+      icon: '/icon.png',
+    })
+  }
+})
+```
+
+## 浏览器兼容性
+
+现代浏览器（Chrome、Firefox、Safari、Edge）对 HTML5 支持良好。对于旧浏览器：
+
+### 检测支持
+
+```javascript
+// 检测 Canvas
+const hasCanvas = !!document.createElement('canvas').getContext
+
+// 检测地理定位
+const hasGeolocation = 'geolocation' in navigator
+
+// 检测 localStorage
+const hasStorage = 'localStorage' in window
+```
+
+### Modernizr
+
+```html
+<script src="modernizr.js"></script>
+<script>
+  if (Modernizr.canvas) {
+    // 支持 Canvas
+  }
+</script>
+```
+
+### Polyfill
+
+对于不支持的特性，可以使用 polyfill：
+
+```html
+<!-- HTML5 Shiv：让 IE8 支持 HTML5 标签 -->
+<!--[if lt IE 9]>
+  <script src="html5shiv.js"></script>
+<![endif]-->
+```
+
+## HTML5 完整模板
+
+```html
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="页面描述" />
+    <title>页面标题</title>
+    <link rel="icon" href="/favicon.ico" />
+    <link rel="stylesheet" href="/css/style.css" />
+  </head>
+  <body>
+    <header>
+      <nav>
+        <ul>
+          <li><a href="/">首页</a></li>
+          <li><a href="/about">关于</a></li>
+        </ul>
+      </nav>
+    </header>
+
+    <main>
+      <article>
+        <h1>文章标题</h1>
+        <time datetime="2024-01-15">2024年1月15日</time>
+        <p>文章内容...</p>
+      </article>
+
+      <aside>
+        <h2>相关链接</h2>
+        <ul>
+          <li><a href="#">链接1</a></li>
+        </ul>
+      </aside>
+    </main>
+
+    <footer>
+      <p>版权信息</p>
+    </footer>
+
+    <script src="/js/app.js" defer></script>
+  </body>
+</html>
+```
+
+## 小结
+
+HTML5 带来了全面的升级：
+
+- **语义化标签**：header、nav、main、article、section、aside、footer
+- **多媒体**：video、audio、track
+- **绘图**：canvas、SVG
+- **表单增强**：新输入类型、验证、datalist
+- **Web 存储**：localStorage、sessionStorage
+- **API**：Geolocation、Web Workers、WebSocket、拖放、History
+
+这些特性构成了现代 Web 开发的基础。后续文章会详细介绍各个部分。

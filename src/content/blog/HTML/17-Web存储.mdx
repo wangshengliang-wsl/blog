@@ -1,0 +1,612 @@
+---
+title: Web 存储
+description: 深入了解 HTML5 Web 存储 API，包括 localStorage、sessionStorage 和 IndexedDB 的使用方法和最佳实践
+pubDate: 2025-11-28
+toc: true
+ogImage: true
+category: HTML
+---
+
+HTML5 提供了多种客户端存储方案，让 Web 应用可以在浏览器本地保存数据。本文介绍 localStorage、sessionStorage 和 IndexedDB。
+
+## Web Storage 概述
+
+Web Storage 包括 localStorage 和 sessionStorage，它们提供了简单的键值对存储：
+
+| 特性     | localStorage         | sessionStorage             |
+| -------- | -------------------- | -------------------------- |
+| 生命周期 | 永久（除非手动清除） | 会话级（关闭标签页即清除） |
+| 作用域   | 同源的所有窗口       | 同一窗口/标签页            |
+| 容量     | 约 5-10MB            | 约 5-10MB                  |
+| 数据类型 | 字符串               | 字符串                     |
+
+## localStorage
+
+localStorage 用于长期存储数据，即使关闭浏览器也不会丢失。
+
+### 基本操作
+
+```javascript
+// 存储
+localStorage.setItem('username', '张三')
+
+// 读取
+const username = localStorage.getItem('username')
+console.log(username) // "张三"
+
+// 删除单个
+localStorage.removeItem('username')
+
+// 清空所有
+localStorage.clear()
+
+// 获取键名
+const key = localStorage.key(0) // 第一个键名
+
+// 数据条数
+console.log(localStorage.length)
+```
+
+### 存储对象和数组
+
+localStorage 只能存储字符串，需要用 JSON 转换：
+
+```javascript
+// 存储对象
+const user = { name: '张三', age: 25 }
+localStorage.setItem('user', JSON.stringify(user))
+
+// 读取对象
+const savedUser = JSON.parse(localStorage.getItem('user'))
+console.log(savedUser.name) // "张三"
+
+// 存储数组
+const todos = ['学习 HTML', '学习 CSS', '学习 JS']
+localStorage.setItem('todos', JSON.stringify(todos))
+
+// 读取数组
+const savedTodos = JSON.parse(localStorage.getItem('todos'))
+```
+
+### 封装工具函数
+
+```javascript
+const storage = {
+  get(key) {
+    const value = localStorage.getItem(key)
+    try {
+      return JSON.parse(value)
+    } catch {
+      return value
+    }
+  },
+
+  set(key, value) {
+    if (typeof value === 'object') {
+      value = JSON.stringify(value)
+    }
+    localStorage.setItem(key, value)
+  },
+
+  remove(key) {
+    localStorage.removeItem(key)
+  },
+
+  clear() {
+    localStorage.clear()
+  },
+}
+
+// 使用
+storage.set('user', { name: '张三', age: 25 })
+const user = storage.get('user')
+```
+
+### 带过期时间的存储
+
+```javascript
+const storageWithExpiry = {
+  set(key, value, ttl) {
+    const item = {
+      value,
+      expiry: ttl ? Date.now() + ttl : null,
+    }
+    localStorage.setItem(key, JSON.stringify(item))
+  },
+
+  get(key) {
+    const itemStr = localStorage.getItem(key)
+    if (!itemStr) return null
+
+    const item = JSON.parse(itemStr)
+
+    if (item.expiry && Date.now() > item.expiry) {
+      localStorage.removeItem(key)
+      return null
+    }
+
+    return item.value
+  },
+}
+
+// 存储 1 小时后过期的数据
+storageWithExpiry.set('token', 'abc123', 3600000)
+
+// 读取（过期后返回 null）
+const token = storageWithExpiry.get('token')
+```
+
+## sessionStorage
+
+sessionStorage 用于会话级存储，关闭标签页后数据消失。
+
+```javascript
+// 用法与 localStorage 完全相同
+sessionStorage.setItem('tabId', Math.random().toString(36))
+const tabId = sessionStorage.getItem('tabId')
+```
+
+### 使用场景
+
+- 表单临时数据（防止刷新丢失）
+- 页面间传递数据
+- 一次性验证信息
+
+```javascript
+// 保存表单数据，防止刷新丢失
+const form = document.querySelector('form')
+
+form.addEventListener('input', (e) => {
+  const formData = new FormData(form)
+  const data = Object.fromEntries(formData.entries())
+  sessionStorage.setItem('formDraft', JSON.stringify(data))
+})
+
+// 页面加载时恢复
+window.addEventListener('load', () => {
+  const draft = sessionStorage.getItem('formDraft')
+  if (draft) {
+    const data = JSON.parse(draft)
+    Object.entries(data).forEach(([name, value]) => {
+      const input = form.querySelector(`[name="${name}"]`)
+      if (input) input.value = value
+    })
+  }
+})
+
+// 提交后清除
+form.addEventListener('submit', () => {
+  sessionStorage.removeItem('formDraft')
+})
+```
+
+## Storage 事件
+
+当存储发生变化时，其他同源页面会收到 storage 事件：
+
+```javascript
+window.addEventListener('storage', (e) => {
+  console.log('键名:', e.key)
+  console.log('旧值:', e.oldValue)
+  console.log('新值:', e.newValue)
+  console.log('URL:', e.url)
+  console.log('Storage对象:', e.storageArea)
+})
+```
+
+注意：事件只在其他页面触发，不在当前页面触发。
+
+### 跨标签页通信
+
+```javascript
+// 页面 A：发送消息
+function sendMessage(channel, message) {
+  localStorage.setItem(
+    channel,
+    JSON.stringify({
+      data: message,
+      timestamp: Date.now(),
+    })
+  )
+}
+
+sendMessage('chat', { from: 'A', text: 'Hello!' })
+
+// 页面 B：接收消息
+window.addEventListener('storage', (e) => {
+  if (e.key === 'chat') {
+    const message = JSON.parse(e.newValue)
+    console.log('收到消息:', message.data)
+  }
+})
+```
+
+## IndexedDB
+
+IndexedDB 是一个功能强大的客户端数据库，支持：
+
+- 存储大量结构化数据
+- 索引和查询
+- 事务支持
+- 异步操作
+
+### 打开数据库
+
+```javascript
+const request = indexedDB.open('MyDatabase', 1)
+
+request.onerror = (e) => {
+  console.error('数据库打开失败:', e.target.error)
+}
+
+request.onsuccess = (e) => {
+  const db = e.target.result
+  console.log('数据库打开成功')
+}
+
+request.onupgradeneeded = (e) => {
+  const db = e.target.result
+
+  // 创建对象仓库（表）
+  if (!db.objectStoreNames.contains('users')) {
+    const store = db.createObjectStore('users', {
+      keyPath: 'id',
+      autoIncrement: true,
+    })
+
+    // 创建索引
+    store.createIndex('name', 'name', { unique: false })
+    store.createIndex('email', 'email', { unique: true })
+  }
+}
+```
+
+### CRUD 操作
+
+```javascript
+class IndexedDBHelper {
+  constructor(dbName, version) {
+    this.dbName = dbName
+    this.version = version
+    this.db = null
+  }
+
+  async open() {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open(this.dbName, this.version)
+
+      request.onerror = () => reject(request.error)
+      request.onsuccess = () => {
+        this.db = request.result
+        resolve(this.db)
+      }
+
+      request.onupgradeneeded = (e) => {
+        const db = e.target.result
+        if (!db.objectStoreNames.contains('users')) {
+          const store = db.createObjectStore('users', {
+            keyPath: 'id',
+            autoIncrement: true,
+          })
+          store.createIndex('name', 'name')
+          store.createIndex('email', 'email', { unique: true })
+        }
+      }
+    })
+  }
+
+  // 添加数据
+  async add(storeName, data) {
+    return new Promise((resolve, reject) => {
+      const transaction = this.db.transaction(storeName, 'readwrite')
+      const store = transaction.objectStore(storeName)
+      const request = store.add(data)
+
+      request.onsuccess = () => resolve(request.result)
+      request.onerror = () => reject(request.error)
+    })
+  }
+
+  // 获取数据
+  async get(storeName, key) {
+    return new Promise((resolve, reject) => {
+      const transaction = this.db.transaction(storeName, 'readonly')
+      const store = transaction.objectStore(storeName)
+      const request = store.get(key)
+
+      request.onsuccess = () => resolve(request.result)
+      request.onerror = () => reject(request.error)
+    })
+  }
+
+  // 获取所有数据
+  async getAll(storeName) {
+    return new Promise((resolve, reject) => {
+      const transaction = this.db.transaction(storeName, 'readonly')
+      const store = transaction.objectStore(storeName)
+      const request = store.getAll()
+
+      request.onsuccess = () => resolve(request.result)
+      request.onerror = () => reject(request.error)
+    })
+  }
+
+  // 更新数据
+  async put(storeName, data) {
+    return new Promise((resolve, reject) => {
+      const transaction = this.db.transaction(storeName, 'readwrite')
+      const store = transaction.objectStore(storeName)
+      const request = store.put(data)
+
+      request.onsuccess = () => resolve(request.result)
+      request.onerror = () => reject(request.error)
+    })
+  }
+
+  // 删除数据
+  async delete(storeName, key) {
+    return new Promise((resolve, reject) => {
+      const transaction = this.db.transaction(storeName, 'readwrite')
+      const store = transaction.objectStore(storeName)
+      const request = store.delete(key)
+
+      request.onsuccess = () => resolve()
+      request.onerror = () => reject(request.error)
+    })
+  }
+
+  // 通过索引查询
+  async getByIndex(storeName, indexName, value) {
+    return new Promise((resolve, reject) => {
+      const transaction = this.db.transaction(storeName, 'readonly')
+      const store = transaction.objectStore(storeName)
+      const index = store.index(indexName)
+      const request = index.getAll(value)
+
+      request.onsuccess = () => resolve(request.result)
+      request.onerror = () => reject(request.error)
+    })
+  }
+}
+
+// 使用
+const dbHelper = new IndexedDBHelper('MyApp', 1)
+await dbHelper.open()
+
+// 添加
+await dbHelper.add('users', { name: '张三', email: 'zhangsan@example.com' })
+
+// 查询
+const user = await dbHelper.get('users', 1)
+const allUsers = await dbHelper.getAll('users')
+
+// 更新
+await dbHelper.put('users', {
+  id: 1,
+  name: '张三三',
+  email: 'zhangsan@example.com',
+})
+
+// 删除
+await dbHelper.delete('users', 1)
+
+// 索引查询
+const usersByName = await dbHelper.getByIndex('users', 'name', '张三')
+```
+
+### 游标遍历
+
+```javascript
+async function iterateWithCursor(db, storeName) {
+  return new Promise((resolve, reject) => {
+    const results = []
+    const transaction = db.transaction(storeName, 'readonly')
+    const store = transaction.objectStore(storeName)
+    const request = store.openCursor()
+
+    request.onsuccess = (e) => {
+      const cursor = e.target.result
+      if (cursor) {
+        results.push(cursor.value)
+        cursor.continue()
+      } else {
+        resolve(results)
+      }
+    }
+
+    request.onerror = () => reject(request.error)
+  })
+}
+```
+
+## 存储方案对比
+
+| 特性       | Cookie | localStorage | sessionStorage | IndexedDB  |
+| ---------- | ------ | ------------ | -------------- | ---------- |
+| 容量       | ~4KB   | ~5-10MB      | ~5-10MB        | 无限制     |
+| 同步/异步  | 同步   | 同步         | 同步           | 异步       |
+| 数据类型   | 字符串 | 字符串       | 字符串         | 任意       |
+| 索引查询   | 否     | 否           | 否             | 是         |
+| 服务器发送 | 是     | 否           | 否             | 否         |
+| 过期时间   | 支持   | 需手动实现   | 会话级         | 需手动实现 |
+
+### 选择建议
+
+- **Cookie**：需要服务器读取的小量数据（如认证信息）
+- **localStorage**：长期存储的用户偏好、缓存数据
+- **sessionStorage**：临时数据、表单草稿
+- **IndexedDB**：大量结构化数据、离线应用
+
+## 安全注意事项
+
+### XSS 风险
+
+存储在客户端的数据可能被 XSS 攻击窃取：
+
+```javascript
+// 攻击者可能通过 XSS 窃取所有 localStorage 数据
+console.log(localStorage)
+```
+
+建议：
+
+- 不要存储敏感信息（密码、信用卡号）
+- Token 设置适当的过期时间
+- 使用 HttpOnly Cookie 存储敏感 Token
+
+### 同源策略
+
+Web Storage 受同源策略限制：
+
+- `http://example.com` 和 `https://example.com` 不共享
+- `example.com` 和 `www.example.com` 不共享
+- 不同端口也不共享
+
+### 存储配额
+
+浏览器有存储配额限制：
+
+```javascript
+if (navigator.storage && navigator.storage.estimate) {
+  const { usage, quota } = await navigator.storage.estimate()
+  console.log(`已使用: ${usage / 1024 / 1024}MB`)
+  console.log(`总配额: ${quota / 1024 / 1024}MB`)
+  console.log(`使用率: ${((usage / quota) * 100).toFixed(2)}%`)
+}
+```
+
+处理配额超出：
+
+```javascript
+try {
+  localStorage.setItem('key', largeData)
+} catch (e) {
+  if (e.name === 'QuotaExceededError') {
+    // 清理旧数据或提示用户
+    console.error('存储空间不足')
+  }
+}
+```
+
+## 实际应用示例
+
+### 购物车
+
+```javascript
+class ShoppingCart {
+  constructor() {
+    this.storageKey = 'shopping_cart'
+  }
+
+  getItems() {
+    const data = localStorage.getItem(this.storageKey)
+    return data ? JSON.parse(data) : []
+  }
+
+  addItem(product) {
+    const items = this.getItems()
+    const existingItem = items.find((item) => item.id === product.id)
+
+    if (existingItem) {
+      existingItem.quantity += 1
+    } else {
+      items.push({ ...product, quantity: 1 })
+    }
+
+    this.saveItems(items)
+  }
+
+  removeItem(productId) {
+    const items = this.getItems().filter((item) => item.id !== productId)
+    this.saveItems(items)
+  }
+
+  updateQuantity(productId, quantity) {
+    const items = this.getItems()
+    const item = items.find((item) => item.id === productId)
+
+    if (item) {
+      item.quantity = quantity
+      this.saveItems(items)
+    }
+  }
+
+  saveItems(items) {
+    localStorage.setItem(this.storageKey, JSON.stringify(items))
+  }
+
+  clear() {
+    localStorage.removeItem(this.storageKey)
+  }
+
+  getTotal() {
+    return this.getItems().reduce(
+      (sum, item) => sum + item.price * item.quantity,
+      0
+    )
+  }
+}
+
+const cart = new ShoppingCart()
+cart.addItem({ id: 1, name: '商品A', price: 99 })
+console.log(cart.getItems())
+console.log(cart.getTotal())
+```
+
+### 用户偏好设置
+
+```javascript
+const preferences = {
+  defaults: {
+    theme: 'light',
+    fontSize: 16,
+    language: 'zh-CN',
+    notifications: true,
+  },
+
+  get(key) {
+    const stored = localStorage.getItem('preferences')
+    const prefs = stored ? JSON.parse(stored) : {}
+    return prefs[key] ?? this.defaults[key]
+  },
+
+  set(key, value) {
+    const stored = localStorage.getItem('preferences')
+    const prefs = stored ? JSON.parse(stored) : {}
+    prefs[key] = value
+    localStorage.setItem('preferences', JSON.stringify(prefs))
+  },
+
+  getAll() {
+    const stored = localStorage.getItem('preferences')
+    const prefs = stored ? JSON.parse(stored) : {}
+    return { ...this.defaults, ...prefs }
+  },
+
+  reset() {
+    localStorage.removeItem('preferences')
+  },
+}
+
+// 使用
+preferences.set('theme', 'dark')
+const theme = preferences.get('theme')
+document.body.classList.toggle('dark-theme', theme === 'dark')
+```
+
+## 小结
+
+本文介绍了 HTML5 Web 存储：
+
+- **localStorage**：永久存储，适合用户偏好、缓存数据
+- **sessionStorage**：会话级存储，适合临时数据
+- **IndexedDB**：客户端数据库，适合大量结构化数据
+
+使用要点：
+
+- 只能存储字符串，对象需要 JSON 转换
+- 注意存储容量限制
+- 不要存储敏感信息
+- 处理好存储异常
+
+下一篇会介绍 HTML5 新增的表单特性。

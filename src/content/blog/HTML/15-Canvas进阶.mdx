@@ -1,0 +1,582 @@
+---
+title: Canvas 进阶
+description: 深入学习 Canvas 的高级技巧，包括动画实现、性能优化、离屏渲染、事件处理和实战案例
+pubDate: 2025-11-28
+toc: true
+ogImage: true
+category: HTML
+---
+
+上一篇介绍了 Canvas 的基础绑图。这篇文章深入探讨动画、性能优化和实际应用场景。
+
+## 动画原理
+
+Canvas 动画的原理是：快速地清除画布并重新绘制内容，形成连续的动画效果。
+
+### requestAnimationFrame
+
+`requestAnimationFrame` 是实现动画的最佳方式��
+
+```javascript
+const canvas = document.getElementById('canvas')
+const ctx = canvas.getContext('2d')
+
+let x = 0
+
+function animate() {
+  // 清除画布
+  ctx.clearRect(0, 0, canvas.width, canvas.height)
+
+  // 绘制
+  ctx.fillStyle = 'blue'
+  ctx.fillRect(x, 100, 50, 50)
+
+  // 更新状态
+  x += 2
+  if (x > canvas.width) x = -50
+
+  // 请求下一帧
+  requestAnimationFrame(animate)
+}
+
+animate()
+```
+
+### 为什么不用 setInterval
+
+```javascript
+// 不推荐
+setInterval(() => {
+  // 绘制...
+}, 1000 / 60) // 60fps
+```
+
+`requestAnimationFrame` 的优势：
+
+- 自动与屏幕刷新率同步（通常 60fps）
+- 标签页不可见时自动暂停，节省资源
+- 由浏览器优化调度，更流畅
+
+### 控制帧率
+
+```javascript
+let lastTime = 0
+const fps = 30
+const interval = 1000 / fps
+
+function animate(currentTime) {
+  requestAnimationFrame(animate)
+
+  const deltaTime = currentTime - lastTime
+
+  if (deltaTime < interval) return
+
+  lastTime = currentTime - (deltaTime % interval)
+
+  // 绘制逻辑...
+  ctx.clearRect(0, 0, canvas.width, canvas.height)
+  // ...
+}
+
+requestAnimationFrame(animate)
+```
+
+### 基于时间的动画
+
+为了在不同帧率下保持一致的速度：
+
+```javascript
+let lastTime = performance.now()
+
+function animate(currentTime) {
+  const deltaTime = (currentTime - lastTime) / 1000 // 转换为秒
+  lastTime = currentTime
+
+  // 速度：像素/秒
+  const speed = 200
+  x += speed * deltaTime
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height)
+  ctx.fillRect(x, 100, 50, 50)
+
+  requestAnimationFrame(animate)
+}
+
+requestAnimationFrame(animate)
+```
+
+## 粒子系统
+
+粒子系统是 Canvas 动画的常见应用：
+
+```javascript
+class Particle {
+  constructor(x, y) {
+    this.x = x
+    this.y = y
+    this.vx = (Math.random() - 0.5) * 4
+    this.vy = (Math.random() - 0.5) * 4
+    this.radius = Math.random() * 3 + 1
+    this.color = `hsl(${Math.random() * 360}, 70%, 50%)`
+    this.life = 1
+    this.decay = Math.random() * 0.02 + 0.01
+  }
+
+  update() {
+    this.x += this.vx
+    this.y += this.vy
+    this.life -= this.decay
+    return this.life > 0
+  }
+
+  draw(ctx) {
+    ctx.globalAlpha = this.life
+    ctx.fillStyle = this.color
+    ctx.beginPath()
+    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.globalAlpha = 1
+  }
+}
+
+const particles = []
+
+canvas.addEventListener('mousemove', (e) => {
+  for (let i = 0; i < 5; i++) {
+    particles.push(new Particle(e.offsetX, e.offsetY))
+  }
+})
+
+function animate() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height)
+
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i]
+    if (!p.update()) {
+      particles.splice(i, 1)
+    } else {
+      p.draw(ctx)
+    }
+  }
+
+  requestAnimationFrame(animate)
+}
+
+animate()
+```
+
+## 事件处理
+
+### 获取鼠标位置
+
+```javascript
+canvas.addEventListener('click', (e) => {
+  const rect = canvas.getBoundingClientRect()
+  const x = e.clientX - rect.left
+  const y = e.clientY - rect.top
+
+  console.log('点击位置:', x, y)
+})
+```
+
+### 检测点击图形
+
+Canvas 不像 SVG 那样有 DOM 元素，需要手动检测：
+
+```javascript
+// 矩形检测
+function isPointInRect(x, y, rect) {
+  return (
+    x >= rect.x &&
+    x <= rect.x + rect.width &&
+    y >= rect.y &&
+    y <= rect.y + rect.height
+  )
+}
+
+// 圆形检测
+function isPointInCircle(x, y, circle) {
+  const dx = x - circle.x
+  const dy = y - circle.y
+  return dx * dx + dy * dy <= circle.radius * circle.radius
+}
+
+// 使用 isPointInPath（适用于复杂路径）
+ctx.beginPath()
+ctx.arc(100, 100, 50, 0, Math.PI * 2)
+
+canvas.addEventListener('click', (e) => {
+  const rect = canvas.getBoundingClientRect()
+  const x = e.clientX - rect.left
+  const y = e.clientY - rect.top
+
+  if (ctx.isPointInPath(x, y)) {
+    console.log('点击了圆形')
+  }
+})
+```
+
+### 拖拽实现
+
+```javascript
+const shapes = [
+  { x: 50, y: 50, width: 80, height: 60, color: 'blue' },
+  { x: 150, y: 100, width: 80, height: 60, color: 'red' },
+]
+
+let dragging = null
+let offsetX, offsetY
+
+canvas.addEventListener('mousedown', (e) => {
+  const rect = canvas.getBoundingClientRect()
+  const x = e.clientX - rect.left
+  const y = e.clientY - rect.top
+
+  for (const shape of shapes) {
+    if (isPointInRect(x, y, shape)) {
+      dragging = shape
+      offsetX = x - shape.x
+      offsetY = y - shape.y
+      break
+    }
+  }
+})
+
+canvas.addEventListener('mousemove', (e) => {
+  if (!dragging) return
+
+  const rect = canvas.getBoundingClientRect()
+  dragging.x = e.clientX - rect.left - offsetX
+  dragging.y = e.clientY - rect.top - offsetY
+
+  draw()
+})
+
+canvas.addEventListener('mouseup', () => {
+  dragging = null
+})
+
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height)
+  for (const shape of shapes) {
+    ctx.fillStyle = shape.color
+    ctx.fillRect(shape.x, shape.y, shape.width, shape.height)
+  }
+}
+
+draw()
+```
+
+## 性能优化
+
+### 1. 离屏渲染
+
+将不常变化的内容绑制到离屏 Canvas，然后复制到主 Canvas：
+
+```javascript
+// 创建离屏 Canvas
+const offscreen = document.createElement('canvas')
+offscreen.width = 200
+offscreen.height = 200
+const offCtx = offscreen.getContext('2d')
+
+// 在离屏 Canvas 上绘制复杂图形（只执行一次）
+offCtx.fillStyle = 'blue'
+for (let i = 0; i < 1000; i++) {
+  offCtx.fillRect(Math.random() * 200, Math.random() * 200, 2, 2)
+}
+
+// 动画中直接复制
+function animate() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height)
+
+  // 直接绘制离屏 Canvas
+  ctx.drawImage(offscreen, x, y)
+
+  requestAnimationFrame(animate)
+}
+```
+
+### 2. 减少状态切换
+
+```javascript
+// 不好：频繁切换状态
+for (const shape of shapes) {
+  ctx.fillStyle = shape.color
+  ctx.fillRect(shape.x, shape.y, shape.width, shape.height)
+}
+
+// 好：按颜色分组
+const byColor = {}
+for (const shape of shapes) {
+  if (!byColor[shape.color]) byColor[shape.color] = []
+  byColor[shape.color].push(shape)
+}
+
+for (const [color, group] of Object.entries(byColor)) {
+  ctx.fillStyle = color
+  for (const shape of group) {
+    ctx.fillRect(shape.x, shape.y, shape.width, shape.height)
+  }
+}
+```
+
+### 3. 只重绘变化区域
+
+```javascript
+// 记录需要重绘的区域
+const dirtyRects = []
+
+function markDirty(x, y, width, height) {
+  dirtyRects.push({ x, y, width, height })
+}
+
+function draw() {
+  for (const rect of dirtyRects) {
+    ctx.clearRect(rect.x, rect.y, rect.width, rect.height)
+    // 只重绘该区域的内容
+  }
+  dirtyRects.length = 0
+}
+```
+
+### 4. 使用整数坐标
+
+```javascript
+// 不好：小数坐标导致抗锯齿计算
+ctx.fillRect(10.5, 20.3, 100, 100)
+
+// 好：使用整数
+ctx.fillRect(Math.round(10.5), Math.round(20.3), 100, 100)
+```
+
+### 5. 避免使用阴影
+
+阴影的渲染开销很大：
+
+```javascript
+// 性能差
+ctx.shadowBlur = 10
+ctx.shadowColor = 'black'
+
+// 如果需要阴影，考虑：
+// 1. 使用离屏渲染预先生成
+// 2. 使用图片代替
+```
+
+### 6. 使用 Web Worker
+
+复杂计算移到 Worker：
+
+```javascript
+// main.js
+const worker = new Worker('worker.js')
+
+worker.postMessage({ type: 'calculate', data: largeDataSet })
+
+worker.onmessage = (e) => {
+  const result = e.data
+  // 使用结果绘制
+}
+
+// worker.js
+self.onmessage = (e) => {
+  if (e.data.type === 'calculate') {
+    const result = heavyCalculation(e.data.data)
+    self.postMessage(result)
+  }
+}
+```
+
+## 高分辨率支持
+
+在 Retina 屏幕上，Canvas 可能显得模糊：
+
+```javascript
+function setupCanvas(canvas) {
+  const dpr = window.devicePixelRatio || 1
+  const rect = canvas.getBoundingClientRect()
+
+  // 设置实际像素尺寸
+  canvas.width = rect.width * dpr
+  canvas.height = rect.height * dpr
+
+  // 设置显示尺寸
+  canvas.style.width = rect.width + 'px'
+  canvas.style.height = rect.height + 'px'
+
+  // 缩放上下文
+  const ctx = canvas.getContext('2d')
+  ctx.scale(dpr, dpr)
+
+  return ctx
+}
+
+const ctx = setupCanvas(canvas)
+// 后续绘制使用 CSS 像素单位
+```
+
+## 实战：简单游戏
+
+```javascript
+const canvas = document.getElementById('game')
+const ctx = canvas.getContext('2d')
+
+// 游戏状态
+const player = {
+  x: 200,
+  y: 500,
+  width: 60,
+  height: 20,
+  speed: 8,
+}
+
+const ball = {
+  x: 200,
+  y: 300,
+  radius: 10,
+  vx: 4,
+  vy: -4,
+}
+
+const bricks = []
+const rows = 5,
+  cols = 8
+const brickWidth = 45,
+  brickHeight = 20,
+  padding = 5
+
+for (let row = 0; row < rows; row++) {
+  for (let col = 0; col < cols; col++) {
+    bricks.push({
+      x: col * (brickWidth + padding) + 30,
+      y: row * (brickHeight + padding) + 30,
+      width: brickWidth,
+      height: brickHeight,
+      alive: true,
+    })
+  }
+}
+
+// 键盘控制
+const keys = {}
+document.addEventListener('keydown', (e) => (keys[e.key] = true))
+document.addEventListener('keyup', (e) => (keys[e.key] = false))
+
+function update() {
+  // 玩家移动
+  if (keys['ArrowLeft']) player.x -= player.speed
+  if (keys['ArrowRight']) player.x += player.speed
+  player.x = Math.max(0, Math.min(canvas.width - player.width, player.x))
+
+  // 球移动
+  ball.x += ball.vx
+  ball.y += ball.vy
+
+  // 墙壁碰撞
+  if (ball.x - ball.radius < 0 || ball.x + ball.radius > canvas.width) {
+    ball.vx = -ball.vx
+  }
+  if (ball.y - ball.radius < 0) {
+    ball.vy = -ball.vy
+  }
+
+  // 挡板碰撞
+  if (
+    ball.y + ball.radius > player.y &&
+    ball.x > player.x &&
+    ball.x < player.x + player.width
+  ) {
+    ball.vy = -Math.abs(ball.vy)
+  }
+
+  // 砖块碰撞
+  for (const brick of bricks) {
+    if (!brick.alive) continue
+    if (
+      ball.x > brick.x &&
+      ball.x < brick.x + brick.width &&
+      ball.y > brick.y &&
+      ball.y < brick.y + brick.height
+    ) {
+      brick.alive = false
+      ball.vy = -ball.vy
+    }
+  }
+
+  // 游戏结束检测
+  if (ball.y > canvas.height) {
+    alert('Game Over!')
+    location.reload()
+  }
+}
+
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height)
+
+  // 绘制挡板
+  ctx.fillStyle = '#333'
+  ctx.fillRect(player.x, player.y, player.width, player.height)
+
+  // 绘制球
+  ctx.fillStyle = 'red'
+  ctx.beginPath()
+  ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2)
+  ctx.fill()
+
+  // 绘制砖块
+  for (const brick of bricks) {
+    if (!brick.alive) continue
+    ctx.fillStyle = `hsl(${brick.x + brick.y}, 70%, 50%)`
+    ctx.fillRect(brick.x, brick.y, brick.width, brick.height)
+  }
+}
+
+function gameLoop() {
+  update()
+  draw()
+  requestAnimationFrame(gameLoop)
+}
+
+gameLoop()
+```
+
+## OffscreenCanvas
+
+Web Worker 中使用 Canvas：
+
+```javascript
+// main.js
+const canvas = document.getElementById('canvas')
+const offscreen = canvas.transferControlToOffscreen()
+
+const worker = new Worker('worker.js')
+worker.postMessage({ canvas: offscreen }, [offscreen])
+
+// worker.js
+self.onmessage = (e) => {
+  const canvas = e.data.canvas
+  const ctx = canvas.getContext('2d')
+
+  function animate() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+    // 绘制...
+    requestAnimationFrame(animate)
+  }
+
+  animate()
+}
+```
+
+## 小结
+
+这篇文章介绍了 Canvas 的进阶内容：
+
+- **动画**：requestAnimationFrame、基于时间的动画
+- **粒子系统**：面向对象的粒子管理
+- **事件处理**：鼠标位置、点击检测、拖拽
+- **性能优化**：离屏渲染、减少状态切换、整数坐标
+- **高分辨率**：devicePixelRatio 适配
+- **实战案例**：简单的打砖块游戏
+
+Canvas 是一个强大的绘图 API，掌握好基础和优化技巧，可以实现丰富的可视化和交互效果。下一篇会介绍 SVG。

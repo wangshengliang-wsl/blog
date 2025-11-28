@@ -1,0 +1,498 @@
+---
+title: ES2024 新特性
+description: ES2024 (ES15) 带来 Promise.withResolvers、Object.groupBy、正则 v 标志、可调整大小的 ArrayBuffer 等实用新功能
+pubDate: 2025-11-28
+toc: true
+ogImage: true
+category: ES6+
+---
+
+ES2024（ES15）于 2024 年 6 月正式发布，带来了 Promise 的便捷创建方式、强大的数据分组方法、正则表达式的 Unicode 集合增强等特性。
+
+## Promise.withResolvers()
+
+`Promise.withResolvers()` 返回一个对象，包含新创建的 Promise 及其 `resolve` 和 `reject` 函数：
+
+```javascript
+const { promise, resolve, reject } = Promise.withResolvers()
+
+// 在其他地方控制 Promise 的状态
+setTimeout(() => resolve('done'), 1000)
+
+const result = await promise // 'done'
+```
+
+在此之前，类似的模式需要这样写：
+
+```javascript
+// ES2024 之前
+let resolve, reject
+const promise = new Promise((res, rej) => {
+  resolve = res
+  reject = rej
+})
+
+// ES2024
+const { promise, resolve, reject } = Promise.withResolvers()
+```
+
+常见用途：
+
+```javascript
+// 事件转 Promise
+function waitForEvent(element, eventName) {
+  const { promise, resolve } = Promise.withResolvers()
+  element.addEventListener(eventName, resolve, { once: true })
+  return promise
+}
+
+await waitForEvent(button, 'click')
+
+// 超时控制
+function withTimeout(asyncFn, ms) {
+  const { promise, resolve, reject } = Promise.withResolvers()
+
+  const timer = setTimeout(() => reject(new Error('Timeout')), ms)
+
+  asyncFn()
+    .then((result) => {
+      clearTimeout(timer)
+      resolve(result)
+    })
+    .catch(reject)
+
+  return promise
+}
+
+// 请求队列
+class RequestQueue {
+  #queue = []
+
+  add(request) {
+    const { promise, resolve, reject } = Promise.withResolvers()
+    this.#queue.push({ request, resolve, reject })
+    this.#process()
+    return promise
+  }
+
+  async #process() {
+    // 处理队列...
+  }
+}
+```
+
+流式数据处理：
+
+```javascript
+async function* streamToAsyncIterator(stream) {
+  const reader = stream.getReader()
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      yield value
+    }
+  } finally {
+    reader.releaseLock()
+  }
+}
+```
+
+## Object.groupBy() / Map.groupBy()
+
+按条件对数组元素分组，返回对象或 Map。
+
+**Object.groupBy()**
+
+```javascript
+const items = [
+  { name: '苹果', type: 'fruit' },
+  { name: '牛肉', type: 'meat' },
+  { name: '香蕉', type: 'fruit' },
+  { name: '鸡肉', type: 'meat' },
+]
+
+const grouped = Object.groupBy(items, (item) => item.type)
+// {
+//   fruit: [{ name: '苹果', type: 'fruit' }, { name: '香蕉', type: 'fruit' }],
+//   meat: [{ name: '牛肉', type: 'meat' }, { name: '鸡肉', type: 'meat' }]
+// }
+```
+
+回调函数返回的值会被转换为字符串作为键：
+
+```javascript
+const nums = [1, 2, 3, 4, 5, 6]
+
+Object.groupBy(nums, (n) => (n % 2 === 0 ? 'even' : 'odd'))
+// { odd: [1, 3, 5], even: [2, 4, 6] }
+
+// 按数字范围分组
+Object.groupBy(nums, (n) => Math.floor(n / 3))
+// { '0': [1, 2], '1': [3, 4, 5], '2': [6] }
+```
+
+**Map.groupBy()**
+
+当需要用对象作为键时，使用 `Map.groupBy()`：
+
+```javascript
+const items = [
+  { name: 'A', category: { id: 1 } },
+  { name: 'B', category: { id: 2 } },
+  { name: 'C', category: { id: 1 } },
+]
+
+const cat1 = { id: 1 }
+const cat2 = { id: 2 }
+
+// 预定义的分类对象
+const categories = new Map([
+  [1, cat1],
+  [2, cat2],
+])
+
+const grouped = Map.groupBy(items, (item) => categories.get(item.category.id))
+// Map {
+//   { id: 1 } => [{ name: 'A', ... }, { name: 'C', ... }],
+//   { id: 2 } => [{ name: 'B', ... }]
+// }
+```
+
+实际应用：
+
+```javascript
+// 按状态分组订单
+const orders = [
+  { id: 1, status: 'pending' },
+  { id: 2, status: 'shipped' },
+  { id: 3, status: 'pending' },
+  { id: 4, status: 'delivered' },
+]
+
+const byStatus = Object.groupBy(orders, (o) => o.status)
+// { pending: [...], shipped: [...], delivered: [...] }
+
+// 按首字母分组
+const words = ['apple', 'banana', 'avocado', 'blueberry']
+Object.groupBy(words, (w) => w[0])
+// { a: ['apple', 'avocado'], b: ['banana', 'blueberry'] }
+
+// 按日期分组
+const logs = [
+  { date: '2024-01-01', msg: 'a' },
+  { date: '2024-01-01', msg: 'b' },
+  { date: '2024-01-02', msg: 'c' },
+]
+Object.groupBy(logs, (log) => log.date)
+// { '2024-01-01': [...], '2024-01-02': [...] }
+```
+
+与 Lodash `groupBy` 的对比：
+
+```javascript
+// Lodash
+import { groupBy } from 'lodash'
+groupBy(items, 'type')
+groupBy(items, (item) => item.type)
+
+// 原生
+Object.groupBy(items, (item) => item.type)
+```
+
+## String.prototype.isWellFormed() / toWellFormed()
+
+处理 Unicode 字符串中的孤立代理项（lone surrogate）。
+
+在 UTF-16 编码中，某些字符（如 emoji）用代理对表示。孤立的代理项会导致一些操作出错：
+
+```javascript
+// 正常字符串
+const normal = 'hello'
+
+// 包含孤立代理项的字符串（不完整的 emoji）
+const malformed = 'hello\uD800world' // \uD800 是高位代理，没有配对的低位代理
+```
+
+**isWellFormed()**
+
+检查字符串是否包含孤立代理项：
+
+```javascript
+'hello'.isWellFormed() // true
+'hello😀'.isWellFormed() // true（完整的 emoji）
+'hello\uD800'.isWellFormed() // false（孤立高位代理）
+'\uDC00world'.isWellFormed() // false（孤立低位代理）
+```
+
+**toWellFormed()**
+
+将孤立代理项替换为 Unicode 替换字符（U+FFFD）：
+
+```javascript
+'hello\uD800world'.toWellFormed() // 'hello�world'
+'\uDC00abc\uD800'.toWellFormed() // '�abc�'
+'normal string'.toWellFormed() // 'normal string'（已经是良构的）
+```
+
+实际应用：
+
+```javascript
+// 安全地编码 URL
+function safeEncodeURI(str) {
+  // encodeURI 对孤立代理项会抛出 URIError
+  return encodeURI(str.toWellFormed())
+}
+
+// 处理用户输入
+function sanitizeInput(input) {
+  if (!input.isWellFormed()) {
+    console.warn('输入包含无效的 Unicode 字符')
+    return input.toWellFormed()
+  }
+  return input
+}
+
+// 安全地使用 TextEncoder
+function safeEncode(str) {
+  const encoder = new TextEncoder()
+  // TextEncoder 会将孤立代理项替换为 U+FFFD
+  // 使用 toWellFormed() 可以预先处理，使行为更可预测
+  return encoder.encode(str.toWellFormed())
+}
+```
+
+## 正则表达式 /v 标志
+
+`v` 标志是 `u` 标志的增强版，提供更强大的 Unicode 集合操作。
+
+**集合运算**
+
+```javascript
+// 交集：[A&&B]
+// 匹配既是希腊字母又是大写字母的字符
+const regex = /[\p{Script=Greek}&&\p{Lu}]/v
+regex.test('Ω') // true（大写希腊字母）
+regex.test('ω') // false（小写希腊字母）
+regex.test('A') // false（大写但不是希腊字母）
+
+// 差集：[A--B]
+// 匹配字母但不是 ASCII 字母
+const nonAsciiLetter = /[\p{Letter}--[a-zA-Z]]/v
+nonAsciiLetter.test('中') // true
+nonAsciiLetter.test('A') // false
+```
+
+**嵌套字符类**
+
+```javascript
+// v 标志允许在字符类中嵌套字符类
+const regex = /[[a-z]--[aeiou]]/v // 辅音字母
+regex.test('b') // true
+regex.test('a') // false
+
+// 复杂的集合运算
+const complexRegex = /[[\p{L}&&\p{ASCII}]--[A-Z]]/v // ASCII 小写字母
+```
+
+**字符串字面量**
+
+```javascript
+// v 标志支持在字符类中使用多字符字符串
+const flags = /[\q{🇨🇳|🇺🇸|🇯🇵}]/v
+flags.test('🇨🇳') // true
+flags.test('🇬🇧') // false
+
+// \q{} 语法用于字符串字面量
+const words = /[\q{one|two|three}]/v
+words.test('one') // true
+```
+
+**Unicode 属性转义增强**
+
+```javascript
+// v 标志下的属性可以匹配多字符序列
+const emojiRegex = /\p{RGI_Emoji}/v
+emojiRegex.test('👨‍👩‍👧') // true（家庭 emoji，多个码点）
+
+// u 标志只能匹配单个码点
+const oldRegex = /\p{Emoji}/u
+// 无法正确匹配组合 emoji
+```
+
+`v` 标志与 `u` 标志互斥：
+
+```javascript
+// 不能同时使用
+// /./uv // SyntaxError
+
+// 检查标志
+const regex = /./v
+regex.unicodeSets // true
+```
+
+## ArrayBuffer 可调整大小
+
+ES2024 允许创建可调整大小的 ArrayBuffer：
+
+```javascript
+// 创建可调整大小的 ArrayBuffer
+// 参数：初始大小，最大大小
+const buffer = new ArrayBuffer(8, { maxByteLength: 16 })
+
+buffer.byteLength // 8
+buffer.maxByteLength // 16
+buffer.resizable // true
+
+// 调整大小
+buffer.resize(12)
+buffer.byteLength // 12
+
+buffer.resize(4)
+buffer.byteLength // 4
+
+// 不能超过最大大小
+buffer.resize(20) // RangeError
+```
+
+与 TypedArray 配合使用：
+
+```javascript
+const buffer = new ArrayBuffer(8, { maxByteLength: 32 })
+const view = new Uint8Array(buffer)
+
+view.length // 8
+view[0] = 1
+view[7] = 8
+
+buffer.resize(16)
+view.length // 16（自动更新）
+view[0] // 1（数据保留）
+view[15] = 16
+
+buffer.resize(4)
+view.length // 4
+// 超出新大小的数据被丢弃
+```
+
+固定长度视图：
+
+```javascript
+const buffer = new ArrayBuffer(16, { maxByteLength: 32 })
+
+// 创建固定长度视图
+const fixedView = new Uint8Array(buffer, 0, 8)
+fixedView.length // 8
+
+buffer.resize(4)
+// 访问 fixedView 会抛出错误，因为它引用了被截断的区域
+fixedView[0] // TypeError: out of bounds
+```
+
+检查 ArrayBuffer 是否可调整：
+
+```javascript
+const resizable = new ArrayBuffer(8, { maxByteLength: 16 })
+const fixed = new ArrayBuffer(8)
+
+resizable.resizable // true
+fixed.resizable // false
+
+resizable.maxByteLength // 16
+fixed.maxByteLength // 8（等于 byteLength）
+```
+
+SharedArrayBuffer 也支持可增长：
+
+```javascript
+const shared = new SharedArrayBuffer(8, { maxByteLength: 16 })
+shared.growable // true
+
+// 只能增长，不能收缩
+shared.grow(12)
+shared.byteLength // 12
+```
+
+## Atomics.waitAsync()
+
+`Atomics.waitAsync()` 是 `Atomics.wait()` 的异步版本，不会阻塞主线程：
+
+```javascript
+const sab = new SharedArrayBuffer(4)
+const int32 = new Int32Array(sab)
+
+// Atomics.wait() 是同步的，会阻塞线程
+// 只能在 Worker 中使用，主线程会报错
+
+// Atomics.waitAsync() 是异步的，可以在主线程使用
+const result = Atomics.waitAsync(int32, 0, 0)
+// { async: true, value: Promise }
+
+result.value.then((status) => {
+  console.log(status) // 'ok' 或 'timed-out'
+})
+
+// 在另一个线程中
+Atomics.store(int32, 0, 1)
+Atomics.notify(int32, 0)
+```
+
+返回值结构：
+
+```javascript
+// 如果当前值已经不等于期望值，同步返回
+const immediate = Atomics.waitAsync(int32, 0, 999)
+// { async: false, value: 'not-equal' }
+
+// 如果需要等待，返回 Promise
+const waiting = Atomics.waitAsync(int32, 0, 0)
+// { async: true, value: Promise<'ok' | 'timed-out'> }
+```
+
+超时参数：
+
+```javascript
+// 等待最多 1000ms
+const result = Atomics.waitAsync(int32, 0, 0, 1000)
+
+result.value.then((status) => {
+  if (status === 'timed-out') {
+    console.log('等待超时')
+  } else {
+    console.log('被唤醒')
+  }
+})
+```
+
+多线程协调示例：
+
+```javascript
+// 主线程
+const sab = new SharedArrayBuffer(4)
+const int32 = new Int32Array(sab)
+
+const worker = new Worker('worker.js')
+worker.postMessage(sab)
+
+// 等待 worker 完成
+const { value } = Atomics.waitAsync(int32, 0, 0)
+value.then(() => {
+  console.log('Worker 任务完成')
+})
+
+// worker.js
+self.onmessage = (e) => {
+  const int32 = new Int32Array(e.data)
+
+  // 执行任务...
+
+  // 通知主线程
+  Atomics.store(int32, 0, 1)
+  Atomics.notify(int32, 0)
+}
+```
+
+---
+
+ES2024 的特性继续完善 JavaScript 的能力。`Promise.withResolvers()` 简化了 Promise 的外部控制，`Object.groupBy()` 提供了原生的数组分组方案，正则表达式的 `v` 标志带来了强大的 Unicode 集合运算。这些特性让日常开发更加便捷，特别是 `groupBy` 方法，填补了 JavaScript 长期以来缺少原生分组函数的空白。

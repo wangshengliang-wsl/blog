@@ -1,0 +1,873 @@
+---
+title: 语义化最佳实践
+description: 总结 HTML 语义化的最佳实践，包括常见页面结构、组件模式和实际项目中的语义化应用
+pubDate: 2025-11-28
+toc: true
+ogImage: true
+category: HTML
+---
+
+前面介绍了语义化和 ARIA，这篇来看看实际项目中如何应用这些知识，总结语义化的最佳实践。
+
+## 页面整体结构
+
+### 典型页面布局
+
+```html
+<!DOCTYPE html>
+<html lang="zh-Hans">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>页面标题 - 网站名</title>
+    <meta name="description" content="页面描述" />
+  </head>
+  <body>
+    <a href="#main-content" class="skip-link">跳到主内容</a>
+
+    <header>
+      <nav aria-label="主导航">
+        <!-- 导航内容 -->
+      </nav>
+    </header>
+
+    <main id="main-content">
+      <article>
+        <!-- 文章内容 -->
+      </article>
+    </main>
+
+    <aside aria-label="侧边栏">
+      <!-- 侧边内容 -->
+    </aside>
+
+    <footer>
+      <!-- 页脚内容 -->
+    </footer>
+  </body>
+</html>
+```
+
+### header 使用
+
+`<header>` 可以用在多个地方：
+
+```html
+<!-- 页面头部 -->
+<body>
+  <header>
+    <h1>网站名称</h1>
+    <nav>...</nav>
+  </header>
+</body>
+
+<!-- 文章头部 -->
+<article>
+  <header>
+    <h2>文章标题</h2>
+    <p>
+      <time datetime="2024-01-15">2024年1月15日</time>
+      · 作者：张三
+    </p>
+  </header>
+  <p>文章内容...</p>
+</article>
+
+<!-- 区块头部 -->
+<section>
+  <header>
+    <h3>区块标题</h3>
+    <p>区块简介</p>
+  </header>
+  <p>区块内容...</p>
+</section>
+```
+
+### footer 使用
+
+`<footer>` 同样可以用在多个上下文：
+
+```html
+<!-- 页面底部 -->
+<body>
+  <footer>
+    <p>&copy; 2024 公司名称</p>
+    <nav aria-label="页脚导航">...</nav>
+  </footer>
+</body>
+
+<!-- 文章底部 -->
+<article>
+  <h2>文章标题</h2>
+  <p>文章内容...</p>
+  <footer>
+    <p>标签：<a href="#">HTML</a>, <a href="#">CSS</a></p>
+    <p>分享：<a href="#">微博</a></p>
+  </footer>
+</article>
+```
+
+### main 使用
+
+每个页面只能有一个 `<main>`：
+
+```html
+<!-- 正确 -->
+<body>
+  <header>...</header>
+  <main>唯一的主内容区域</main>
+  <footer>...</footer>
+</body>
+
+<!-- 错误：多个 main -->
+<body>
+  <main>...</main>
+  <main>...</main>
+</body>
+```
+
+### nav 使用
+
+导航区域用 `<nav>`，但不是所有链接集合都需要：
+
+```html
+<!-- 主导航 -->
+<nav aria-label="主导航">
+  <ul>
+    <li><a href="/">首页</a></li>
+    <li><a href="/about">关于</a></li>
+    <li><a href="/contact">联系</a></li>
+  </ul>
+</nav>
+
+<!-- 面包屑导航 -->
+<nav aria-label="面包屑">
+  <ol>
+    <li><a href="/">首页</a></li>
+    <li><a href="/products">产品</a></li>
+    <li aria-current="page">详情</li>
+  </ol>
+</nav>
+
+<!-- 页脚链接：不一定需要 nav -->
+<footer>
+  <ul>
+    <li><a href="/terms">服务条款</a></li>
+    <li><a href="/privacy">隐私政策</a></li>
+  </ul>
+</footer>
+```
+
+多个 `<nav>` 时用 `aria-label` 区分。
+
+## 标题层级
+
+### 正确的层级结构
+
+```html
+<!-- 正确：层级连续 -->
+<h1>网站标题</h1>
+<h2>章节 1</h2>
+<h3>子章节 1.1</h3>
+<h3>子章节 1.2</h3>
+<h2>章节 2</h2>
+<h3>子章节 2.1</h3>
+
+<!-- 错误：跳过层级 -->
+<h1>网站标题</h1>
+<h3>章节 1</h3>
+<!-- 不应该跳过 h2 -->
+<h4>子章节</h4>
+```
+
+### 单页应用的标题
+
+```html
+<!-- 每个视图有自己的标题结构 -->
+<main>
+  <!-- 首页视图 -->
+  <h1>欢迎来到网站</h1>
+
+  <!-- 产品列表视图 -->
+  <h1>产品列表</h1>
+  <h2>热门产品</h2>
+  <h2>新品上市</h2>
+
+  <!-- 产品详情视图 -->
+  <h1>产品名称</h1>
+  <h2>产品描述</h2>
+  <h2>规格参数</h2>
+</main>
+```
+
+### 隐藏的标题
+
+有时需要为屏幕阅读器添加隐藏标题：
+
+```html
+<section aria-labelledby="search-title">
+  <h2 id="search-title" class="sr-only">搜索</h2>
+  <form>
+    <input type="search" aria-label="搜索" />
+    <button>搜索</button>
+  </form>
+</section>
+
+<style>
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+</style>
+```
+
+## article 和 section
+
+### article：独立完整的内容
+
+```html
+<!-- 博客文章 -->
+<article>
+  <header>
+    <h2>文章标题</h2>
+    <time datetime="2024-01-15">2024年1月15日</time>
+  </header>
+  <p>文章内容...</p>
+</article>
+
+<!-- 评论 -->
+<article>
+  <header>
+    <h3>用户名</h3>
+    <time datetime="2024-01-16">1天前</time>
+  </header>
+  <p>评论内容...</p>
+</article>
+
+<!-- 卡片（可独立分享的内容） -->
+<article class="product-card">
+  <img src="product.jpg" alt="产品图片" />
+  <h3>产品名称</h3>
+  <p>产品描述...</p>
+  <a href="/product/123">查看详情</a>
+</article>
+```
+
+### section：主题性分组
+
+```html
+<!-- 页面章节 -->
+<section>
+  <h2>功能介绍</h2>
+  <p>功能描述...</p>
+</section>
+
+<section>
+  <h2>用户评价</h2>
+  <p>评价内容...</p>
+</section>
+
+<!-- 文章内的章节 -->
+<article>
+  <h1>HTML 入门</h1>
+
+  <section>
+    <h2>什么是 HTML</h2>
+    <p>...</p>
+  </section>
+
+  <section>
+    <h2>基本结构</h2>
+    <p>...</p>
+  </section>
+</article>
+```
+
+### 何时用 div
+
+当内容没有语义含义，只是为了样式分组时：
+
+```html
+<!-- 样式容器 -->
+<div class="container">
+  <div class="row">
+    <div class="col">...</div>
+    <div class="col">...</div>
+  </div>
+</div>
+
+<!-- 包装器 -->
+<div class="card-wrapper">
+  <article class="card">...</article>
+</div>
+```
+
+## 列表的正确使用
+
+### 无序列表
+
+没有特定顺序的项目：
+
+```html
+<!-- 导航菜单 -->
+<nav>
+  <ul>
+    <li><a href="/">首页</a></li>
+    <li><a href="/about">关于</a></li>
+  </ul>
+</nav>
+
+<!-- 标签列表 -->
+<ul class="tags">
+  <li><a href="/tag/html">HTML</a></li>
+  <li><a href="/tag/css">CSS</a></li>
+</ul>
+
+<!-- 功能列表 -->
+<ul>
+  <li>免费试用</li>
+  <li>随时取消</li>
+  <li>24小时支持</li>
+</ul>
+```
+
+### 有序列表
+
+有特定顺序的项目：
+
+```html
+<!-- 步骤 -->
+<ol>
+  <li>创建账号</li>
+  <li>填写信息</li>
+  <li>开始使用</li>
+</ol>
+
+<!-- 排行榜 -->
+<ol>
+  <li>第一名</li>
+  <li>第二名</li>
+  <li>第三名</li>
+</ol>
+
+<!-- 面包屑 -->
+<nav aria-label="面包屑">
+  <ol>
+    <li><a href="/">首页</a></li>
+    <li><a href="/blog">博客</a></li>
+    <li aria-current="page">当前文章</li>
+  </ol>
+</nav>
+```
+
+### 定义列表
+
+术语和定义的配对：
+
+```html
+<!-- 词汇表 -->
+<dl>
+  <dt>HTML</dt>
+  <dd>超文本标记语言</dd>
+
+  <dt>CSS</dt>
+  <dd>层叠样式表</dd>
+</dl>
+
+<!-- 键值对信息 -->
+<dl>
+  <dt>作者</dt>
+  <dd>张三</dd>
+
+  <dt>发布日期</dt>
+  <dd>2024年1月15日</dd>
+
+  <dt>分类</dt>
+  <dd>前端开发</dd>
+</dl>
+
+<!-- 常见问题 -->
+<dl>
+  <dt>如何注册？</dt>
+  <dd>点击右上角注册按钮...</dd>
+
+  <dt>如何找回密码？</dt>
+  <dd>在登录页点击"忘记密码"...</dd>
+</dl>
+```
+
+## 表单最佳实践
+
+### 表单结构
+
+```html
+<form action="/submit" method="POST">
+  <fieldset>
+    <legend>个人信息</legend>
+
+    <div class="form-group">
+      <label for="name">姓名 <span aria-hidden="true">*</span></label>
+      <input type="text" id="name" name="name" required aria-required="true" />
+    </div>
+
+    <div class="form-group">
+      <label for="email">邮箱 <span aria-hidden="true">*</span></label>
+      <input
+        type="email"
+        id="email"
+        name="email"
+        required
+        aria-required="true"
+        aria-describedby="email-hint"
+      />
+      <p id="email-hint" class="hint">我们不会分享您的邮箱</p>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>偏好设置</legend>
+
+    <div class="form-group">
+      <span id="contact-label">首选联系方式</span>
+      <div role="group" aria-labelledby="contact-label">
+        <label>
+          <input type="radio" name="contact" value="email" />
+          邮箱
+        </label>
+        <label>
+          <input type="radio" name="contact" value="phone" />
+          电话
+        </label>
+      </div>
+    </div>
+  </fieldset>
+
+  <button type="submit">提交</button>
+</form>
+```
+
+### 错误处理
+
+```html
+<div class="form-group">
+  <label for="password">密码</label>
+  <input
+    type="password"
+    id="password"
+    name="password"
+    required
+    minlength="8"
+    aria-invalid="true"
+    aria-describedby="password-error password-requirements"
+  />
+  <p id="password-requirements" class="hint">至少8位，包含字母和数字</p>
+  <p id="password-error" class="error" role="alert">密码不符合要求</p>
+</div>
+```
+
+### 搜索表单
+
+```html
+<search>
+  <form action="/search" method="GET" role="search">
+    <label for="search-input" class="sr-only">搜索</label>
+    <input
+      type="search"
+      id="search-input"
+      name="q"
+      placeholder="搜索..."
+      aria-label="搜索文章"
+    />
+    <button type="submit">
+      <span class="sr-only">搜索</span>
+      <svg aria-hidden="true"><!-- 搜索图标 --></svg>
+    </button>
+  </form>
+</search>
+```
+
+## 图片和媒体
+
+### 内容图片
+
+```html
+<!-- 简单图片 -->
+<img src="photo.jpg" alt="团队成员在会议室讨论" />
+
+<!-- 带说明的图片 -->
+<figure>
+  <img src="chart.png" alt="2024年销售数据柱状图" />
+  <figcaption>图1：2024年各季度销售数据对比，Q4增长明显</figcaption>
+</figure>
+
+<!-- 响应式图片 -->
+<picture>
+  <source media="(min-width: 800px)" srcset="large.jpg" />
+  <source media="(min-width: 400px)" srcset="medium.jpg" />
+  <img src="small.jpg" alt="产品展示图" />
+</picture>
+```
+
+### 装饰图片
+
+```html
+<!-- 装饰性图片用空 alt -->
+<img src="decoration.png" alt="" />
+
+<!-- 或用 CSS 背景 -->
+<div class="hero" style="background-image: url('bg.jpg')">
+  <h1>标题</h1>
+</div>
+
+<!-- 图标按钮 -->
+<button>
+  <img src="icon.svg" alt="" aria-hidden="true" />
+  <span>按钮文字</span>
+</button>
+```
+
+### 视频和音频
+
+```html
+<!-- 视频 -->
+<figure>
+  <video controls>
+    <source src="video.mp4" type="video/mp4" />
+    <track kind="captions" src="captions.vtt" srclang="zh" label="中文字幕" />
+    <p>您的浏览器不支持视频播放。<a href="video.mp4">下载视频</a></p>
+  </video>
+  <figcaption>演示视频：产品使用教程</figcaption>
+</figure>
+
+<!-- 音频 -->
+<figure>
+  <audio controls>
+    <source src="podcast.mp3" type="audio/mpeg" />
+    <p>您的浏览器不支持音频播放。<a href="podcast.mp3">下载音频</a></p>
+  </audio>
+  <figcaption>播客第10期：前端发展趋势</figcaption>
+  <details>
+    <summary>文字稿</summary>
+    <p>完整的音频文字内容...</p>
+  </details>
+</figure>
+```
+
+## 表格最佳实践
+
+### 数据表格
+
+```html
+<table>
+  <caption>
+    2024年各季度销售数据（单位：万元）
+  </caption>
+  <thead>
+    <tr>
+      <th scope="col">产品</th>
+      <th scope="col">Q1</th>
+      <th scope="col">Q2</th>
+      <th scope="col">Q3</th>
+      <th scope="col">Q4</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th scope="row">产品A</th>
+      <td>100</td>
+      <td>120</td>
+      <td>90</td>
+      <td>150</td>
+    </tr>
+    <tr>
+      <th scope="row">产品B</th>
+      <td>80</td>
+      <td>95</td>
+      <td>110</td>
+      <td>130</td>
+    </tr>
+  </tbody>
+  <tfoot>
+    <tr>
+      <th scope="row">总计</th>
+      <td>180</td>
+      <td>215</td>
+      <td>200</td>
+      <td>280</td>
+    </tr>
+  </tfoot>
+</table>
+```
+
+### 复杂表格
+
+```html
+<table>
+  <caption>
+    课程表
+  </caption>
+  <thead>
+    <tr>
+      <th scope="col">时间</th>
+      <th scope="col">周一</th>
+      <th scope="col">周二</th>
+      <th scope="col">周三</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th scope="row">8:00-9:00</th>
+      <td>数学</td>
+      <td>语文</td>
+      <td rowspan="2">体育</td>
+    </tr>
+    <tr>
+      <th scope="row">9:00-10:00</th>
+      <td>英语</td>
+      <td>物理</td>
+    </tr>
+  </tbody>
+</table>
+```
+
+### 不要用表格布局
+
+```html
+<!-- 错误：用表格做布局 -->
+<table>
+  <tr>
+    <td>导航</td>
+    <td>主内容</td>
+    <td>侧边栏</td>
+  </tr>
+</table>
+
+<!-- 正确：用 CSS 布局 -->
+<div class="layout">
+  <nav>导航</nav>
+  <main>主内容</main>
+  <aside>侧边栏</aside>
+</div>
+```
+
+## 链接和按钮
+
+### 链接：导航到某处
+
+```html
+<!-- 页面导航 -->
+<a href="/about">关于我们</a>
+
+<!-- 锚点跳转 -->
+<a href="#section-2">跳到第二节</a>
+
+<!-- 外部链接 -->
+<a href="https://example.com" target="_blank" rel="noopener noreferrer">
+  外部网站
+  <span class="sr-only">（在新窗口打开）</span>
+</a>
+
+<!-- 下载链接 -->
+<a href="/files/doc.pdf" download>下载 PDF</a>
+
+<!-- 邮件链接 -->
+<a href="mailto:contact@example.com">联系我们</a>
+```
+
+### 按钮：执行操作
+
+```html
+<!-- 提交表单 -->
+<button type="submit">提交</button>
+
+<!-- 触发操作 -->
+<button type="button" onclick="openModal()">打开对话框</button>
+
+<!-- 重置表单 -->
+<button type="reset">重置</button>
+
+<!-- 禁用状态 -->
+<button type="submit" disabled>提交中...</button>
+```
+
+### 链接还是按钮？
+
+```html
+<!-- 导航到新页面 → 链接 -->
+<a href="/products">查看产品</a>
+
+<!-- 执行操作，不离开页面 → 按钮 -->
+<button onclick="addToCart()">加入购物车</button>
+
+<!-- 错误：用链接做按钮 -->
+<a href="#" onclick="doSomething()">执行操作</a>
+
+<!-- 错误：用 div 做按钮 -->
+<div onclick="doSomething()">执行操作</div>
+```
+
+### 有意义的链接文本
+
+```html
+<!-- 不好：不知道链接到哪 -->
+<p>了解更多，<a href="/about">点击这里</a></p>
+
+<!-- 好：链接文本有意义 -->
+<p><a href="/about">了解更多关于我们的信息</a></p>
+
+<!-- 不好：相同文本不同链接 -->
+<article>
+  <h2>文章1</h2>
+  <a href="/post/1">阅读更多</a>
+</article>
+<article>
+  <h2>文章2</h2>
+  <a href="/post/2">阅读更多</a>
+</article>
+
+<!-- 好：区分链接 -->
+<article>
+  <h2>文章1</h2>
+  <a href="/post/1">阅读更多：文章1</a>
+</article>
+<article>
+  <h2>文章2</h2>
+  <a href="/post/2">阅读更多：文章2</a>
+</article>
+
+<!-- 或者用 aria-label -->
+<article>
+  <h2 id="title1">文章1</h2>
+  <a href="/post/1" aria-labelledby="title1">阅读更多</a>
+</article>
+```
+
+## 时间和日期
+
+```html
+<!-- 机器��读的日期 -->
+<time datetime="2024-01-15">2024年1月15日</time>
+
+<!-- 相对时间 -->
+<time datetime="2024-01-15T10:30:00">今天上午10:30</time>
+
+<!-- 持续时间 -->
+<p>视频时长：<time datetime="PT1H30M">1小时30分钟</time></p>
+
+<!-- 日期范围 -->
+<p>
+  活动时间：
+  <time datetime="2024-01-15">1月15日</time> -
+  <time datetime="2024-01-20">1月20日</time>
+</p>
+```
+
+## 引用
+
+### 短引用
+
+```html
+<p>爱因斯坦说过：<q>想象力比知识更重要</q>。</p>
+```
+
+### 块引用
+
+```html
+<figure>
+  <blockquote cite="https://example.com/source">
+    <p>这是一段长引用，可能包含多个段落...</p>
+    <p>第二段内容...</p>
+  </blockquote>
+  <figcaption>— <cite>《书名》</cite>，作者名</figcaption>
+</figure>
+```
+
+### 引用来源
+
+```html
+<p>
+  更多信息请参考
+  <cite>《HTML 权威指南》</cite>。
+</p>
+```
+
+## 代码和术语
+
+### 代码
+
+```html
+<!-- 行内代码 -->
+<p>使用 <code>console.log()</code> 输出日志。</p>
+
+<!-- 代码块 -->
+<pre><code>function hello() {
+  console.log('Hello, World!')
+}
+</code></pre>
+
+<!-- 用户输入 -->
+<p>按下 <kbd>Ctrl</kbd> + <kbd>C</kbd> 复制。</p>
+
+<!-- 程序输出 -->
+<p>命令输出：<samp>Hello, World!</samp></p>
+
+<!-- 变量 -->
+<p>变量 <var>x</var> 的值是 10。</p>
+```
+
+### 术语和缩写
+
+```html
+<!-- 首次定义术语 -->
+<p><dfn>HTML</dfn> 是超文本标记语言的缩写。</p>
+
+<!-- 缩写 -->
+<p><abbr title="World Wide Web">WWW</abbr> 即万维网。</p>
+```
+
+## 小结
+
+语义化最佳实践的核心原则：
+
+**选择正确的标签**：
+
+- 标题用 `<h1>`-`<h6>`
+- 段落用 `<p>`
+- 导航用 `<nav>`
+- 主内容用 `<main>`
+- 独立内容用 `<article>`
+
+**保持层级清晰**：
+
+- 标题不跳级
+- 结构嵌套合理
+- 区分 `<article>` 和 `<section>`
+
+**表单要完整**：
+
+- 控件关联标签
+- 分组用 `<fieldset>`
+- 错误提示可访问
+
+**链接和按钮**：
+
+- 导航用链接
+- 操作用按钮
+- 文本要有意义
+
+**图片和媒体**：
+
+- 内容图片有 alt
+- 装饰图片空 alt
+- 视频有字幕
+
+记住：语义化不仅是技术要求，更是对用户的尊重。好的语义化让网站对所有人都友好。
+
+下一篇会介绍 HTML 与 SEO 的关系。

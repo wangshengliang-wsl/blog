@@ -1,0 +1,691 @@
+---
+title: HTML 性能优化
+description: 学习 HTML 层面的性能优化技巧，包括资源加载优化、渲染优化、预加载策略和性能监测方法
+pubDate: 2025-11-28
+toc: true
+ogImage: true
+category: HTML
+---
+
+虽然性能优化涉及多个方面，但 HTML 作为网页的骨架，有很多可以在 HTML 层面做的优化。本文介绍这些技巧。
+
+## 资源加载优化
+
+### 预加载关键资源
+
+```html
+<head>
+  <!-- 预加载关键 CSS -->
+  <link rel="preload" href="critical.css" as="style" />
+
+  <!-- 预加载关键字体 -->
+  <link
+    rel="preload"
+    href="font.woff2"
+    as="font"
+    type="font/woff2"
+    crossorigin
+  />
+
+  <!-- 预加载关键脚本 -->
+  <link rel="preload" href="main.js" as="script" />
+
+  <!-- 预加载关键图片 -->
+  <link rel="preload" href="hero.jpg" as="image" />
+</head>
+```
+
+`as` 属性值：
+
+| 值         | 资源类型       |
+| ---------- | -------------- |
+| `style`    | CSS 样式表     |
+| `script`   | JavaScript     |
+| `font`     | 字体文件       |
+| `image`    | 图片           |
+| `fetch`    | fetch/XHR 请求 |
+| `document` | HTML 文档      |
+
+### 预连接
+
+提前建立连接，减少后续请求的延迟：
+
+```html
+<head>
+  <!-- 预连接到 CDN -->
+  <link rel="preconnect" href="https://cdn.example.com" />
+
+  <!-- 预连接到 API 服务器 -->
+  <link rel="preconnect" href="https://api.example.com" />
+
+  <!-- 预连接到字体服务 -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+</head>
+```
+
+### DNS 预解析
+
+```html
+<head>
+  <!-- DNS 预解析 -->
+  <link rel="dns-prefetch" href="//cdn.example.com" />
+  <link rel="dns-prefetch" href="//analytics.example.com" />
+</head>
+```
+
+preconnect vs dns-prefetch：
+
+- `preconnect`：建立完整连接（DNS + TCP + TLS）
+- `dns-prefetch`：只做 DNS 解析
+- 对关键资源用 preconnect，非关键资源用 dns-prefetch
+
+### 预获取
+
+预获取下一个页面可能需要的资源：
+
+```html
+<head>
+  <!-- 预获取下一页的资源 -->
+  <link rel="prefetch" href="next-page.html" />
+  <link rel="prefetch" href="next-page-data.json" />
+</head>
+```
+
+### 预渲染
+
+预渲染整个页面：
+
+```html
+<head>
+  <!-- 预渲染下一个可能访问的页面 -->
+  <link rel="prerender" href="https://example.com/likely-next-page" />
+</head>
+```
+
+注意：预渲染会消耗较多资源，只用于非常可能访问的页面。
+
+### 模块预加载
+
+```html
+<head>
+  <link rel="modulepreload" href="app.js" />
+  <link rel="modulepreload" href="utils.js" />
+</head>
+
+<script type="module" src="app.js"></script>
+```
+
+## 脚本加载优化
+
+### async 和 defer
+
+```html
+<!-- 普通脚本：阻塞解析 -->
+<script src="script.js"></script>
+
+<!-- async：异步加载，加载完立即执行 -->
+<script src="analytics.js" async></script>
+
+<!-- defer：异步加载，DOM 解析完后执行 -->
+<script src="app.js" defer></script>
+```
+
+执行时机：
+
+| 属性  | 加载 | 执行时机   | 执行顺序 |
+| ----- | ---- | ---------- | -------- |
+| (无)  | 阻塞 | 立即       | 按顺序   |
+| async | 异步 | 加载完成后 | 不确定   |
+| defer | 异步 | DOM 解析后 | 按顺序   |
+
+### 使用建议
+
+```html
+<head>
+  <!-- 关键脚本：使用 defer 保证顺序 -->
+  <script src="framework.js" defer></script>
+  <script src="app.js" defer></script>
+
+  <!-- 独立脚本：使用 async -->
+  <script src="analytics.js" async></script>
+  <script src="ads.js" async></script>
+</head>
+```
+
+### 内联关键脚本
+
+```html
+<head>
+  <script>
+    // 关键的初始化代码，避免额外请求
+    document.documentElement.classList.add('js-enabled')
+  </script>
+</head>
+```
+
+### 动态加载
+
+```html
+<script>
+  // 按需加载非关键脚本
+  function loadScript(src) {
+    return new Promise((resolve, reject) => {
+      const script = document.createElement('script')
+      script.src = src
+      script.onload = resolve
+      script.onerror = reject
+      document.body.appendChild(script)
+    })
+  }
+
+  // 用户交互后再加载
+  button.addEventListener('click', async () => {
+    await loadScript('heavy-feature.js')
+    initHeavyFeature()
+  })
+</script>
+```
+
+## 样式加载优化
+
+### 关键 CSS 内联
+
+```html
+<head>
+  <style>
+    /* 首屏关键样式内联 */
+    body {
+      margin: 0;
+      font-family: system-ui, sans-serif;
+    }
+    .header {
+      background: #fff;
+      padding: 16px;
+    }
+    /* ... 更多关键样式 */
+  </style>
+
+  <!-- 非关键 CSS 异步加载 -->
+  <link
+    rel="preload"
+    href="styles.css"
+    as="style"
+    onload="this.onload=null;this.rel='stylesheet'"
+  />
+  <noscript><link rel="stylesheet" href="styles.css" /></noscript>
+</head>
+```
+
+### media 属性
+
+```html
+<!-- 只在匹配时加载 -->
+<link rel="stylesheet" href="print.css" media="print" />
+<link rel="stylesheet" href="large.css" media="(min-width: 1024px)" />
+
+<!-- 初始不阻塞，之后应用 -->
+<link
+  rel="stylesheet"
+  href="non-critical.css"
+  media="print"
+  onload="this.media='all'"
+/>
+```
+
+### 字体优化
+
+```html
+<head>
+  <!-- 预加载关键字体 -->
+  <link
+    rel="preload"
+    href="font.woff2"
+    as="font"
+    type="font/woff2"
+    crossorigin
+  />
+</head>
+
+<style>
+  @font-face {
+    font-family: 'MyFont';
+    src: url('font.woff2') format('woff2');
+    font-display: swap; /* 先显示后备字体 */
+  }
+</style>
+```
+
+font-display 值：
+
+| 值         | 行为                             |
+| ---------- | -------------------------------- |
+| `auto`     | 浏览器默认                       |
+| `block`    | 短暂不可见，然后显示             |
+| `swap`     | 立即显示后备字体，加载后替换     |
+| `fallback` | 短暂不可见，后备字体，可能不替换 |
+| `optional` | 短暂不可见，可能不加载           |
+
+## 图片优化
+
+### 懒加载
+
+```html
+<!-- 原生懒加载 -->
+<img src="image.jpg" loading="lazy" alt="描述" />
+
+<!-- 首屏图片不要懒加载 -->
+<img src="hero.jpg" loading="eager" alt="主图" />
+```
+
+### 响应式图片
+
+```html
+<!-- srcset + sizes -->
+<img
+  src="image-800.jpg"
+  srcset="image-400.jpg 400w, image-800.jpg 800w, image-1200.jpg 1200w"
+  sizes="(max-width: 600px) 100vw,
+         (max-width: 1000px) 50vw,
+         800px"
+  alt="描述"
+/>
+
+<!-- picture 元素 -->
+<picture>
+  <source type="image/avif" srcset="image.avif" />
+  <source type="image/webp" srcset="image.webp" />
+  <img src="image.jpg" alt="描述" />
+</picture>
+```
+
+### 指定尺寸
+
+```html
+<!-- 指定宽高，避免布局偏移 -->
+<img src="image.jpg" width="800" height="600" alt="描述" />
+
+<!-- 或使用 aspect-ratio -->
+<style>
+  img {
+    aspect-ratio: 4/3;
+    width: 100%;
+    height: auto;
+  }
+</style>
+```
+
+### 解码优化
+
+```html
+<!-- 异步解码，不阻塞主线程 -->
+<img src="large-image.jpg" decoding="async" alt="描述" />
+```
+
+### fetchpriority
+
+```html
+<!-- 提高优先级 -->
+<img src="hero.jpg" fetchpriority="high" alt="主图" />
+
+<!-- 降低优先级 -->
+<img src="below-fold.jpg" fetchpriority="low" loading="lazy" alt="描述" />
+```
+
+## 减少 DOM 复杂度
+
+### 精简 HTML
+
+```html
+<!-- 不好：过多嵌套 -->
+<div class="wrapper">
+  <div class="container">
+    <div class="row">
+      <div class="col">
+        <div class="card">
+          <div class="card-body">
+            <p>内容</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 好：扁平结构 -->
+<article class="card">
+  <p>内容</p>
+</article>
+```
+
+### 避免不必要的元素
+
+```html
+<!-- 不好 -->
+<div><span>文字</span></div>
+
+<!-- 好 -->
+<p>文字</p>
+```
+
+### 使用列表而非重复 div
+
+```html
+<!-- 不好 -->
+<div class="item">项目1</div>
+<div class="item">项目2</div>
+<div class="item">项目3</div>
+
+<!-- 好 -->
+<ul>
+  <li>项目1</li>
+  <li>项目2</li>
+  <li>项目3</li>
+</ul>
+```
+
+## 渲染优化
+
+### 避免阻塞渲染
+
+```html
+<head>
+  <!-- CSS 在 head 中 -->
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- 内容 -->
+
+  <!-- 脚本在 body 末尾或使用 defer -->
+  <script src="app.js" defer></script>
+</body>
+```
+
+### content-visibility
+
+```html
+<style>
+  /* 跳过屏幕外内容的渲染 */
+  .below-fold {
+    content-visibility: auto;
+    contain-intrinsic-size: 0 500px; /* 估计高度 */
+  }
+</style>
+
+<div class="above-fold">首屏内容</div>
+<div class="below-fold">非首屏内容</div>
+```
+
+### contain 属性
+
+```html
+<style>
+  /* 限制重排/重绘范围 */
+  .card {
+    contain: layout style paint;
+  }
+
+  /* 或��使用 strict（layout + style + paint + size） */
+  .widget {
+    contain: strict;
+    width: 300px;
+    height: 200px;
+  }
+</style>
+```
+
+## 缓存策略
+
+### Cache-Control
+
+```html
+<!-- 通过 HTTP 头设置，这里是示例 -->
+<!-- Cache-Control: max-age=31536000, immutable -->
+```
+
+### Service Worker
+
+```html
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js')
+  }
+</script>
+```
+
+```javascript
+// sw.js
+const CACHE_NAME = 'v1'
+const ASSETS = ['/', '/styles.css', '/app.js', '/offline.html']
+
+self.addEventListener('install', (event) => {
+  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS)))
+})
+
+self.addEventListener('fetch', (event) => {
+  event.respondWith(
+    caches.match(event.request).then((response) => {
+      return response || fetch(event.request)
+    })
+  )
+})
+```
+
+## 性能监测
+
+### Performance API
+
+```javascript
+// 测量关键指标
+const paint = performance.getEntriesByType('paint')
+console.log('FP:', paint.find((e) => e.name === 'first-paint')?.startTime)
+console.log(
+  'FCP:',
+  paint.find((e) => e.name === 'first-contentful-paint')?.startTime
+)
+
+// 测量资源加载
+const resources = performance.getEntriesByType('resource')
+resources.forEach((resource) => {
+  console.log(resource.name, resource.duration)
+})
+
+// 测量自定义指标
+performance.mark('feature-start')
+// ... 执行代码
+performance.mark('feature-end')
+performance.measure('feature', 'feature-start', 'feature-end')
+```
+
+### Web Vitals
+
+```html
+<script type="module">
+  import { onCLS, onFID, onLCP } from 'web-vitals'
+
+  onCLS(console.log) // Cumulative Layout Shift
+  onFID(console.log) // First Input Delay
+  onLCP(console.log) // Largest Contentful Paint
+</script>
+```
+
+### Lighthouse
+
+```html
+<!-- 在 Chrome DevTools 中运行 Lighthouse 审计 -->
+<!-- 或使用 CLI：npx lighthouse https://example.com -->
+```
+
+## 性能清单
+
+```markdown
+## 资源加载
+
+- [ ] 关键资源使用 preload
+- [ ] 第三方域名使用 preconnect/dns-prefetch
+- [ ] 非关键资源使用 prefetch
+
+## 脚本优化
+
+- [ ] 使用 async/defer
+- [ ] 关键脚本内联
+- [ ] 按需动态加载
+
+## 样式优化
+
+- [ ] 关键 CSS 内联
+- [ ] 非关键 CSS 异步加载
+- [ ] 字体使用 font-display: swap
+
+## 图片优化
+
+- [ ] 使用懒加载
+- [ ] 提供响应式图片
+- [ ] 使用现代格式（WebP/AVIF）
+- [ ] 指定宽高或 aspect-ratio
+
+## DOM 优化
+
+- [ ] 减少 DOM 节点数量
+- [ ] 避免深层嵌套
+- [ ] 使用 content-visibility
+
+## 渲染优化
+
+- [ ] CSS 在 head，JS 在 body 末尾
+- [ ] 避免布局偏移
+- [ ] 使用 contain 属性
+```
+
+## 实际优化示例
+
+### 优化前
+
+```html
+<!DOCTYPE html>
+<html>
+  <head>
+    <link rel="stylesheet" href="huge-framework.css" />
+    <link rel="stylesheet" href="styles.css" />
+    <script src="jquery.js"></script>
+    <script src="app.js"></script>
+  </head>
+  <body>
+    <div class="wrapper">
+      <div class="container">
+        <div class="header">
+          <img src="logo.png" />
+          <!-- ... -->
+        </div>
+      </div>
+    </div>
+    <!-- 大量 DOM -->
+  </body>
+</html>
+```
+
+### 优化后
+
+```html
+<!DOCTYPE html>
+<html lang="zh-Hans">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <!-- 预连接 -->
+    <link rel="preconnect" href="https://cdn.example.com" />
+
+    <!-- 预加载关键资源 -->
+    <link rel="preload" href="critical.css" as="style" />
+    <link rel="preload" href="main.js" as="script" />
+    <link rel="preload" href="hero.jpg" as="image" />
+
+    <!-- 关键 CSS 内联 -->
+    <style>
+      body {
+        margin: 0;
+        font-family: system-ui;
+      }
+      .header {
+        padding: 16px;
+      }
+      /* 首屏关键样式 */
+    </style>
+
+    <!-- 非关键 CSS 异步加载 -->
+    <link
+      rel="stylesheet"
+      href="styles.css"
+      media="print"
+      onload="this.media='all'"
+    />
+    <noscript><link rel="stylesheet" href="styles.css" /></noscript>
+
+    <title>页面标题</title>
+  </head>
+  <body>
+    <header class="header">
+      <img src="logo.png" width="120" height="40" alt="Logo" />
+    </header>
+
+    <main>
+      <img
+        src="hero.jpg"
+        fetchpriority="high"
+        alt="主图"
+        width="1200"
+        height="600"
+      />
+
+      <!-- 非首屏内容 -->
+      <section style="content-visibility: auto;">
+        <img src="content.jpg" loading="lazy" alt="描述" />
+      </section>
+    </main>
+
+    <!-- 脚本异步加载 -->
+    <script src="app.js" defer></script>
+    <script src="analytics.js" async></script>
+  </body>
+</html>
+```
+
+## 小结
+
+HTML 性能优化的核心策略：
+
+**资源加载**：
+
+- preload 加载关键资源
+- preconnect 提前建立连接
+- prefetch 预获取未来资源
+
+**脚本优化**：
+
+- 使用 async/defer 异步���载
+- 关键脚本内联
+- 非关键脚本按需加载
+
+**样式优化**：
+
+- 关键 CSS 内联
+- 非关键 CSS 异步加载
+- 字体使用 font-display
+
+**图片优化**：
+
+- 原生 loading="lazy"
+- 响应式图片
+- 现代图片格式
+- 指定尺寸避免偏移
+
+**渲染优化**：
+
+- 减少 DOM 复杂度
+- 使用 content-visibility
+- 避免阻塞渲染
+
+性能优化是持续的过程，需要通过测量来指导优化方向。
+
+下一篇（也是本系列最后一篇）会介绍 HTML 开发工具。

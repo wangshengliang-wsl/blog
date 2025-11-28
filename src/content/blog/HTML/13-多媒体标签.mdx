@@ -1,0 +1,555 @@
+---
+title: 多媒体标签
+description: 详解 HTML5 多媒体标签 video 和 audio 的使用方法，包括播放控制、多格式支持、字幕、JavaScript API 等
+pubDate: 2025-11-28
+toc: true
+ogImage: true
+category: HTML
+---
+
+HTML5 之前，网页播放音视频需要依赖 Flash 等第三方插件。HTML5 引入了原生的 `<video>` 和 `<audio>` 标签，让多媒体播放变得简单且无需插件。
+
+## video 视频标签
+
+`<video>` 用于嵌入视频：
+
+```html
+<video src="movie.mp4" controls width="640" height="360">
+  您的浏览器不支持 HTML5 视频
+</video>
+```
+
+标签之间的文本在浏览器不支持 video 时显示。
+
+### 基本属性
+
+| 属性               | 说明           |
+| ------------------ | -------------- |
+| `src`              | 视频文件路径   |
+| `controls`         | 显示播放控制条 |
+| `width` / `height` | 视频宽高       |
+| `autoplay`         | 自动播放       |
+| `muted`            | 静音           |
+| `loop`             | 循环播放       |
+| `poster`           | 封面图片       |
+| `preload`          | 预加载策略     |
+
+### controls 控制条
+
+```html
+<!-- 显示浏览器默认控制条 -->
+<video src="movie.mp4" controls></video>
+
+<!-- 不显示控制条 -->
+<video src="movie.mp4"></video>
+```
+
+默认控制条包含：播放/暂停、进度条、音量、全屏等按钮。
+
+### autoplay 和 muted
+
+由于用户体验考虑，大多数浏览器阻止带声音的自动播放：
+
+```html
+<!-- 可能被阻止 -->
+<video src="movie.mp4" autoplay></video>
+
+<!-- 可以自动播放（静音） -->
+<video src="movie.mp4" autoplay muted></video>
+```
+
+要实现带声音的自动播放，需要用户先与页面交互。
+
+### poster 封面
+
+```html
+<video src="movie.mp4" poster="cover.jpg" controls></video>
+```
+
+视频加载前或未播放时显示封面图。
+
+### preload 预加载
+
+```html
+<!-- 不预加载 -->
+<video src="movie.mp4" preload="none"></video>
+
+<!-- 只预加载元数据（时长、���寸等） -->
+<video src="movie.mp4" preload="metadata"></video>
+
+<!-- 预加载整个视频（默认） -->
+<video src="movie.mp4" preload="auto"></video>
+```
+
+| 值         | 说明                 |
+| ---------- | -------------------- |
+| `none`     | 不预加载，节省带宽   |
+| `metadata` | 只加载元信息（推荐） |
+| `auto`     | 尽可能预加载整个视频 |
+
+### playsinline
+
+在移动设备上，视频默认全屏播放。`playsinline` 让视频在页面内播放：
+
+```html
+<video src="movie.mp4" playsinline controls></video>
+```
+
+## source 多格式支持
+
+不同浏览器支持的视频格式不同：
+
+| 格式           | Chrome | Firefox | Safari | Edge |
+| -------------- | ------ | ------- | ------ | ---- |
+| MP4 (H.264)    | ✓      | ✓       | ✓      | ✓    |
+| WebM (VP8/VP9) | ✓      | ✓       | ✗      | ✓    |
+| Ogg (Theora)   | ✓      | ✓       | ✗      | ✓    |
+
+使用 `<source>` 提供多种格式：
+
+```html
+<video controls width="640" height="360">
+  <source src="movie.webm" type="video/webm" />
+  <source src="movie.mp4" type="video/mp4" />
+  <p>
+    您的浏览器不支持 HTML5 视频。
+    <a href="movie.mp4">下载视频</a>
+  </p>
+</video>
+```
+
+浏览器会按顺序尝试，使用第一个支持的格式。
+
+### MIME 类型
+
+`type` 属性告诉浏览器视频的 MIME 类型，避免下载不支持的格式：
+
+```html
+<source src="movie.mp4" type="video/mp4" />
+<source src="movie.webm" type="video/webm" />
+<source src="movie.ogv" type="video/ogg" />
+```
+
+可以包含编解码器信息：
+
+```html
+<source src="movie.mp4" type='video/mp4; codecs="avc1.42E01E, mp4a.40.2"' />
+<source src="movie.webm" type='video/webm; codecs="vp8, vorbis"' />
+```
+
+## track 字幕
+
+`<track>` 为视频添加字幕、标题或章节：
+
+```html
+<video controls>
+  <source src="movie.mp4" type="video/mp4" />
+
+  <track kind="subtitles" src="subs_cn.vtt" srclang="zh" label="中文" default />
+  <track kind="subtitles" src="subs_en.vtt" srclang="en" label="English" />
+  <track kind="captions" src="captions.vtt" srclang="en" label="Captions" />
+</video>
+```
+
+### track 的属性
+
+| 属性      | 说明                                                        |
+| --------- | ----------------------------------------------------------- |
+| `kind`    | 类型：subtitles、captions、descriptions、chapters、metadata |
+| `src`     | 字幕文件路径（WebVTT 格式）                                 |
+| `srclang` | 字幕语言                                                    |
+| `label`   | 显示给用户的标签                                            |
+| `default` | 默认启用                                                    |
+
+### kind 类型
+
+| kind 值        | 用途                       |
+| -------------- | -------------------------- |
+| `subtitles`    | 字幕翻译                   |
+| `captions`     | 隐藏式字幕（包含音效描述） |
+| `descriptions` | 视频描述（供视障用户）     |
+| `chapters`     | 章节标题                   |
+| `metadata`     | JavaScript 可读的元数据    |
+
+### WebVTT 格式
+
+字幕文件使用 WebVTT 格式：
+
+```text
+WEBVTT
+
+00:00:00.000 --> 00:00:03.000
+欢迎观看本视频
+
+00:00:03.000 --> 00:00:06.000
+今天我们来学习 HTML5
+
+00:00:06.000 --> 00:00:10.000
+HTML5 是 HTML 的最新版本
+```
+
+## audio 音频标签
+
+`<audio>` 的用法与 `<video>` 类似：
+
+```html
+<audio src="music.mp3" controls>您的浏览器不支持 HTML5 音频</audio>
+```
+
+### 多格式支持
+
+```html
+<audio controls>
+  <source src="music.ogg" type="audio/ogg" />
+  <source src="music.mp3" type="audio/mpeg" />
+  <source src="music.wav" type="audio/wav" />
+  <p>您的浏览器不支持 HTML5 音频</p>
+</audio>
+```
+
+常见音频格式：
+
+| 格式 | MIME 类型  | 说明         |
+| ---- | ---------- | ------------ |
+| MP3  | audio/mpeg | 广泛支持     |
+| Ogg  | audio/ogg  | 开放格式     |
+| WAV  | audio/wav  | 无损，文件大 |
+| AAC  | audio/aac  | 高质量       |
+
+### audio 的属性
+
+与 video 共有的属性：
+
+- `src`
+- `controls`
+- `autoplay`
+- `muted`
+- `loop`
+- `preload`
+
+## JavaScript API
+
+`<video>` 和 `<audio>` 都有丰富的 JavaScript API。
+
+### 获取元素
+
+```javascript
+const video = document.querySelector('video')
+const audio = document.getElementById('myAudio')
+```
+
+### 播放控制
+
+```javascript
+// 播放
+video.play()
+
+// 暂停
+video.pause()
+
+// 判断是否暂停
+console.log(video.paused) // true / false
+
+// 跳转到指定时间（秒）
+video.currentTime = 30
+
+// 获取当前时间
+console.log(video.currentTime)
+
+// 获取总时长
+console.log(video.duration)
+
+// 设置音量（0-1）
+video.volume = 0.5
+
+// 静音
+video.muted = true
+
+// 设置播放速度
+video.playbackRate = 2 // 2倍速
+```
+
+### 属性
+
+| 属性                         | 说明               |
+| ---------------------------- | ------------------ |
+| `currentTime`                | 当前播放时间（秒） |
+| `duration`                   | 总时长（秒）       |
+| `paused`                     | 是否暂停           |
+| `ended`                      | 是否播放完毕       |
+| `volume`                     | 音量（0-1）        |
+| `muted`                      | 是否静音           |
+| `playbackRate`               | 播放速度           |
+| `currentSrc`                 | 当前播放的源       |
+| `videoWidth` / `videoHeight` | 视频原始尺寸       |
+| `readyState`                 | 就绪状态           |
+| `buffered`                   | 已缓冲的时间范围   |
+
+### 事件
+
+```javascript
+const video = document.querySelector('video')
+
+// 可以播放
+video.addEventListener('canplay', () => {
+  console.log('视频可以播放了')
+})
+
+// 开始播放
+video.addEventListener('play', () => {
+  console.log('开始播放')
+})
+
+// 暂停
+video.addEventListener('pause', () => {
+  console.log('已暂停')
+})
+
+// 播放完毕
+video.addEventListener('ended', () => {
+  console.log('播放完毕')
+})
+
+// 时间更新
+video.addEventListener('timeupdate', () => {
+  console.log('当前时间:', video.currentTime)
+})
+
+// 音量变化
+video.addEventListener('volumechange', () => {
+  console.log('音量:', video.volume)
+})
+
+// 错误
+video.addEventListener('error', () => {
+  console.log('播放错误')
+})
+
+// 加载进度
+video.addEventListener('progress', () => {
+  if (video.buffered.length > 0) {
+    const buffered = video.buffered.end(video.buffered.length - 1)
+    console.log('已缓冲:', buffered, '秒')
+  }
+})
+```
+
+常用事件：
+
+| 事件             | 触发时机           |
+| ---------------- | ------------------ |
+| `loadstart`      | 开始加载           |
+| `loadedmetadata` | 元数据加载完成     |
+| `loadeddata`     | 第一帧加载完成     |
+| `canplay`        | 可以开始播放       |
+| `canplaythrough` | 可以流畅播放到结尾 |
+| `play`           | 开始播放           |
+| `pause`          | 暂停               |
+| `playing`        | 正在播放           |
+| `ended`          | 播放结束           |
+| `timeupdate`     | 播放位置改变       |
+| `volumechange`   | 音量改变           |
+| `seeking`        | 正在跳转           |
+| `seeked`         | 跳转完成           |
+| `waiting`        | 等待数据           |
+| `error`          | 发生错误           |
+
+## 自定义播放器
+
+使用 API 可以创建自定义播放器界面：
+
+```html
+<div class="custom-player">
+  <video id="video" src="movie.mp4"></video>
+
+  <div class="controls">
+    <button id="playBtn">播放</button>
+    <input type="range" id="progress" min="0" max="100" value="0" />
+    <span id="time">00:00 / 00:00</span>
+    <input type="range" id="volume" min="0" max="100" value="100" />
+    <button id="fullscreenBtn">全屏</button>
+  </div>
+</div>
+```
+
+```javascript
+const video = document.getElementById('video')
+const playBtn = document.getElementById('playBtn')
+const progress = document.getElementById('progress')
+const timeDisplay = document.getElementById('time')
+const volumeSlider = document.getElementById('volume')
+const fullscreenBtn = document.getElementById('fullscreenBtn')
+
+// 播放/暂停
+playBtn.addEventListener('click', () => {
+  if (video.paused) {
+    video.play()
+    playBtn.textContent = '暂停'
+  } else {
+    video.pause()
+    playBtn.textContent = '播放'
+  }
+})
+
+// 更新进度条
+video.addEventListener('timeupdate', () => {
+  const percent = (video.currentTime / video.duration) * 100
+  progress.value = percent
+
+  const current = formatTime(video.currentTime)
+  const total = formatTime(video.duration)
+  timeDisplay.textContent = `${current} / ${total}`
+})
+
+// 拖动进度条
+progress.addEventListener('input', () => {
+  video.currentTime = (progress.value / 100) * video.duration
+})
+
+// 音量控制
+volumeSlider.addEventListener('input', () => {
+  video.volume = volumeSlider.value / 100
+})
+
+// 全屏
+fullscreenBtn.addEventListener('click', () => {
+  if (video.requestFullscreen) {
+    video.requestFullscreen()
+  }
+})
+
+// 格式化时间
+function formatTime(seconds) {
+  const mins = Math.floor(seconds / 60)
+  const secs = Math.floor(seconds % 60)
+  return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+}
+```
+
+## 响应式视频
+
+### 保持宽高比
+
+```css
+.video-container {
+  position: relative;
+  padding-bottom: 56.25%; /* 16:9 比例 */
+  height: 0;
+}
+
+.video-container video {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+```
+
+```html
+<div class="video-container">
+  <video src="movie.mp4" controls></video>
+</div>
+```
+
+### 现代 CSS 方式
+
+```css
+video {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+}
+```
+
+## 无障碍访问
+
+### ��供字幕
+
+```html
+<video controls>
+  <source src="movie.mp4" type="video/mp4" />
+  <track
+    kind="captions"
+    src="captions.vtt"
+    srclang="zh"
+    label="中文字幕"
+    default
+  />
+</video>
+```
+
+### 提供文字描述
+
+```html
+<figure>
+  <video controls aria-describedby="video-desc">
+    <source src="movie.mp4" type="video/mp4" />
+  </video>
+  <figcaption id="video-desc">
+    这段视频展示了如何使用 HTML5 video 标签...
+  </figcaption>
+</figure>
+```
+
+### 键盘控制
+
+浏览器默认的 controls 支持键盘操作：
+
+- 空格：播放/暂停
+- 方向键：快进/快退
+- M：静音
+- F：全屏
+
+自定义播放器也应该支持这些快捷键。
+
+## 性能优化
+
+### 懒加载
+
+```html
+<video preload="none" poster="cover.jpg" controls>
+  <source src="movie.mp4" type="video/mp4" />
+</video>
+```
+
+### 不同分辨率
+
+```html
+<video controls>
+  <source src="movie-1080p.mp4" type="video/mp4" media="(min-width: 1200px)" />
+  <source src="movie-720p.mp4" type="video/mp4" media="(min-width: 800px)" />
+  <source src="movie-480p.mp4" type="video/mp4" />
+</video>
+```
+
+### 视频压缩
+
+使用 FFmpeg 压缩视频：
+
+```bash
+# 压缩 MP4
+ffmpeg -i input.mp4 -c:v libx264 -crf 23 -c:a aac -b:a 128k output.mp4
+
+# 转换为 WebM
+ffmpeg -i input.mp4 -c:v libvpx-vp9 -crf 30 -b:v 0 -c:a libopus output.webm
+```
+
+## 小结
+
+这篇文章介绍了 HTML5 多媒体标签：
+
+- **video**：视频播放，支持 controls、autoplay、muted、loop、poster、preload
+- **audio**：音频播放，用法类似 video
+- **source**：多格式支持
+- **track**：字幕和章节
+- **JavaScript API**：播放控制、事件监听
+
+关键点：
+
+- 提供多种格式以保证兼容性
+- 使用 preload="metadata" 优化加载
+- 静音才能自动播放
+- 提供字幕保证无障碍访问
+
+下一篇会介绍 Canvas 绑图。
