@@ -37,6 +37,7 @@ html:has(#bg-rose) {
 body {
   overflow-x: hidden;
   overflow-y: scroll;
+  padding-top: 5.5rem;
 }
 
 ::selection {
