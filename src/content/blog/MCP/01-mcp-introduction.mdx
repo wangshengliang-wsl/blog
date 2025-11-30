@@ -1,0 +1,242 @@
+---
+title: MCP入门：AI应用与外部世界的标准桥梁
+description: 介绍Model Context Protocol的核心概念、架构设计与应用场景，帮助开发者理解MCP如何解决AI应用的上下文隔离问题
+pubDate: 2025-12-01
+toc: true
+ogImage: true
+category: MCP
+---
+
+大模型很强，但它有一个根本性的限制：**无法直接访问外部世界**。
+
+ChatGPT 不知道你本地文件的内容，Claude 读不了你的数据库，DeepSeek 也无法调用你公司的内部 API。每次对话，大模型都像一个被关在房间里的天才——聪明，但与外界隔绝。
+
+MCP（Model Context Protocol）就是来解决这个问题的。
+
+## 问题的本质
+
+假设你在用 Claude Desktop 处理工作，想让它帮你：
+
+- 读取本地的项目文档
+- 查询数据库里的用户数据
+- 调用内部的翻译 API
+
+传统方案怎么做？每个 AI 应用都要单独对接这些数据源和工具。Claude Desktop 要写一套集成代码，Cursor 要写一套，VS Code 里的 AI 插件又要写一套。数据源和工具那边也一样——要接入 N 个 AI 应用，就要写 N 套适配代码。
+
+这就是典型的 **M×N 问题**：M 个 AI 应用对接 N 个数据源/工具，需要 M×N 种集成方式。
+
+MCP 的思路是：定义一套标准协议，让所有 AI 应用和所有数据源/工具都按这个标准来通信。M 个应用 + N 个工具，只需要 M+N 种实现。
+
+## MCP 是什么
+
+MCP 全称 Model Context Protocol，Anthropic 在 2024 年 11 月开源的协议规范。一句话概括：
+
+> MCP 定义了 AI 应用与外部程序之间的通信标准。
+
+这里有两个关键词：
+
+**AI 应用**：能与大模型交互的应用程序，比如 Claude Desktop、Cursor、VS Code 的 AI 插件。MCP 称之为 Host。
+
+**外部程序**：提供数据或功能的服务，比如文件系统、数据库、第三方 API 的封装。MCP 称之为 Server。
+
+MCP 不关心你用什么大模型、什么编程语言，它只规定通信的格式和流程。只要双方都遵循 MCP 协议，就能无缝对接。
+
+## 架构：四个角色
+
+MCP 的架构包含四个核心角色：
+
+![](https://raw.githubusercontent.com/wangshengliang-wsl/blog/main/img/_-%20visual%20selection.png)
+
+**Host**：宿主应用，用户直接交互的 AI 应用程序。Claude Desktop、Cursor 都是 Host。Host 负责管理用户会话、调用大模型、协调各个 Client。
+
+**Client**：客户端，Host 内部创建的连接管理器。每连接一个 MCP Server，Host 就会创建一个 Client 实例来负责通信。用户感知不到 Client 的存在。
+
+**Server**：服务端，提供具体能力的外部程序。一个 Server 可以提供文件读写能力，另一个提供数据库查询能力。Server 是开发者主要编写的部分。
+
+**Transport**：传输层，Client 和 Server 之间的通信方式。目前支持两种：
+
+- **stdio**：标准输入输出，适合本地进程通信，高效简洁
+- **HTTP with SSE**：基于 HTTP 的流式传输，适合远程服务
+
+## 通信流程
+
+以 Claude Desktop 连接一个本地 MCP Server 为例，完整流程是这样的：
+
+![](https://raw.githubusercontent.com/wangshengliang-wsl/blog/main/img/mcp-transport-process.png)
+
+这里有个容易混淆的点：**工具是谁调用的？**
+
+答案是：Client 调用的，不是大模型。大模型只接收输入、产出输出，它没有能力执行代码。当大模型认为需要某个工具时，它只是在回复中表明意图，真正执行工具的是 Host 里的 Client。
+
+## 三大核心能力
+
+MCP Server 可以向 AI 应用暴露三种能力：
+
+### Tools（工具）
+
+让大模型能够**执行操作**。
+
+```json
+{
+  "name": "get_weather",
+  "description": "获取指定城市的天气信息",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "city": { "type": "string", "description": "城市名称" }
+    },
+    "required": ["city"]
+  }
+}
+```
+
+Tools 是最常用的能力。文件读写、API 调用、数据库操作，都可以封装成 Tool。大模型会根据用户意图自动决定是否调用以及传入什么参数。
+
+### Resources（资源）
+
+让大模型能够**读取数据**。
+
+```json
+{
+  "uri": "file:///project/config.json",
+  "name": "项目配置文件",
+  "mimeType": "application/json"
+}
+```
+
+Resources 和 Tools 的区别在于：Tools 是动作（读文件、写数据库），Resources 是静态数据（配置文件、文档内容）。Resources 通过 URI 标识，支持模板化访问。
+
+### Prompts（提示词模板）
+
+预定义的提示词，可复用。
+
+```json
+{
+  "name": "code-review",
+  "description": "代码审查提示词模板",
+  "arguments": [
+    { "name": "language", "description": "编程语言" },
+    { "name": "code", "description": "待审查的代码" }
+  ]
+}
+```
+
+Prompts 用于标准化常见任务的提示词，比如代码审查、文档生成。用户可以直接选择模板，而不用每次手写提示词。
+
+## 与 Function Calling 的区别
+
+熟悉 OpenAI API 的开发者可能会问：这不就是 Function Calling 吗？
+
+有联系，但不一样。
+
+**Function Calling** 是大模型层面的能力。你在 API 请求中定义 functions，大模型在回复中告诉你它想调用哪个 function、传什么参数。但 function 的具体执行，你得自己写代码处理。
+
+**MCP** 是应用层面的协议。它规定了 AI 应用和外部服务如何通信，包括连接建立、能力发现、工具调用的完整流程。MCP Server 不止能提供 Tools，还有 Resources 和 Prompts。
+
+可以这样理解：Function Calling 是大模型表达"我想调用某个函数"的能力，MCP 是让这个调用真正执行起来的基础设施。
+
+一个形象的类比：
+
+- Function Calling 像是手机上的"打电话"按钮
+- MCP 像是电信运营商的通信协议
+
+按钮告诉系统你想打电话，协议负责把电话真正接通。
+
+## 通信格式
+
+MCP 基于 JSON-RPC 2.0 协议。看两个典型的消息：
+
+**请求（调用工具）**：
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "get_weather",
+    "arguments": { "city": "北京" }
+  }
+}
+```
+
+**响应（返回结果）**：
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [{ "type": "text", "text": "北京：晴，25°C" }]
+  }
+}
+```
+
+JSON-RPC 的好处是简单通用，任何语言都能轻松解析和生成。
+
+## 应用场景
+
+MCP 的应用场景非常广泛：
+
+**开发工具集成**：Cursor、VS Code 等 IDE 通过 MCP 连接代码分析、文档检索、测试执行等服务。
+
+**企业知识库**：将公司内部文档、Wiki、代码仓库通过 MCP Server 暴露给 AI，实现智能问答。
+
+**自动化工作流**：连接 Slack、Jira、GitHub 等服务，让 AI 助手自动处理日常任务。
+
+**数据分析**：通过 MCP 连接数据库，让 AI 直接查询和分析数据。
+
+目前支持 MCP 的 AI 应用包括：
+
+- Claude Desktop（官方客户端）
+- Cursor（AI 代码编辑器）
+- Continue（VS Code/JetBrains AI 插件）
+- Zed（新一代代码编辑器）
+
+## 动手体验
+
+想快速体验 MCP？最简单的方式是在 Claude Desktop 中配置一个官方示例 Server。
+
+找到 Claude Desktop 的配置文件：
+
+- macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- Windows: `%APPDATA%\Claude\claude_desktop_config.json`
+
+添加配置：
+
+```json
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "/Users/你的用户名/Documents"
+      ]
+    }
+  }
+}
+```
+
+重启 Claude Desktop，你就可以让 Claude 直接读取和操作 Documents 目录下的文件了。
+
+## 这个系列会讲什么
+
+这是 MCP 系列的第一篇，后续文章会深入每个主题：
+
+- **第 2 篇**：从零搭建 MCP Server，用 TypeScript SDK 实现一个完整的工具服务
+- **第 3 篇**：深入 Tools，掌握参数校验、错误处理、异步操作
+- **第 4 篇**：Resources 资源管理，学习 URI 设计和资源模板
+- **第 5 篇**：Prompts 与资源订阅，实现实时数据同步
+- **第 6 篇**：远程通信，使用 HTTP 部署可公网访问的 MCP Server
+- **第 7 篇**：MCP Client 开发，将 MCP 能力集成到自己的 AI 应用
+- **第 8 篇**：生产实践，安全、性能与部署策略
+
+每篇都会有可运行的代码示例，不只是概念讲解。
+
+## 参考资料
+
+- [MCP 官方文档](https://modelcontextprotocol.io/)
+- [MCP GitHub 仓库](https://github.com/modelcontextprotocol)
+- [MCP TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk)

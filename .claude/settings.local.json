@@ -10,7 +10,9 @@
       "WebFetch(domain:es6.ruanyifeng.com)",
       "Bash(find:*)",
       "mcp__ide__getDiagnostics",
-      "Bash(pnpm build:*)"
+      "Bash(pnpm build:*)",
+      "Bash(xargs:*)",
+      "WebSearch"
     ],
     "deny": [],
     "ask": []

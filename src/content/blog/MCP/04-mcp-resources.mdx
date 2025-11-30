@@ -1,0 +1,578 @@
+---
+title: MCP Resources：向AI暴露你的数据
+description: 学习如何通过MCP Resources向AI应用暴露文件、数据库记录等上下文数据，掌握直接资源与资源模板的使用方法
+pubDate: 2025-12-07
+toc: true
+ogImage: true
+category: MCP
+---
+
+前面讲的 Tools 让大模型能够**执行操作**。这篇讲 Resources——让大模型能够**访问数据**。
+
+## Resources vs Tools
+
+先搞清楚两者的区别：
+
+| 维度     | Tools                       | Resources                  |
+| -------- | --------------------------- | -------------------------- |
+| 本质     | 动作                        | 数据                       |
+| 触发方式 | 大模型决定何时调用          | 用户或应用主动请求         |
+| 典型场景 | 读写文件、调用API、执行命令 | 暴露配置、文档、数据库记录 |
+| 参数     | 支持复杂参数                | 通过 URI 定位              |
+
+一个形象的比喻：
+
+- Tools 像是遥控器上的按钮，大模型按下按钮触发动作
+- Resources 像是书架上的书，需要时拿来参考
+
+两者可以配合使用。比如，Resources 暴露数据库表结构，Tools 提供 SQL 执行能力。
+
+## 协议规范
+
+Resources 涉及三个协议方法：
+
+### resources/list
+
+获取所有可用资源列表：
+
+```json
+// 请求
+{ "jsonrpc": "2.0", "id": 1, "method": "resources/list" }
+
+// 响应
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "resources": [
+      {
+        "uri": "config://app/settings",
+        "name": "应用配置",
+        "description": "应用的全局配置文件",
+        "mimeType": "application/json"
+      },
+      {
+        "uri": "file:///docs/readme.md",
+        "name": "项目说明",
+        "mimeType": "text/markdown"
+      }
+    ]
+  }
+}
+```
+
+### resources/read
+
+读取指定资源的内容：
+
+```json
+// 请求
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "method": "resources/read",
+  "params": { "uri": "config://app/settings" }
+}
+
+// 响应
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "result": {
+    "contents": [
+      {
+        "uri": "config://app/settings",
+        "mimeType": "application/json",
+        "text": "{\"theme\": \"dark\", \"language\": \"zh-CN\"}"
+      }
+    ]
+  }
+}
+```
+
+### resources/templates/list
+
+获取资源模板列表（用于动态资源）：
+
+```json
+// 请求
+{ "jsonrpc": "2.0", "id": 3, "method": "resources/templates/list" }
+
+// 响应
+{
+  "jsonrpc": "2.0",
+  "id": 3,
+  "result": {
+    "resourceTemplates": [
+      {
+        "uriTemplate": "db://users/{id}",
+        "name": "用户数据",
+        "description": "根据ID获取用户信息",
+        "mimeType": "application/json"
+      }
+    ]
+  }
+}
+```
+
+## URI 设计
+
+Resources 通过 URI 标识，URI 设计很重要。
+
+### 标准 URI 格式
+
+```
+scheme://host/path
+```
+
+比如：
+
+- `file:///Users/name/document.txt` - 本地文件
+- `https://api.example.com/data` - 远程资源
+
+### 自定义 scheme
+
+MCP 允许使用自定义 scheme，让 URI 更有语义：
+
+```
+config://app/database     - 数据库配置
+db://users/123            - ID为123的用户
+log://app/2024-01-15      - 指定日期的日志
+```
+
+### 设计原则
+
+1. **scheme 表示资源类型**：`config://`、`db://`、`log://`
+2. **路径有层次**：`config://app/database` 而不是 `config://app-database`
+3. **参数化用模板**：`db://users/{id}` 而不是写死的 `db://users/123`
+
+## 使用 SDK 注册资源
+
+MCP SDK 提供了 `server.resource()` 方法注册静态资源：
+
+```typescript
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
+
+const server = new McpServer({
+  name: 'config-server',
+  version: '1.0.0',
+})
+
+// 注册一个静态资源
+server.resource(
+  'config://app/settings', // URI
+  '应用配置', // 名称
+  async () => ({
+    // 读取函数
+    contents: [
+      {
+        uri: 'config://app/settings',
+        mimeType: 'application/json',
+        text: JSON.stringify(
+          {
+            theme: 'dark',
+            language: 'zh-CN',
+            notifications: true,
+          },
+          null,
+          2
+        ),
+      },
+    ],
+  })
+)
+```
+
+`server.resource()` 三个参数：
+
+1. URI：资源的唯一标识
+2. 名称：显示给用户的友好名称
+3. 读取函数：返回资源内容的异步函数
+
+## 资源内容格式
+
+资源内容有两种格式：
+
+### 文本内容
+
+适用于文本文件、JSON、XML、Markdown 等：
+
+```typescript
+{
+  uri: 'file:///readme.md',
+  mimeType: 'text/markdown',
+  text: '# 标题\n\n正文内容...',
+}
+```
+
+### 二进制内容
+
+适用于图片、PDF、压缩文件等，使用 Base64 编码：
+
+```typescript
+{
+  uri: 'file:///logo.png',
+  mimeType: 'image/png',
+  blob: 'iVBORw0KGgoAAAANSUhEUgAA...', // Base64
+}
+```
+
+## 资源模板
+
+静态资源适合固定内容，比如配置文件。如果资源是动态的（比如根据 ID 查询用户），就需要**资源模板**。
+
+资源模板使用 RFC 6570 URI 模板语法：
+
+```
+db://users/{id}        - 简单参数
+log://app/{date}       - 日期参数
+file://{path}          - 路径参数
+```
+
+### 注册资源模板
+
+SDK 目前没有直接的 `server.resourceTemplate()` 方法，需要使用底层 API：
+
+```typescript
+import {
+  ListResourceTemplatesRequestSchema,
+  ReadResourceRequestSchema,
+} from '@modelcontextprotocol/sdk/types.js'
+
+// 注册模板列表处理器
+server.setRequestHandler(ListResourceTemplatesRequestSchema, async () => ({
+  resourceTemplates: [
+    {
+      uriTemplate: 'db://users/{id}',
+      name: '用户数据',
+      description: '根据用户ID获取用户信息',
+      mimeType: 'application/json',
+    },
+  ],
+}))
+
+// 注册资源读取处理器
+server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+  const uri = request.params.uri
+
+  // 解析 db://users/{id} 格式的 URI
+  const userMatch = uri.match(/^db:\/\/users\/(\d+)$/)
+  if (userMatch) {
+    const userId = userMatch[1]
+    const user = await fetchUser(userId) // 假设这是查询用户的函数
+
+    return {
+      contents: [
+        {
+          uri,
+          mimeType: 'application/json',
+          text: JSON.stringify(user, null, 2),
+        },
+      ],
+    }
+  }
+
+  throw new Error(`未知资源: ${uri}`)
+})
+```
+
+### URI 模板语法
+
+RFC 6570 定义了几种参数语法：
+
+```
+{var}          - 简单字符串
+{var*}         - 可展开为多个值
+{+var}         - 保留特殊字符（不转义 /）
+{#var}         - 片段（以 # 开头）
+```
+
+实际使用中，`{var}` 最常见。
+
+## 实战：配置管理 Server
+
+整合前面的知识，实现一个配置文件管理 Server：
+
+```typescript
+// src/index.ts
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
+import {
+  ListResourceTemplatesRequestSchema,
+  ReadResourceRequestSchema,
+  ListResourcesRequestSchema,
+} from '@modelcontextprotocol/sdk/types.js'
+import fs from 'fs/promises'
+import path from 'path'
+
+const server = new McpServer({
+  name: 'config-manager',
+  version: '1.0.0',
+})
+
+const CONFIG_DIR = process.env.CONFIG_DIR || './config'
+
+// 支持的配置文件类型
+const CONFIG_TYPES: Record<string, { ext: string; mime: string }> = {
+  json: { ext: '.json', mime: 'application/json' },
+  yaml: { ext: '.yaml', mime: 'application/x-yaml' },
+  toml: { ext: '.toml', mime: 'application/toml' },
+  env: { ext: '.env', mime: 'text/plain' },
+}
+
+// 获取所有配置文件
+async function listConfigFiles(): Promise<string[]> {
+  try {
+    const files = await fs.readdir(CONFIG_DIR)
+    return files.filter((f) =>
+      Object.values(CONFIG_TYPES).some((type) => f.endsWith(type.ext))
+    )
+  } catch {
+    return []
+  }
+}
+
+// 读取配置文件内容
+async function readConfigFile(filename: string): Promise<string> {
+  const fullPath = path.join(CONFIG_DIR, filename)
+  return fs.readFile(fullPath, 'utf-8')
+}
+
+// 获取文件的 MIME 类型
+function getMimeType(filename: string): string {
+  for (const type of Object.values(CONFIG_TYPES)) {
+    if (filename.endsWith(type.ext)) {
+      return type.mime
+    }
+  }
+  return 'text/plain'
+}
+
+// 静态资源：配置目录信息
+server.resource('config://info', '配置目录信息', async () => {
+  const files = await listConfigFiles()
+  return {
+    contents: [
+      {
+        uri: 'config://info',
+        mimeType: 'application/json',
+        text: JSON.stringify(
+          {
+            directory: CONFIG_DIR,
+            fileCount: files.length,
+            files,
+            supportedTypes: Object.keys(CONFIG_TYPES),
+          },
+          null,
+          2
+        ),
+      },
+    ],
+  }
+})
+
+// 处理资源列表请求
+server.setRequestHandler(ListResourcesRequestSchema, async () => {
+  const files = await listConfigFiles()
+
+  const resources = files.map((file) => ({
+    uri: `config://files/${file}`,
+    name: file,
+    description: `配置文件: ${file}`,
+    mimeType: getMimeType(file),
+  }))
+
+  // 加上静态资源
+  resources.unshift({
+    uri: 'config://info',
+    name: '配置目录信息',
+    description: '显示配置目录的概览信息',
+    mimeType: 'application/json',
+  })
+
+  return { resources }
+})
+
+// 资源模板：按文件名访问
+server.setRequestHandler(ListResourceTemplatesRequestSchema, async () => ({
+  resourceTemplates: [
+    {
+      uriTemplate: 'config://files/{filename}',
+      name: '配置文件',
+      description: '根据文件名读取配置文件内容',
+    },
+  ],
+}))
+
+// 处理资源读取请求
+server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+  const uri = request.params.uri
+
+  // config://info 由 server.resource() 处理，这里处理动态资源
+  const fileMatch = uri.match(/^config:\/\/files\/(.+)$/)
+  if (fileMatch) {
+    const filename = fileMatch[1]
+
+    // 安全检查：防止路径遍历
+    if (filename.includes('..') || filename.includes('/')) {
+      throw new Error('无效的文件名')
+    }
+
+    try {
+      const content = await readConfigFile(filename)
+      return {
+        contents: [
+          {
+            uri,
+            mimeType: getMimeType(filename),
+            text: content,
+          },
+        ],
+      }
+    } catch (error) {
+      throw new Error(`无法读取配置文件: ${filename}`)
+    }
+  }
+
+  throw new Error(`未知资源: ${uri}`)
+})
+
+async function main() {
+  const transport = new StdioServerTransport()
+  await server.connect(transport)
+  console.error(`Config Manager 已启动，配置目录: ${CONFIG_DIR}`)
+}
+
+main().catch(console.error)
+```
+
+这个 Server 提供：
+
+1. **静态资源** `config://info`：配置目录的概览信息
+2. **动态资源** `config://files/{filename}`：按文件名访问具体配置
+
+### 测试准备
+
+创建配置目录和示例文件：
+
+```bash
+mkdir config
+
+# config/app.json
+echo '{"name": "my-app", "version": "1.0.0"}' > config/app.json
+
+# config/database.yaml
+cat > config/database.yaml << 'EOF'
+host: localhost
+port: 5432
+database: mydb
+EOF
+```
+
+### 在 Claude Desktop 中配置
+
+```json
+{
+  "mcpServers": {
+    "config-manager": {
+      "command": "node",
+      "args": ["/path/to/config-manager/dist/index.js"],
+      "env": {
+        "CONFIG_DIR": "/path/to/your/project/config"
+      }
+    }
+  }
+}
+```
+
+重启后，可以这样使用：
+
+- "列出所有配置文件"
+- "读取 app.json 的内容"
+- "database.yaml 里配置的端口是多少？"
+
+## Resources 的使用方式
+
+Resources 和 Tools 的触发方式不同。Tools 由大模型自动决定调用，Resources 需要更主动的方式：
+
+### 方式一：用户在 UI 中选择
+
+Claude Desktop 等客户端会展示可用的 Resources 列表，用户可以点击选择要加载的资源。选中的资源内容会被加入对话上下文。
+
+### 方式二：配合 Tools 使用
+
+定义一个读取资源的 Tool：
+
+```typescript
+server.tool(
+  'load_config',
+  '加载指定的配置文件到对话上下文',
+  { name: z.string().describe('配置文件名') },
+  async ({ name }) => {
+    const content = await readConfigFile(name)
+    return {
+      content: [
+        {
+          type: 'resource',
+          resource: {
+            uri: `config://files/${name}`,
+            mimeType: getMimeType(name),
+            text: content,
+          },
+        },
+      ],
+    }
+  }
+)
+```
+
+这样大模型可以主动决定加载哪个配置。
+
+### 方式三：应用层集成
+
+如果你在开发自己的 AI 应用，可以在应用层面控制何时加载 Resources，比如：
+
+- 打开项目时自动加载项目配置
+- 进入某个工作流时加载相关文档
+- 用户提问涉及特定领域时加载知识库
+
+## Resources 与 Context Window
+
+Resources 的内容会占用大模型的上下文窗口（Context Window）。如果资源内容很大，需要注意：
+
+1. **分页加载**：大文件分段返回
+2. **按需加载**：不要一次性加载所有资源
+3. **摘要优先**：先返回摘要，需要时再返回完整内容
+
+```typescript
+server.resource('log://app/today', '今日日志', async () => {
+  const logs = await readTodayLogs()
+
+  // 如果日志太多，只返回最近 100 条
+  const recent = logs.slice(-100)
+  const summary = `共 ${logs.length} 条日志，显示最近 100 条`
+
+  return {
+    contents: [
+      {
+        uri: 'log://app/today',
+        mimeType: 'text/plain',
+        text: `${summary}\n\n${recent.join('\n')}`,
+      },
+    ],
+  }
+})
+```
+
+## 下一步
+
+Resources 用于静态数据暴露。下一篇讲两个主题：
+
+1. **Prompts**：预定义的提示词模板
+2. **资源订阅**：当资源内容变化时通知客户端
+
+## 参考
+
+- [MCP Resources 规范](https://modelcontextprotocol.io/docs/concepts/resources)
+- [RFC 6570 URI Template](https://www.rfc-editor.org/rfc/rfc6570)

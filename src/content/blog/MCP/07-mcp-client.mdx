@@ -1,0 +1,731 @@
+---
+title: 构建MCP Client：打造你的AI应用
+description: 学习如何开发MCP Client，实现与多个MCP Server的连接管理，将MCP能力集成到自己的AI应用中
+pubDate: 2025-12-13
+toc: true
+ogImage: true
+category: MCP
+---
+
+前几篇都在讲 Server 端开发。这篇换个视角——如何开发 MCP Client，把 MCP 的能力集成到自己的 AI 应用中。
+
+## Host 与 Client 的关系
+
+先回顾一下 MCP 架构中的角色：
+
+```
+┌─────────────────────────────────────────────┐
+│                   Host                       │
+│              (你的 AI 应用)                   │
+│                                              │
+│   ┌──────────┐  ┌──────────┐  ┌──────────┐  │
+│   │ Client 1 │  │ Client 2 │  │ Client 3 │  │
+│   └────┬─────┘  └────┬─────┘  └────┬─────┘  │
+└────────┼─────────────┼─────────────┼────────┘
+         │             │             │
+    ┌────┴────┐   ┌────┴────┐   ┌────┴────┐
+    │ Server  │   │ Server  │   │ Server  │
+    └─────────┘   └─────────┘   └─────────┘
+```
+
+- **Host**：你的 AI 应用，负责用户交互、调用大模型、协调各个 Client
+- **Client**：连接管理器，每个 Client 负责与一个 Server 通信
+- **Server**：提供 Tools、Resources、Prompts 的服务
+
+开发 MCP Client 就是让你的应用能够：
+
+1. 连接 MCP Server
+2. 发现 Server 提供的能力
+3. 调用 Tools、读取 Resources、使用 Prompts
+4. 把这些能力整合到大模型对话中
+
+## Client SDK 基础
+
+MCP TypeScript SDK 提供了 `Client` 类：
+
+```typescript
+import { Client } from '@modelcontextprotocol/sdk/client/index.js'
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
+
+// 创建 Client
+const client = new Client({
+  name: 'my-ai-app',
+  version: '1.0.0',
+})
+
+// 创建 Transport（启动 Server 进程）
+const transport = new StdioClientTransport({
+  command: 'node',
+  args: ['./path/to/server.js'],
+})
+
+// 连接
+await client.connect(transport)
+
+// 现在可以调用 Server 的能力了
+```
+
+### 连接本地 Server（stdio）
+
+stdio 方式会启动 Server 作为子进程：
+
+```typescript
+import { spawn } from 'child_process'
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
+
+const transport = new StdioClientTransport({
+  command: 'node',
+  args: ['./server/dist/index.js'],
+  env: {
+    ...process.env,
+    CONFIG_DIR: '/path/to/config',
+  },
+})
+```
+
+### 连接远程 Server（HTTP）
+
+HTTP 方式连接远程 Server：
+
+```typescript
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
+
+const transport = new StreamableHTTPClientTransport(
+  new URL('https://mcp-server.example.com/mcp')
+)
+```
+
+## 发现与调用能力
+
+连接建立后，可以发现和使用 Server 的能力。
+
+### 列出工具
+
+```typescript
+const toolsResult = await client.listTools()
+
+console.log('可用工具:')
+for (const tool of toolsResult.tools) {
+  console.log(`- ${tool.name}: ${tool.description}`)
+}
+```
+
+### 调用工具
+
+```typescript
+const result = await client.callTool({
+  name: 'get_weather',
+  arguments: { city: '北京' },
+})
+
+// result.content 是返回内容数组
+for (const item of result.content) {
+  if (item.type === 'text') {
+    console.log(item.text)
+  }
+}
+```
+
+### 列出资源
+
+```typescript
+const resourcesResult = await client.listResources()
+
+for (const resource of resourcesResult.resources) {
+  console.log(`- ${resource.uri}: ${resource.name}`)
+}
+```
+
+### 读取资源
+
+```typescript
+const resource = await client.readResource({
+  uri: 'config://app/settings',
+})
+
+for (const content of resource.contents) {
+  if (content.text) {
+    console.log(content.text)
+  }
+}
+```
+
+### 列出提示词
+
+```typescript
+const promptsResult = await client.listPrompts()
+
+for (const prompt of promptsResult.prompts) {
+  console.log(`- ${prompt.name}: ${prompt.description}`)
+}
+```
+
+### 获取提示词内容
+
+```typescript
+const prompt = await client.getPrompt({
+  name: 'code-review',
+  arguments: {
+    language: 'TypeScript',
+    code: 'function add(a, b) { return a + b }',
+  },
+})
+
+// prompt.messages 是填充后的消息数组
+```
+
+## 与大模型集成
+
+关键问题：**如何让大模型使用 MCP Tools？**
+
+思路是把 MCP Tools 转换成大模型的 Function Calling 格式。
+
+### 转换 Tools 格式
+
+以 OpenAI 为例：
+
+```typescript
+import OpenAI from 'openai'
+
+// MCP Tool 转 OpenAI Function
+function mcpToolToOpenAIFunction(tool: Tool): OpenAI.ChatCompletionTool {
+  return {
+    type: 'function',
+    function: {
+      name: tool.name,
+      description: tool.description || '',
+      parameters: tool.inputSchema as any,
+    },
+  }
+}
+
+// 获取所有工具并转换
+const toolsResult = await client.listTools()
+const openaiTools = toolsResult.tools.map(mcpToolToOpenAIFunction)
+```
+
+### 处理大模型的工具调用
+
+```typescript
+const openai = new OpenAI()
+
+async function chat(messages: OpenAI.ChatCompletionMessageParam[]) {
+  const response = await openai.chat.completions.create({
+    model: 'gpt-4',
+    messages,
+    tools: openaiTools,
+  })
+
+  const choice = response.choices[0]
+
+  // 检查是否需要调用工具
+  if (choice.finish_reason === 'tool_calls' && choice.message.tool_calls) {
+    const toolResults: OpenAI.ChatCompletionMessageParam[] = []
+
+    for (const toolCall of choice.message.tool_calls) {
+      const { name, arguments: argsStr } = toolCall.function
+      const args = JSON.parse(argsStr)
+
+      // 调用 MCP Tool
+      const result = await client.callTool({ name, arguments: args })
+
+      // 提取文本结果
+      const text = result.content
+        .filter((c): c is { type: 'text'; text: string } => c.type === 'text')
+        .map((c) => c.text)
+        .join('\n')
+
+      toolResults.push({
+        role: 'tool',
+        tool_call_id: toolCall.id,
+        content: text,
+      })
+    }
+
+    // 把工具结果发回给大模型
+    return chat([...messages, choice.message, ...toolResults])
+  }
+
+  return choice.message.content
+}
+```
+
+## 多 Server 管理
+
+实际应用通常需要连接多个 MCP Server。需要解决几个问题：
+
+### 统一管理连接
+
+```typescript
+interface ServerConfig {
+  name: string
+  command: string
+  args: string[]
+  env?: Record<string, string>
+}
+
+class McpManager {
+  private clients = new Map<string, Client>()
+
+  async connect(config: ServerConfig): Promise<void> {
+    const client = new Client({
+      name: 'my-app',
+      version: '1.0.0',
+    })
+
+    const transport = new StdioClientTransport({
+      command: config.command,
+      args: config.args,
+      env: config.env,
+    })
+
+    await client.connect(transport)
+    this.clients.set(config.name, client)
+
+    console.log(`已连接: ${config.name}`)
+  }
+
+  async connectAll(configs: ServerConfig[]): Promise<void> {
+    await Promise.all(configs.map((c) => this.connect(c)))
+  }
+
+  getClient(name: string): Client | undefined {
+    return this.clients.get(name)
+  }
+
+  async disconnectAll(): Promise<void> {
+    for (const [name, client] of this.clients) {
+      await client.close()
+      console.log(`已断开: ${name}`)
+    }
+    this.clients.clear()
+  }
+}
+```
+
+### 聚合所有工具
+
+```typescript
+interface ToolWithSource {
+  tool: Tool
+  serverName: string
+}
+
+class McpManager {
+  // ... 前面的代码
+
+  async getAllTools(): Promise<ToolWithSource[]> {
+    const allTools: ToolWithSource[] = []
+
+    for (const [serverName, client] of this.clients) {
+      const result = await client.listTools()
+      for (const tool of result.tools) {
+        allTools.push({ tool, serverName })
+      }
+    }
+
+    return allTools
+  }
+
+  async callTool(
+    serverName: string,
+    toolName: string,
+    args: Record<string, unknown>
+  ) {
+    const client = this.clients.get(serverName)
+    if (!client) {
+      throw new Error(`Server not found: ${serverName}`)
+    }
+
+    return client.callTool({ name: toolName, arguments: args })
+  }
+}
+```
+
+### 处理工具名冲突
+
+不同 Server 可能有同名工具，需要添加前缀或命名空间：
+
+```typescript
+async getAllToolsWithPrefix(): Promise<Map<string, { client: Client; originalName: string }>> {
+  const toolMap = new Map()
+
+  for (const [serverName, client] of this.clients) {
+    const result = await client.listTools()
+    for (const tool of result.tools) {
+      // 添加 server 名作为前缀
+      const prefixedName = `${serverName}__${tool.name}`
+      toolMap.set(prefixedName, {
+        client,
+        originalName: tool.name,
+      })
+    }
+  }
+
+  return toolMap
+}
+```
+
+## 实战：命令行 AI 助手
+
+整合前面的知识，构建一个可以使用 MCP 工具的命令行 AI 助手：
+
+```typescript
+// src/index.ts
+import { Client } from '@modelcontextprotocol/sdk/client/index.js'
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
+import OpenAI from 'openai'
+import * as readline from 'readline'
+
+// 配置
+const MCP_SERVERS = [
+  {
+    name: 'file-tools',
+    command: 'node',
+    args: ['./servers/file-tools/dist/index.js'],
+    env: { ALLOWED_DIR: process.cwd() },
+  },
+  {
+    name: 'weather',
+    command: 'node',
+    args: ['./servers/weather/dist/index.js'],
+  },
+]
+
+// MCP 管理器
+class McpManager {
+  private clients = new Map<string, Client>()
+  private toolMap = new Map<
+    string,
+    { client: Client; originalName: string; serverName: string }
+  >()
+
+  async initialize(): Promise<void> {
+    for (const config of MCP_SERVERS) {
+      try {
+        const client = new Client({ name: 'cli-assistant', version: '1.0.0' })
+        const transport = new StdioClientTransport({
+          command: config.command,
+          args: config.args,
+          env: { ...process.env, ...config.env },
+        })
+
+        await client.connect(transport)
+        this.clients.set(config.name, client)
+        console.log(`✓ 已连接 ${config.name}`)
+
+        // 收集工具
+        const tools = await client.listTools()
+        for (const tool of tools.tools) {
+          const key = `${config.name}__${tool.name}`
+          this.toolMap.set(key, {
+            client,
+            originalName: tool.name,
+            serverName: config.name,
+          })
+        }
+      } catch (error) {
+        console.error(`✗ 连接 ${config.name} 失败:`, error)
+      }
+    }
+  }
+
+  getOpenAITools(): OpenAI.ChatCompletionTool[] {
+    const tools: OpenAI.ChatCompletionTool[] = []
+
+    for (const [serverName, client] of this.clients) {
+      // 同步获取工具（假设已缓存）
+    }
+
+    // 简化：直接从 toolMap 构建
+    for (const [prefixedName, info] of this.toolMap) {
+      tools.push({
+        type: 'function',
+        function: {
+          name: prefixedName,
+          description: `[${info.serverName}] Tool`, // 实际应用中应该缓存描述
+          parameters: { type: 'object', properties: {} },
+        },
+      })
+    }
+
+    return tools
+  }
+
+  async callTool(
+    prefixedName: string,
+    args: Record<string, unknown>
+  ): Promise<string> {
+    const info = this.toolMap.get(prefixedName)
+    if (!info) {
+      return `错误: 工具 ${prefixedName} 不存在`
+    }
+
+    try {
+      const result = await info.client.callTool({
+        name: info.originalName,
+        arguments: args,
+      })
+
+      return result.content
+        .filter((c): c is { type: 'text'; text: string } => c.type === 'text')
+        .map((c) => c.text)
+        .join('\n')
+    } catch (error) {
+      return `调用失败: ${(error as Error).message}`
+    }
+  }
+
+  async close(): Promise<void> {
+    for (const client of this.clients.values()) {
+      await client.close()
+    }
+  }
+}
+
+// AI 助手
+class Assistant {
+  private openai: OpenAI
+  private mcp: McpManager
+  private messages: OpenAI.ChatCompletionMessageParam[] = []
+  private tools: OpenAI.ChatCompletionTool[] = []
+
+  constructor(mcp: McpManager) {
+    this.openai = new OpenAI()
+    this.mcp = mcp
+  }
+
+  async initialize(): Promise<void> {
+    // 获取所有 MCP 工具
+    await this.refreshTools()
+
+    // 系统提示
+    this.messages.push({
+      role: 'system',
+      content: `你是一个智能助手，可以使用以下工具来帮助用户：
+${this.tools.map((t) => `- ${t.function.name}: ${t.function.description}`).join('\n')}
+
+请根据用户需求选择合适的工具。如果不需要工具，直接回答即可。`,
+    })
+  }
+
+  private async refreshTools(): Promise<void> {
+    // 从 MCP 获取工具列表
+    this.tools = []
+
+    for (const [serverName, client] of (this.mcp as any).clients) {
+      try {
+        const result = await client.listTools()
+        for (const tool of result.tools) {
+          this.tools.push({
+            type: 'function',
+            function: {
+              name: `${serverName}__${tool.name}`,
+              description: tool.description || '',
+              parameters: tool.inputSchema as any,
+            },
+          })
+        }
+      } catch (error) {
+        console.error(`获取 ${serverName} 工具失败`)
+      }
+    }
+  }
+
+  async chat(userMessage: string): Promise<string> {
+    this.messages.push({ role: 'user', content: userMessage })
+
+    while (true) {
+      const response = await this.openai.chat.completions.create({
+        model: 'gpt-4',
+        messages: this.messages,
+        tools: this.tools.length > 0 ? this.tools : undefined,
+      })
+
+      const choice = response.choices[0]
+      const message = choice.message
+
+      this.messages.push(message)
+
+      // 检查是否需要调用工具
+      if (choice.finish_reason === 'tool_calls' && message.tool_calls) {
+        console.log('\n🔧 调用工具中...')
+
+        for (const toolCall of message.tool_calls) {
+          const { name, arguments: argsStr } = toolCall.function
+          const args = JSON.parse(argsStr)
+
+          console.log(`   → ${name}(${JSON.stringify(args)})`)
+
+          const result = await this.mcp.callTool(name, args)
+
+          console.log(
+            `   ← ${result.slice(0, 100)}${result.length > 100 ? '...' : ''}`
+          )
+
+          this.messages.push({
+            role: 'tool',
+            tool_call_id: toolCall.id,
+            content: result,
+          })
+        }
+
+        // 继续让大模型处理工具结果
+        continue
+      }
+
+      // 没有工具调用，返回最终回复
+      return message.content || ''
+    }
+  }
+}
+
+// 主程序
+async function main() {
+  console.log('🤖 AI 助手启动中...\n')
+
+  // 初始化 MCP
+  const mcp = new McpManager()
+  await mcp.initialize()
+
+  // 初始化助手
+  const assistant = new Assistant(mcp)
+  await assistant.initialize()
+
+  console.log('\n✓ 初始化完成，开始对话（输入 exit 退出）\n')
+
+  // 命令行交互
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  })
+
+  const prompt = () => {
+    rl.question('你: ', async (input) => {
+      const trimmed = input.trim()
+
+      if (trimmed.toLowerCase() === 'exit') {
+        console.log('\n再见！')
+        await mcp.close()
+        rl.close()
+        return
+      }
+
+      if (!trimmed) {
+        prompt()
+        return
+      }
+
+      try {
+        const response = await assistant.chat(trimmed)
+        console.log(`\n助手: ${response}\n`)
+      } catch (error) {
+        console.error(`\n错误: ${(error as Error).message}\n`)
+      }
+
+      prompt()
+    })
+  }
+
+  prompt()
+}
+
+main().catch(console.error)
+```
+
+### 依赖
+
+```json
+{
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "openai": "^4.0.0"
+  }
+}
+```
+
+### 使用示例
+
+```bash
+$ node dist/index.js
+
+🤖 AI 助手启动中...
+
+✓ 已连接 file-tools
+✓ 已连接 weather
+
+✓ 初始化完成，开始对话（输入 exit 退出）
+
+你: 帮我看看当前目录有哪些文件
+
+🔧 调用工具中...
+   → file-tools__list_directory({"path":"."})
+   ← 📁 src
+      📁 dist
+      📄 package.json
+      📄 tsconfig.json
+
+助手: 当前目录包含以下内容：
+- src/ - 源代码目录
+- dist/ - 编译输出目录
+- package.json - 项目配置
+- tsconfig.json - TypeScript 配置
+
+你: 北京天气怎么样？
+
+🔧 调用工具中...
+   → weather__get_weather({"city":"北京"})
+   ← 北京天气：晴，25°C，东北风3级
+
+助手: 北京现在天气不错，晴天，气温25°C，有东北风3级，很适合外出活动。
+
+你: exit
+
+再见！
+```
+
+## 错误处理
+
+Client 开发需要处理各种错误情况：
+
+```typescript
+async function safeCallTool(
+  client: Client,
+  name: string,
+  args: Record<string, unknown>
+): Promise<{ success: boolean; result?: string; error?: string }> {
+  try {
+    const result = await client.callTool({ name, arguments: args })
+
+    // 检查工具是否返回错误
+    if (result.isError) {
+      const errorText = result.content
+        .filter((c): c is { type: 'text'; text: string } => c.type === 'text')
+        .map((c) => c.text)
+        .join('\n')
+
+      return { success: false, error: errorText }
+    }
+
+    const text = result.content
+      .filter((c): c is { type: 'text'; text: string } => c.type === 'text')
+      .map((c) => c.text)
+      .join('\n')
+
+    return { success: true, result: text }
+  } catch (error) {
+    // 连接错误、超时等
+    return { success: false, error: (error as Error).message }
+  }
+}
+```
+
+## 下一步
+
+这篇讲了 Client 开发的核心内容。最后一篇会总结 MCP 的最佳实践，包括安全、性能和生产部署。
+
+## 参考
+
+- [MCP Client SDK](https://github.com/modelcontextprotocol/typescript-sdk)
+- [OpenAI Function Calling](https://platform.openai.com/docs/guides/function-calling)
+- [Anthropic Tool Use](https://docs.anthropic.com/en/docs/build-with-claude/tool-use)

@@ -1,0 +1,668 @@
+---
+title: MCP远程通信：从stdio到HTTP
+description: 了解MCP的远程通信机制，使用Streamable HTTP构建可远程访问的MCP Server，实现跨网络的AI能力扩展
+pubDate: 2025-12-11
+toc: true
+ogImage: true
+category: MCP
+---
+
+前面的文章都用 stdio 作为传输层，这只适合本地场景。这篇讲如何通过 HTTP 部署远程 MCP Server。
+
+## Transport 层回顾
+
+MCP 的 Transport 层负责 Client 和 Server 之间的消息传输。目前支持两种方式：
+
+| Transport | 适用场景           | 特点                     |
+| --------- | ------------------ | ------------------------ |
+| stdio     | 本地进程通信       | 高效、简单、无需网络配置 |
+| HTTP      | 远程服务、公网访问 | 需要网络、支持跨机器     |
+
+stdio 的局限性很明显：Client 必须能启动 Server 进程，两者必须在同一台机器上。
+
+如果 MCP Server 需要：
+
+- 部署在服务器上供多人使用
+- 集成到 Web 应用中
+- 跨网络访问内部服务
+
+就需要用 HTTP Transport。
+
+## HTTP Transport 的演进
+
+MCP 的 HTTP Transport 经历了几个版本：
+
+1. **HTTP + SSE**（早期）：请求用 HTTP POST，响应用 SSE 流
+2. **Streamable HTTP**（当前推荐）：更灵活的流式 HTTP 方案
+
+本文以 Streamable HTTP 为主。
+
+## SSE 基础
+
+在深入 Streamable HTTP 之前，先了解 **SSE（Server-Sent Events）**。
+
+SSE 是一种服务器向客户端推送数据的技术。与 WebSocket 的全双工不同，SSE 是单向的（服务器 → 客户端），但更简单、基于 HTTP。
+
+SSE 响应格式：
+
+```
+HTTP/1.1 200 OK
+Content-Type: text/event-stream
+Cache-Control: no-cache
+Connection: keep-alive
+
+data: {"type": "message", "content": "Hello"}
+
+data: {"type": "message", "content": "World"}
+
+event: custom-event
+data: {"foo": "bar"}
+```
+
+特点：
+
+- Content-Type 是 `text/event-stream`
+- 每条消息以 `data: ` 开头
+- 消息之间用空行分隔
+- 可以指定事件类型（`event:`）
+
+## Streamable HTTP 架构
+
+Streamable HTTP 的工作流程：
+
+```
+┌─────────────┐                    ┌─────────────┐
+│   Client    │                    │   Server    │
+│             │                    │             │
+│   ──────────┼───── POST /mcp ───►│             │
+│             │     (JSON-RPC)     │             │
+│             │                    │             │
+│   ◄─────────┼─── SSE Stream ────│             │
+│             │   (responses)      │             │
+└─────────────┘                    └─────────────┘
+```
+
+1. Client 通过 **HTTP POST** 发送 JSON-RPC 请求
+2. Server 通过 **SSE** 返回响应（支持流式）
+3. 连接可以保持，支持服务器主动推送通知
+
+### 会话管理
+
+HTTP 是无状态的，但 MCP 需要会话（比如资源订阅）。Streamable HTTP 通过 session ID 管理会话：
+
+```
+POST /mcp
+Mcp-Session-Id: abc123
+Content-Type: application/json
+
+{"jsonrpc": "2.0", "method": "tools/call", ...}
+```
+
+首次连接时，Server 生成 session ID 并在响应中返回：
+
+```
+Mcp-Session-Id: abc123
+```
+
+后续请求携带这个 ID 来关联会话。
+
+## 使用 SDK 创建 HTTP Server
+
+MCP SDK 提供了 `StreamableHTTPServerTransport`：
+
+```typescript
+// src/index.ts
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
+import { z } from 'zod'
+import express from 'express'
+import { randomUUID } from 'crypto'
+
+const app = express()
+app.use(express.json())
+
+// 创建 MCP Server
+const mcpServer = new McpServer({
+  name: 'remote-tools',
+  version: '1.0.0',
+})
+
+// 注册工具
+mcpServer.tool(
+  'echo',
+  '返回输入的内容',
+  { message: z.string().describe('要回显的消息') },
+  async ({ message }) => ({
+    content: [{ type: 'text', text: `Echo: ${message}` }],
+  })
+)
+
+mcpServer.tool('get_time', '获取当前服务器时间', {}, async () => ({
+  content: [
+    {
+      type: 'text',
+      text: new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' }),
+    },
+  ],
+}))
+
+// 会话管理
+const sessions = new Map<string, StreamableHTTPServerTransport>()
+
+// MCP 端点
+app.post('/mcp', async (req, res) => {
+  // 获取或创建会话
+  let sessionId = req.headers['mcp-session-id'] as string | undefined
+  let transport: StreamableHTTPServerTransport
+
+  if (sessionId && sessions.has(sessionId)) {
+    transport = sessions.get(sessionId)!
+  } else {
+    // 新会话
+    sessionId = randomUUID()
+    transport = new StreamableHTTPServerTransport({
+      sessionId,
+      onsessioninitialized: () => {
+        console.log(`会话已初始化: ${sessionId}`)
+      },
+    })
+
+    sessions.set(sessionId, transport)
+
+    // 连接 MCP Server 到 Transport
+    await mcpServer.connect(transport)
+  }
+
+  // 设置响应头
+  res.setHeader('Mcp-Session-Id', sessionId)
+
+  // 处理请求
+  await transport.handleRequest(req, res, req.body)
+})
+
+// 健康检查
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', sessions: sessions.size })
+})
+
+// 启动服务器
+const PORT = process.env.PORT || 3000
+app.listen(PORT, () => {
+  console.log(`MCP HTTP Server 运行在 http://localhost:${PORT}`)
+  console.log(`MCP 端点: POST http://localhost:${PORT}/mcp`)
+})
+```
+
+### 依赖安装
+
+```bash
+pnpm add @modelcontextprotocol/sdk express zod
+pnpm add -D typescript @types/node @types/express
+```
+
+### 运行
+
+```bash
+pnpm build
+node dist/index.js
+# MCP HTTP Server 运行在 http://localhost:3000
+```
+
+## 测试 HTTP Server
+
+用 curl 测试：
+
+```bash
+# 初始化连接
+curl -X POST http://localhost:3000/mcp \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test"}}}'
+
+# 响应会包含 Mcp-Session-Id 头
+
+# 列出工具（带 session ID）
+curl -X POST http://localhost:3000/mcp \
+  -H "Content-Type: application/json" \
+  -H "Mcp-Session-Id: <上一步返回的ID>" \
+  -d '{"jsonrpc":"2.0","id":2,"method":"tools/list"}'
+
+# 调用工具
+curl -X POST http://localhost:3000/mcp \
+  -H "Content-Type: application/json" \
+  -H "Mcp-Session-Id: <session-id>" \
+  -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"echo","arguments":{"message":"Hello MCP!"}}}'
+```
+
+## 处理 CORS
+
+如果 Client 是浏览器应用，需要处理跨域：
+
+```typescript
+import cors from 'cors'
+
+app.use(
+  cors({
+    origin: ['http://localhost:5173', 'https://your-app.com'],
+    methods: ['POST', 'GET', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Mcp-Session-Id'],
+    exposedHeaders: ['Mcp-Session-Id'],
+  })
+)
+```
+
+## 认证与安全
+
+生产环境需要添加认证：
+
+### API Key 认证
+
+```typescript
+const API_KEY = process.env.API_KEY
+
+app.use('/mcp', (req, res, next) => {
+  const authHeader = req.headers.authorization
+
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Missing API key' })
+  }
+
+  const key = authHeader.slice(7)
+  if (key !== API_KEY) {
+    return res.status(403).json({ error: 'Invalid API key' })
+  }
+
+  next()
+})
+```
+
+### JWT 认证
+
+```typescript
+import jwt from 'jsonwebtoken'
+
+const JWT_SECRET = process.env.JWT_SECRET!
+
+app.use('/mcp', (req, res, next) => {
+  const token = req.headers.authorization?.replace('Bearer ', '')
+
+  if (!token) {
+    return res.status(401).json({ error: 'Missing token' })
+  }
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET)
+    req.user = decoded // 附加用户信息
+    next()
+  } catch {
+    return res.status(403).json({ error: 'Invalid token' })
+  }
+})
+```
+
+## 会话管理进阶
+
+基础示例用 Map 存储会话，生产环境需要更完善的管理：
+
+```typescript
+interface Session {
+  id: string
+  transport: StreamableHTTPServerTransport
+  createdAt: number
+  lastActiveAt: number
+  userId?: string
+}
+
+const sessions = new Map<string, Session>()
+
+// 会话超时清理
+const SESSION_TIMEOUT = 30 * 60 * 1000 // 30分钟
+
+setInterval(() => {
+  const now = Date.now()
+  for (const [id, session] of sessions) {
+    if (now - session.lastActiveAt > SESSION_TIMEOUT) {
+      console.log(`会话超时清理: ${id}`)
+      sessions.delete(id)
+    }
+  }
+}, 60 * 1000) // 每分钟检查
+
+// 更新活跃时间
+app.post('/mcp', async (req, res) => {
+  const sessionId = req.headers['mcp-session-id'] as string
+  const session = sessions.get(sessionId)
+
+  if (session) {
+    session.lastActiveAt = Date.now()
+  }
+
+  // ... 其余处理逻辑
+})
+```
+
+## 完整的生产级 Server
+
+整合前面的内容，一个生产级的 HTTP MCP Server：
+
+```typescript
+// src/index.ts
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
+import { z } from 'zod'
+import express, { Request, Response, NextFunction } from 'express'
+import cors from 'cors'
+import { randomUUID } from 'crypto'
+
+// 配置
+const config = {
+  port: parseInt(process.env.PORT || '3000'),
+  apiKey: process.env.API_KEY,
+  sessionTimeout: 30 * 60 * 1000,
+  corsOrigins: process.env.CORS_ORIGINS?.split(',') || ['*'],
+}
+
+// 会话类型
+interface Session {
+  id: string
+  transport: StreamableHTTPServerTransport
+  mcpServer: McpServer
+  createdAt: number
+  lastActiveAt: number
+}
+
+const sessions = new Map<string, Session>()
+
+// Express 应用
+const app = express()
+app.use(express.json({ limit: '10mb' }))
+app.use(
+  cors({
+    origin: config.corsOrigins,
+    methods: ['POST', 'GET', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Mcp-Session-Id'],
+    exposedHeaders: ['Mcp-Session-Id'],
+  })
+)
+
+// 日志中间件
+app.use((req, res, next) => {
+  const start = Date.now()
+  res.on('finish', () => {
+    console.log(
+      `${req.method} ${req.path} ${res.statusCode} ${Date.now() - start}ms`
+    )
+  })
+  next()
+})
+
+// 认证中间件
+function authMiddleware(req: Request, res: Response, next: NextFunction) {
+  if (!config.apiKey) {
+    return next() // 未配置 API Key 则跳过认证
+  }
+
+  const authHeader = req.headers.authorization
+  if (!authHeader?.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Missing API key' })
+  }
+
+  if (authHeader.slice(7) !== config.apiKey) {
+    return res.status(403).json({ error: 'Invalid API key' })
+  }
+
+  next()
+}
+
+// 创建 MCP Server 工厂函数
+function createMcpServer(): McpServer {
+  const server = new McpServer({
+    name: 'remote-tools',
+    version: '1.0.0',
+  })
+
+  // 注册工具
+  server.tool(
+    'echo',
+    '返回输入的内容',
+    { message: z.string().describe('要回显的消息') },
+    async ({ message }) => ({
+      content: [{ type: 'text', text: `Echo: ${message}` }],
+    })
+  )
+
+  server.tool(
+    'get_time',
+    '获取当前服务器时间',
+    {
+      timezone: z
+        .string()
+        .default('Asia/Shanghai')
+        .describe('时区，如 Asia/Shanghai'),
+    },
+    async ({ timezone }) => ({
+      content: [
+        {
+          type: 'text',
+          text: new Date().toLocaleString('zh-CN', { timeZone: timezone }),
+        },
+      ],
+    })
+  )
+
+  server.tool(
+    'calculate',
+    '执行简单的数学计算',
+    {
+      expression: z.string().describe('数学表达式，如 2+2, 10*5'),
+    },
+    async ({ expression }) => {
+      // 安全的表达式求值（仅允许数字和运算符）
+      if (!/^[\d\s+\-*/().]+$/.test(expression)) {
+        return {
+          content: [{ type: 'text', text: '不支持的表达式格式' }],
+          isError: true,
+        }
+      }
+
+      try {
+        const result = Function(`"use strict"; return (${expression})`)()
+        return {
+          content: [{ type: 'text', text: `${expression} = ${result}` }],
+        }
+      } catch {
+        return {
+          content: [{ type: 'text', text: '计算错误' }],
+          isError: true,
+        }
+      }
+    }
+  )
+
+  return server
+}
+
+// MCP 端点
+app.post('/mcp', authMiddleware, async (req, res) => {
+  try {
+    let sessionId = req.headers['mcp-session-id'] as string | undefined
+    let session: Session | undefined
+
+    if (sessionId) {
+      session = sessions.get(sessionId)
+    }
+
+    if (!session) {
+      // 创建新会话
+      sessionId = randomUUID()
+      const mcpServer = createMcpServer()
+      const transport = new StreamableHTTPServerTransport({
+        sessionId,
+      })
+
+      session = {
+        id: sessionId,
+        transport,
+        mcpServer,
+        createdAt: Date.now(),
+        lastActiveAt: Date.now(),
+      }
+
+      sessions.set(sessionId, session)
+      await mcpServer.connect(transport)
+
+      console.log(`新会话创建: ${sessionId}`)
+    } else {
+      session.lastActiveAt = Date.now()
+    }
+
+    res.setHeader('Mcp-Session-Id', sessionId!)
+    await session.transport.handleRequest(req, res, req.body)
+  } catch (error) {
+    console.error('MCP 请求处理错误:', error)
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Internal server error' })
+    }
+  }
+})
+
+// 删除会话端点
+app.delete('/mcp/sessions/:sessionId', authMiddleware, (req, res) => {
+  const { sessionId } = req.params
+  if (sessions.delete(sessionId)) {
+    res.json({ message: 'Session deleted' })
+  } else {
+    res.status(404).json({ error: 'Session not found' })
+  }
+})
+
+// 健康检查
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    uptime: process.uptime(),
+    sessions: sessions.size,
+    memory: process.memoryUsage(),
+  })
+})
+
+// 会话统计
+app.get('/stats', authMiddleware, (req, res) => {
+  const stats = Array.from(sessions.values()).map((s) => ({
+    id: s.id,
+    createdAt: new Date(s.createdAt).toISOString(),
+    lastActiveAt: new Date(s.lastActiveAt).toISOString(),
+    age: Date.now() - s.createdAt,
+  }))
+
+  res.json({ sessions: stats })
+})
+
+// 会话超时清理
+setInterval(() => {
+  const now = Date.now()
+  let cleaned = 0
+
+  for (const [id, session] of sessions) {
+    if (now - session.lastActiveAt > config.sessionTimeout) {
+      sessions.delete(id)
+      cleaned++
+    }
+  }
+
+  if (cleaned > 0) {
+    console.log(`清理了 ${cleaned} 个过期会话`)
+  }
+}, 60 * 1000)
+
+// 优雅关闭
+process.on('SIGTERM', () => {
+  console.log('收到 SIGTERM，准备关闭...')
+  sessions.clear()
+  process.exit(0)
+})
+
+// 启动
+app.listen(config.port, () => {
+  console.log(`MCP HTTP Server 启动`)
+  console.log(`端口: ${config.port}`)
+  console.log(`认证: ${config.apiKey ? '已启用' : '未启用'}`)
+  console.log(`会话超时: ${config.sessionTimeout / 1000}秒`)
+})
+```
+
+## 部署
+
+### Docker 部署
+
+```dockerfile
+# Dockerfile
+FROM node:20-slim
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm ci --only=production
+
+COPY dist ./dist
+
+ENV NODE_ENV=production
+ENV PORT=3000
+
+EXPOSE 3000
+
+CMD ["node", "dist/index.js"]
+```
+
+```yaml
+# docker-compose.yml
+version: '3.8'
+services:
+  mcp-server:
+    build: .
+    ports:
+      - '3000:3000'
+    environment:
+      - API_KEY=${API_KEY}
+      - CORS_ORIGINS=https://your-app.com
+    restart: unless-stopped
+```
+
+### 反向代理（Nginx）
+
+```nginx
+server {
+    listen 443 ssl http2;
+    server_name mcp.your-domain.com;
+
+    ssl_certificate /path/to/cert.pem;
+    ssl_certificate_key /path/to/key.pem;
+
+    location /mcp {
+        proxy_pass http://localhost:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header Connection '';
+        proxy_buffering off;
+        proxy_cache off;
+
+        # SSE 支持
+        proxy_read_timeout 86400s;
+        proxy_send_timeout 86400s;
+    }
+
+    location /health {
+        proxy_pass http://localhost:3000;
+    }
+}
+```
+
+## 下一步
+
+这篇讲了如何部署 HTTP MCP Server。下一篇换个角度——如何开发 MCP Client，把 MCP 能力集成到自己的 AI 应用中。
+
+## 参考
+
+- [MCP Transports 规范](https://modelcontextprotocol.io/docs/concepts/transports)
+- [Server-Sent Events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events)
+- [Express.js](https://expressjs.com/)
