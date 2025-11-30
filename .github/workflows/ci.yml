@@ -15,6 +15,7 @@ on:
 
 permissions:
   contents: read
+  deployments: write
 
 jobs:
   ci:
@@ -78,3 +79,11 @@ jobs:
           else
             echo "Build succeeded! 🎉"
           fi
+
+      - name: 🚀 Deploy to Cloudflare Pages
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist --project-name=blog

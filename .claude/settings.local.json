@@ -13,7 +13,8 @@
       "Bash(pnpm build:*)",
       "Bash(xargs:*)",
       "WebSearch",
-      "Bash(node --version:*)"
+      "Bash(node --version:*)",
+      "Bash(rm:*)"
     ],
     "deny": [],
     "ask": []
