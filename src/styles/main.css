@@ -14,13 +14,13 @@
 
 /* 导航栏磨砂玻璃效果 */
 .nav-header {
-  background: rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.3);
   backdrop-filter: saturate(180%) blur(12px);
   -webkit-backdrop-filter: saturate(180%) blur(12px);
 }
 
 .dark .nav-header {
-  background: rgba(5, 5, 5, 0.8);
+  background: rgba(5, 5, 5, 0.3);
 }
 
 html {
@@ -69,8 +69,7 @@ body {
   }
 
   #search-results,
-  #nav-panel,
-  #toc-panel {
+  #nav-panel {
     scrollbar-width: none;
   }
 }
