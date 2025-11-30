@@ -9,7 +9,7 @@
     "sync": "astro sync",
     "dev": "astro dev --open",
     "check": "astro check",
-    "build": "./scripts/build.sh",
+    "build": "astro build",
     "preview": "astro preview",
     "format": "prettier . --check --ignore-unknown",
     "format:write": "prettier . --write --ignore-unknown --cache",
@@ -18,7 +18,8 @@
     "toolbar:on": "astro preferences enable devToolbar",
     "toolbar:off": "astro preferences disable devToolbar",
     "prepare": "simple-git-hooks",
-    "postbuild": "pagefind --site dist --exclude-selectors \"pre\" --include-characters \"<>\" && del-cli \"dist/pagefind/*ui*\""
+    "postbuild": "pagefind --site dist --exclude-selectors \"pre\" --include-characters \"<>\" && del-cli \"dist/pagefind/*ui*\"",
+    "deploy": "pnpm build && wrangler pages deploy dist --project-name=blog"
   },
   "devDependencies": {
     "@ascorbic/feed-loader": "^1.0.4",

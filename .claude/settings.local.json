@@ -12,7 +12,8 @@
       "mcp__ide__getDiagnostics",
       "Bash(pnpm build:*)",
       "Bash(xargs:*)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(node --version:*)"
     ],
     "deny": [],
     "ask": []
