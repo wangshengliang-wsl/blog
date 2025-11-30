@@ -34,6 +34,7 @@ export default defineConfig({
   },
   vite: {
     server: {
+      allowedHosts: ['blog.local', '.localcan.dev'],
       headers: {
         // Enable CORS for dev: allow Giscus iframe to load local styles
         'Access-Control-Allow-Origin': '*',
