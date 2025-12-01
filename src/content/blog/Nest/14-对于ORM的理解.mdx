@@ -1,11 +1,14 @@
 ---
 title: 对于ORM的理解
-description: 对于ORM的理解
+description: 深入理解 ORM 概念与 TypeORM 框架，掌握实体定义、关系映射、CRUD 操作及 Nest 集成
 pubDate: 2025-10-14
 toc: true
 ogImage: true
 category: Nest
+tags: [NestJS, TypeORM, ORM, MySQL]
 ---
+
+> **环境信息**：Node.js 20.x、TypeORM 0.3.x、MySQL 8.x、@nestjs/typeorm 10.x
 
 ## 一、对于ORM的理解
 
@@ -47,7 +50,7 @@ name = p.first_name
 
 一比较就可以发现，ORM 使用对象，封装了数据库操作，因此可以不碰 SQL 语言。开发者只使用面向对象编程，与数据对象直接交互，不用关心底层数据库。
 
-总结起来，ORM 有下面这些优点。
+ORM 有下面这些优点：
 
 > - 数据模型都在一个地方定义，更容易更新和维护，也利于重用代码。
 > - ORM 有现成的工具，很多功能都可以自动完成，比如数据消毒、预处理、事务等等。
@@ -949,7 +952,7 @@ export class AppModule {}
 >
 > 由于docker中mysql数据库我们并没有处理时区问题，这样存储进去的时间类型，反馈给前端的时候就会出现东8区的时间差问题。
 
-上面的代码通过**forRoot**方法在根模块（AppModule）中注册了TypeORM模块。这样可以使得TypeORM服务在应用程序的各个模块中都可以共享使用。
+上面的代码通过**forRoot**方法在根模块（AppModule）中注册了TypeORM模块。这样可以使得TypeORM服务在应用程序的各个模块中都可以共享使用，**不过需要注意，这里需要node版本在20以上**。
 
 完善一下`User`实体，新增一些字段
 
@@ -967,7 +970,20 @@ export class User {
   @Column()
   sex: string
 
-  @Column()
+  @Column({
+    type: 'timestamp',
+    transformer: {
+      to: (value: string | Date): Date => {
+        if (typeof value === 'string') {
+          return new Date(`${value}T00:00:00.000Z`)
+        }
+        return value
+      },
+      from: (value: Date): Date => {
+        return value
+      },
+    },
+  })
   birthday: Date
 }
 ```

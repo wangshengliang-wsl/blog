@@ -57,10 +57,24 @@ const specHeadings = generateToc(headings, minHeadingLevel, maxHeadingLevel)
       }}
       {style}
     >
-      <a href="/blog/" class="back-to-list-link" title="返回列表">
-        <span class="i-ri-arrow-left-line"></span>
-        <span>返回列表</span>
-      </a>
+      <div class="toc-search-box">
+        <button type="button" class="toc-search-trigger" aria-label="搜索">
+          <span class="i-ri-search-line"></span>
+        </button>
+        <input
+          type="text"
+          class="toc-search-input"
+          placeholder="搜索目录..."
+          autocomplete="off"
+        />
+        <button
+          type="button"
+          class="toc-search-clear hidden"
+          aria-label="清除搜索"
+        >
+          <span class="i-ri-close-line"></span>
+        </button>
+      </div>
       <div class="toc-desktop-anchor i-ri-menu-2-fill"></div>
       <ul>
         {
@@ -91,6 +105,9 @@ const specHeadings = generateToc(headings, minHeadingLevel, maxHeadingLevel)
     #currentActiveHeading: Element | null = null
     #previousActiveLinks: HTMLAnchorElement[] = []
 
+    #searchTimeout: ReturnType<typeof setTimeout> | null = null
+    readonly #DEBOUNCE_DELAY = 300
+
     connectedCallback() {
       this.#onIdle(() => this.#init())
     }
@@ -102,6 +119,9 @@ const specHeadings = generateToc(headings, minHeadingLevel, maxHeadingLevel)
     #init = () => {
       this.#minH = this.#getHeadingLevel(this.dataset.minH)
       this.#maxH = this.#getHeadingLevel(this.dataset.maxH)
+
+      // 设置搜索功能
+      this.#setupSearch()
 
       // map heading elements to their corresponding toc links
       const tocLinks = this.#getElements('a', false) as HTMLAnchorElement[]
@@ -235,6 +255,84 @@ const specHeadings = generateToc(headings, minHeadingLevel, maxHeadingLevel)
       this.#headingMapToc.clear()
       this.#currentActiveHeading = null
       this.#previousActiveLinks = []
+      if (this.#searchTimeout) {
+        clearTimeout(this.#searchTimeout)
+        this.#searchTimeout = null
+      }
+    }
+
+    // 防抖函数
+    #debounce = (fn: () => void) => {
+      if (this.#searchTimeout) {
+        clearTimeout(this.#searchTimeout)
+      }
+      this.#searchTimeout = setTimeout(fn, this.#DEBOUNCE_DELAY)
+    }
+
+    #setupSearch = () => {
+      const searchBox = this.querySelector('.toc-search-box')
+      const searchTrigger = this.querySelector('.toc-search-trigger')
+      const searchInput = this.querySelector(
+        '.toc-search-input'
+      ) as HTMLInputElement
+      const clearBtn = this.querySelector('.toc-search-clear')
+
+      if (!searchInput) return
+
+      const expand = () => {
+        searchBox?.classList.add('expanded')
+        setTimeout(() => searchInput.focus(), 50)
+      }
+
+      const collapse = () => {
+        if (!searchInput.value) {
+          searchBox?.classList.remove('expanded')
+        }
+      }
+
+      searchTrigger?.addEventListener('click', (e) => {
+        e.stopPropagation()
+        expand()
+      })
+
+      searchInput.addEventListener('focus', () => {
+        searchBox?.classList.add('expanded')
+      })
+
+      searchInput.addEventListener('blur', () => {
+        setTimeout(collapse, 150)
+      })
+
+      searchInput.addEventListener('input', () => {
+        this.#debounce(() => {
+          this.#filterToc(searchInput.value.trim())
+        })
+        clearBtn?.classList.toggle('hidden', !searchInput.value)
+      })
+
+      clearBtn?.addEventListener('click', (e) => {
+        e.stopPropagation()
+        searchInput.value = ''
+        clearBtn.classList.add('hidden')
+        this.#filterToc('')
+        searchBox?.classList.remove('expanded')
+      })
+    }
+
+    #filterToc = (keyword: string) => {
+      const lowerKeyword = keyword.toLowerCase()
+      const tocItems = this.querySelectorAll('ul > li')
+
+      tocItems.forEach((item) => {
+        const link = item.querySelector('a')
+        const text = link?.textContent || ''
+
+        if (!keyword || text.toLowerCase().includes(lowerKeyword)) {
+          item.classList.remove('toc-search-no-match')
+        } else {
+          item.classList.add('toc-search-no-match')
+        }
+      })
     }
   }
 

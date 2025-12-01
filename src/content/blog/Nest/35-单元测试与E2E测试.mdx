@@ -1,0 +1,290 @@
+---
+title: 单元测试与E2E测试
+description: 在 NestJS 中编写单元测试和端到端测试，使用 Jest 进行 Service 和 Controller 的测试
+pubDate: 2025-10-14
+toc: true
+ogImage: true
+category: Nest
+tags: [NestJS, Jest, 单元测试, E2E测试]
+---
+
+> **环境信息**：Node.js 20.x、Jest 29.x、@nestjs/testing 10.x
+
+## 测试的必要性
+
+在生产环境中，代码的稳定性至关重要。通过编写测试用例，可以：
+
+- 在部署前发现潜在问题
+- 重构代码时确保功能不变
+- 作为代码文档，说明函数的预期行为
+
+NestJS 默认集成了 Jest 测试框架，创建项目时已经配置好测试环境。
+
+## 单元测试
+
+单元测试针对单个函数或类进行测试，隔离外部依赖。
+
+### 测试 Service
+
+创建一个简单的 UserService：
+
+```typescript
+// user.service.ts
+@Injectable()
+export class UserService {
+  private users = [
+    { id: 1, name: 'jack' },
+    { id: 2, name: 'rose' },
+  ]
+
+  findAll() {
+    return this.users
+  }
+
+  findOne(id: number) {
+    return this.users.find((u) => u.id === id)
+  }
+
+  create(name: string) {
+    const user = { id: this.users.length + 1, name }
+    this.users.push(user)
+    return user
+  }
+}
+```
+
+编写测试用例：
+
+```typescript
+// user.service.spec.ts
+import { Test, TestingModule } from '@nestjs/testing'
+import { UserService } from './user.service'
+
+describe('UserService', () => {
+  let service: UserService
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [UserService],
+    }).compile()
+
+    service = module.get<UserService>(UserService)
+  })
+
+  it('should be defined', () => {
+    expect(service).toBeDefined()
+  })
+
+  describe('findAll', () => {
+    it('should return an array of users', () => {
+      const result = service.findAll()
+      expect(result).toBeInstanceOf(Array)
+      expect(result.length).toBeGreaterThan(0)
+    })
+  })
+
+  describe('findOne', () => {
+    it('should return a user by id', () => {
+      const result = service.findOne(1)
+      expect(result).toBeDefined()
+      expect(result.name).toBe('jack')
+    })
+
+    it('should return undefined for non-existent id', () => {
+      const result = service.findOne(999)
+      expect(result).toBeUndefined()
+    })
+  })
+
+  describe('create', () => {
+    it('should create a new user', () => {
+      const result = service.create('tom')
+      expect(result.name).toBe('tom')
+      expect(result.id).toBeDefined()
+    })
+  })
+})
+```
+
+运行测试：
+
+```shell
+pnpm test
+```
+
+### Mock 依赖
+
+当 Service 依赖其他模块时，需要 Mock 这些依赖：
+
+```typescript
+// user.service.spec.ts
+import { Test, TestingModule } from '@nestjs/testing'
+import { UserService } from './user.service'
+import { getRepositoryToken } from '@nestjs/typeorm'
+import { User } from './entities/user.entity'
+
+describe('UserService', () => {
+  let service: UserService
+
+  const mockRepository = {
+    find: jest.fn().mockResolvedValue([{ id: 1, name: 'jack' }]),
+    findOne: jest.fn().mockResolvedValue({ id: 1, name: 'jack' }),
+    save: jest.fn().mockResolvedValue({ id: 1, name: 'jack' }),
+  }
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        UserService,
+        {
+          provide: getRepositoryToken(User),
+          useValue: mockRepository,
+        },
+      ],
+    }).compile()
+
+    service = module.get<UserService>(UserService)
+  })
+
+  it('should find all users', async () => {
+    const result = await service.findAll()
+    expect(result).toEqual([{ id: 1, name: 'jack' }])
+    expect(mockRepository.find).toHaveBeenCalled()
+  })
+})
+```
+
+## E2E 测试
+
+端到端测试模拟真实的 HTTP 请求，测试整个请求流程。
+
+### 配置 E2E 测试
+
+NestJS 项目默认在 `test` 目录下有 E2E 测试配置：
+
+```typescript
+// test/app.e2e-spec.ts
+import { Test, TestingModule } from '@nestjs/testing'
+import { INestApplication } from '@nestjs/common'
+import * as request from 'supertest'
+import { AppModule } from './../src/app.module'
+
+describe('AppController (e2e)', () => {
+  let app: INestApplication
+
+  beforeEach(async () => {
+    const moduleFixture: TestingModule = await Test.createTestingModule({
+      imports: [AppModule],
+    }).compile()
+
+    app = moduleFixture.createNestApplication()
+    await app.init()
+  })
+
+  afterAll(async () => {
+    await app.close()
+  })
+
+  it('/ (GET)', () => {
+    return request(app.getHttpServer())
+      .get('/')
+      .expect(200)
+      .expect('Hello World!')
+  })
+})
+```
+
+### 测试 CRUD 接口
+
+```typescript
+describe('UserController (e2e)', () => {
+  let app: INestApplication
+
+  beforeAll(async () => {
+    const moduleFixture: TestingModule = await Test.createTestingModule({
+      imports: [AppModule],
+    }).compile()
+
+    app = moduleFixture.createNestApplication()
+    await app.init()
+  })
+
+  afterAll(async () => {
+    await app.close()
+  })
+
+  it('/user (GET)', () => {
+    return request(app.getHttpServer())
+      .get('/user')
+      .expect(200)
+      .expect((res) => {
+        expect(Array.isArray(res.body)).toBe(true)
+      })
+  })
+
+  it('/user (POST)', () => {
+    return request(app.getHttpServer())
+      .post('/user')
+      .send({ name: 'tom', age: 25 })
+      .expect(201)
+      .expect((res) => {
+        expect(res.body.name).toBe('tom')
+      })
+  })
+
+  it('/user/:id (GET)', () => {
+    return request(app.getHttpServer())
+      .get('/user/1')
+      .expect(200)
+      .expect((res) => {
+        expect(res.body.id).toBe(1)
+      })
+  })
+})
+```
+
+运行 E2E 测试：
+
+```shell
+pnpm test:e2e
+```
+
+## 测试覆盖率
+
+查看测试覆盖率：
+
+```shell
+pnpm test:cov
+```
+
+会生成覆盖率报告，显示哪些代码被测试覆盖，哪些没有。
+
+## 常用断言方法
+
+Jest 提供了丰富的断言方法：
+
+```typescript
+// 相等判断
+expect(value).toBe(expected) // 严格相等
+expect(value).toEqual(expected) // 深度相等
+
+// 类型判断
+expect(value).toBeDefined()
+expect(value).toBeUndefined()
+expect(value).toBeNull()
+expect(value).toBeTruthy()
+expect(value).toBeFalsy()
+
+// 数组判断
+expect(array).toContain(item)
+expect(array).toHaveLength(length)
+
+// 异步测试
+await expect(promise).resolves.toBe(value)
+await expect(promise).rejects.toThrow(Error)
+
+// 函数调用
+expect(mockFn).toHaveBeenCalled()
+expect(mockFn).toHaveBeenCalledWith(arg)
+expect(mockFn).toHaveBeenCalledTimes(times)
+```

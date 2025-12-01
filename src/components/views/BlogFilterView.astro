@@ -30,14 +30,6 @@ interface PostWithReadTime {
 const postsWithReadTime: PostWithReadTime[] = []
 let globalIdx = 0
 
-// 用于 TOC 的文章数据
-interface TocPostData {
-  title: string
-  slug: string
-  category: string
-}
-const tocPostsData: TocPostData[] = []
-
 for (const [category, posts] of categorizedBlogItems) {
   for (const post of posts) {
     const { remarkPluginFrontmatter } = await render(post)
@@ -49,12 +41,6 @@ for (const [category, posts] of categorizedBlogItems) {
       category,
       globalIdx: globalIdx++,
     })
-    // 收集 TOC 数据
-    tocPostsData.push({
-      title: post.data.title,
-      slug: post.id,
-      category,
-    })
   }
 }
 ---
@@ -63,17 +49,35 @@ for (const [category, posts] of categorizedBlogItems) {
   isEmpty ? (
     <Warning html={WARNING} />
   ) : (
-    <blog-filter-view
-      data-categories={JSON.stringify(categories)}
-      data-posts={JSON.stringify(tocPostsData)}
-    >
+    <blog-filter-view data-categories={JSON.stringify(categories)}>
       {/* 左侧分类导航 - 桌面端 */}
       <aside class="category-sidebar lt-lgp:hidden">
         <nav class="toc-desktop toc-desktop-content" id="blog-filter-toc">
-          <a href="/" class="back-home-link" title="返回首页">
-            <span class="i-ri-arrow-left-line" />
-            <span>返回首页</span>
-          </a>
+          <div class="search-box" id="search-box">
+            <button
+              type="button"
+              class="search-trigger"
+              id="search-trigger"
+              aria-label="搜索"
+            >
+              <span class="i-ri-search-line" />
+            </button>
+            <input
+              type="text"
+              class="search-input"
+              id="sidebar-search-input"
+              placeholder="搜索文章..."
+              autocomplete="off"
+            />
+            <button
+              type="button"
+              class="search-clear hidden"
+              id="search-clear"
+              aria-label="清除搜索"
+            >
+              <span class="i-ri-close-line" />
+            </button>
+          </div>
           <ul id="blog-filter-toc-list" class="category-nav">
             {/* 全部分类选项 */}
             <li class="category-group">
@@ -132,14 +136,38 @@ for (const [category, posts] of categorizedBlogItems) {
         <div class="drawer-overlay" id="drawer-overlay" />
         <div class="drawer-content">
           <div class="drawer-header">
-            <span class="drawer-title">分类导航</span>
+            <div class="search-box mobile-search-box" id="mobile-search-box">
+              <button
+                type="button"
+                class="search-trigger"
+                id="mobile-search-trigger"
+                aria-label="搜索"
+              >
+                <span class="i-ri-search-line" />
+              </button>
+              <input
+                type="text"
+                class="search-input"
+                id="mobile-sidebar-search-input"
+                placeholder="搜索文章..."
+                autocomplete="off"
+              />
+              <button
+                type="button"
+                class="search-clear hidden"
+                id="mobile-search-clear"
+                aria-label="清除搜索"
+              >
+                <span class="i-ri-close-line" />
+              </button>
+            </div>
             <button
               type="button"
               class="drawer-close"
               id="drawer-close"
-              aria-label="关闭"
+              aria-label="收起"
             >
-              <span class="i-ri-close-line text-xl" />
+              <span class="i-ri-arrow-left-s-line text-xl" />
             </button>
           </div>
           <ul class="category-nav mobile-nav">
@@ -221,37 +249,197 @@ for (const [category, posts] of categorizedBlogItems) {
 }
 
 <style>
-  /* 返回首页按钮 */
-  .back-home-link {
+  /* 搜索框样式 - 使用下划线动画 */
+  .search-box {
+    position: relative;
     display: flex;
     align-items: center;
-    gap: 0.375rem;
-    padding: 0.5rem 0;
     margin-bottom: 0.75rem;
-    font-size: 0.875rem;
-    color: inherit;
-    text-decoration: none;
-    opacity: 0.8;
-    transition: opacity 0.2s;
-    border-bottom: 1px solid rgba(125, 125, 125, 0.15);
+    height: 2rem;
   }
 
-  .back-home-link:hover {
+  /* 下划线效果 */
+  .search-box::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 2rem;
+    right: 0;
+    height: 1px;
+    background: currentColor;
+    opacity: 0.2;
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .search-box.expanded::after {
+    transform: scaleX(1);
+  }
+
+  /* 搜索触发按钮 */
+  .search-trigger {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    cursor: pointer;
+    opacity: 0.5;
+    font-size: 1rem;
+    border-radius: 50%;
+    transition:
+      opacity 0.2s ease,
+      transform 0.2s ease;
+  }
+
+  .search-trigger:hover {
     opacity: 1;
   }
 
-  .drawer-title {
+  .search-box.expanded .search-trigger {
+    opacity: 0.6;
+    cursor: default;
+    pointer-events: none;
+    transform: scale(0.9);
+  }
+
+  /* 搜索输入框 */
+  .search-input {
+    position: absolute;
+    left: 2rem;
+    right: 1.5rem;
+    border: none;
+    background: transparent;
+    font-size: 0.8125rem;
+    color: inherit;
+    outline: none;
+    padding: 0.25rem 0;
+    opacity: 0;
+    transform: translateX(-8px);
+    pointer-events: none;
+    transition:
+      opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+      transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .search-box.expanded .search-input {
+    opacity: 1;
+    transform: translateX(0);
+    pointer-events: auto;
+  }
+
+  .search-input::placeholder {
+    opacity: 0.4;
+    color: inherit;
+  }
+
+  /* 清除按钮 */
+  .search-clear {
+    position: absolute;
+    right: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    background: none;
+    border: none;
+    cursor: pointer;
+    opacity: 0;
+    font-size: 0.75rem;
+    transform: scale(0.8);
+    transition:
+      opacity 0.2s ease,
+      transform 0.2s ease;
+  }
+
+  .search-box.expanded .search-clear:not(.hidden) {
+    opacity: 0.5;
+    transform: scale(1);
+  }
+
+  .search-clear:hover {
+    opacity: 1 !important;
+  }
+
+  .search-clear.hidden {
+    display: none;
+  }
+
+  /* 移动端搜索框 */
+  .mobile-search-box {
+    flex: 1;
+    margin-right: 0.5rem;
+    margin-bottom: 0;
+  }
+
+  .mobile-search-box::after {
+    left: 1.75rem;
+  }
+
+  .mobile-search-box .search-trigger {
+    width: 1.75rem;
+    height: 1.75rem;
     font-size: 0.9rem;
-    font-weight: 500;
-    opacity: 0.8;
+  }
+
+  .mobile-search-box .search-input {
+    left: 1.75rem;
+    font-size: 0.875rem;
+  }
+
+  /* 搜索匹配项高亮 */
+  .search-no-match {
+    display: none !important;
+  }
+
+  .search-match-highlight {
+    background: rgba(255, 200, 0, 0.3);
+    border-radius: 2px;
   }
 
   /* 分类导航样式 */
   .category-nav {
     list-style: none;
     padding: 0;
-    padding-right: 0.5rem;
+    padding-right: 0.75rem;
     margin: 0;
+    overflow-y: auto;
+    max-height: calc(100vh - 10rem);
+    scrollbar-width: thin;
+    scrollbar-color: rgba(125, 125, 125, 0.3) transparent;
+  }
+
+  /* Webkit 滚动条样式 */
+  .category-nav::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  .category-nav::-webkit-scrollbar-track {
+    background: transparent;
+    border-radius: 2px;
+  }
+
+  .category-nav::-webkit-scrollbar-thumb {
+    background: rgba(125, 125, 125, 0.25);
+    border-radius: 2px;
+    transition: background 0.2s;
+  }
+
+  .category-nav::-webkit-scrollbar-thumb:hover {
+    background: rgba(125, 125, 125, 0.4);
+  }
+
+  :global(.dark) .category-nav::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+  }
+
+  :global(.dark) .category-nav::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.25);
   }
 
   .category-group {
@@ -465,6 +653,8 @@ for (const [category, posts] of categorizedBlogItems) {
   class BlogFilterView extends HTMLElement {
     private categories: string[] = []
     private expandedCategories: Set<string> = new Set<string>()
+    private searchTimeout: ReturnType<typeof setTimeout> | null = null
+    private readonly DEBOUNCE_DELAY = 300
 
     connectedCallback() {
       this.categories = JSON.parse(this.dataset.categories || '[]')
@@ -474,8 +664,214 @@ for (const [category, posts] of categorizedBlogItems) {
     private init() {
       this.setupCategoryHeaders()
       this.setupDrawer()
+      this.setupSearch()
       this.restoreCategoryFromStorage()
       this.restoreExpandedFromStorage()
+    }
+
+    // 防抖函数
+    private debounce(fn: () => void) {
+      if (this.searchTimeout) {
+        clearTimeout(this.searchTimeout)
+      }
+      this.searchTimeout = setTimeout(fn, this.DEBOUNCE_DELAY)
+    }
+
+    private setupSearch() {
+      // 桌面端搜索
+      const searchBox = document.querySelector('#search-box')
+      const searchTrigger = document.querySelector('#search-trigger')
+      const desktopInput = document.querySelector(
+        '#sidebar-search-input'
+      ) as HTMLInputElement
+      const desktopClear = document.querySelector('#search-clear')
+
+      // 移动端搜索
+      const mobileSearchBox = document.querySelector('#mobile-search-box')
+      const mobileSearchTrigger = document.querySelector(
+        '#mobile-search-trigger'
+      )
+      const mobileInput = document.querySelector(
+        '#mobile-sidebar-search-input'
+      ) as HTMLInputElement
+      const mobileClear = document.querySelector('#mobile-search-clear')
+
+      // 通用的搜索框展开/收起逻辑
+      const setupSearchBox = (
+        box: Element | null,
+        trigger: Element | null,
+        input: HTMLInputElement | null,
+        clearBtn: Element | null,
+        otherInput: HTMLInputElement | null,
+        otherClearBtn: Element | null
+      ) => {
+        if (!box || !input) return
+
+        const expand = () => {
+          box.classList.add('expanded')
+          setTimeout(() => input.focus(), 50)
+        }
+
+        const collapse = () => {
+          if (!input.value) {
+            box.classList.remove('expanded')
+          }
+        }
+
+        trigger?.addEventListener('click', (e) => {
+          e.stopPropagation()
+          expand()
+        })
+
+        input.addEventListener('focus', expand)
+        input.addEventListener('blur', () => setTimeout(collapse, 150))
+
+        input.addEventListener('input', () => {
+          this.debounce(() => {
+            this.filterBySearch(input.value.trim())
+          })
+          // 同步另一个输入框
+          if (otherInput) otherInput.value = input.value
+          // 显示/隐藏清除按钮
+          const showClear = !!input.value
+          clearBtn?.classList.toggle('hidden', !showClear)
+          otherClearBtn?.classList.toggle('hidden', !showClear)
+        })
+
+        clearBtn?.addEventListener('click', (e) => {
+          e.stopPropagation()
+          input.value = ''
+          if (otherInput) otherInput.value = ''
+          clearBtn.classList.add('hidden')
+          otherClearBtn?.classList.add('hidden')
+          this.filterBySearch('')
+          box.classList.remove('expanded')
+        })
+      }
+
+      // 设置桌面端搜索框
+      setupSearchBox(
+        searchBox,
+        searchTrigger,
+        desktopInput,
+        desktopClear,
+        mobileInput,
+        mobileClear
+      )
+      // 设置移动端搜索框
+      setupSearchBox(
+        mobileSearchBox,
+        mobileSearchTrigger,
+        mobileInput,
+        mobileClear,
+        desktopInput,
+        desktopClear
+      )
+    }
+
+    private filterBySearch(keyword: string) {
+      const lowerKeyword = keyword.toLowerCase()
+
+      // 过滤侧边栏的分类和文章
+      this.filterSidebarBySearch(lowerKeyword)
+
+      // 过滤主内容区的文章
+      this.filterPostsBySearch(lowerKeyword)
+    }
+
+    private filterSidebarBySearch(keyword: string) {
+      const categoryGroups = this.querySelectorAll('.category-group')
+
+      categoryGroups.forEach((group) => {
+        const header = group.querySelector('.category-header') as HTMLElement
+        const category = header?.dataset.category
+
+        // "全部"选项特殊处理
+        if (category === 'all') {
+          if (!keyword) {
+            group.classList.remove('search-no-match')
+          } else {
+            group.classList.add('search-no-match')
+          }
+          return
+        }
+
+        const categoryName =
+          header?.querySelector('.category-name')?.textContent || ''
+        const postLinks = group.querySelectorAll('.post-link')
+        let hasMatch = false
+        let matchCount = 0
+
+        // 检查分类名是否匹配
+        if (categoryName.toLowerCase().includes(keyword)) {
+          hasMatch = true
+        }
+
+        // 检查文章标题是否匹配
+        postLinks.forEach((link) => {
+          const title = link.textContent || ''
+          if (!keyword || title.toLowerCase().includes(keyword)) {
+            ;(link as HTMLElement).parentElement?.classList.remove(
+              'search-no-match'
+            )
+            if (keyword) matchCount++
+            hasMatch = true
+          } else {
+            ;(link as HTMLElement).parentElement?.classList.add(
+              'search-no-match'
+            )
+          }
+        })
+
+        // 显示/隐藏分类组
+        if (!keyword || hasMatch) {
+          group.classList.remove('search-no-match')
+          // 如果有搜索关键词且有匹配，自动展开
+          if (keyword && matchCount > 0) {
+            const postsContainer = header?.nextElementSibling as HTMLElement
+            if (postsContainer?.classList.contains('category-posts')) {
+              postsContainer.classList.add('expanded')
+              header?.classList.add('expanded')
+            }
+          }
+        } else {
+          group.classList.add('search-no-match')
+        }
+      })
+    }
+
+    private filterPostsBySearch(keyword: string) {
+      const postItems = this.querySelectorAll('.post-item')
+      const categoryFirstPost = new Map<string, boolean>()
+
+      postItems.forEach((item) => {
+        const itemElement = item as HTMLElement
+        const categorizer = item.querySelector('.toc-heading')
+        const titleElement = item.querySelector('.flex-grow a, .flex-grow span')
+        const title = titleElement?.textContent || ''
+        const itemCategory = itemElement.dataset.category || ''
+
+        if (!keyword || title.toLowerCase().includes(keyword)) {
+          item.classList.remove('hidden')
+          // 显示分类标题（如果是该分类的第一篇可见文章）
+          if (categorizer) {
+            if (!categoryFirstPost.has(itemCategory)) {
+              categoryFirstPost.set(itemCategory, true)
+              ;(categorizer as HTMLElement).style.display = ''
+            }
+          }
+        } else {
+          item.classList.add('hidden')
+          if (categorizer) {
+            ;(categorizer as HTMLElement).style.display = 'none'
+          }
+        }
+      })
+
+      // 如果有搜索关键词，重置分类筛选到"全部"
+      if (keyword) {
+        localStorage.setItem('blog-filter-category', 'all')
+      }
     }
 
     private setupCategoryHeaders() {

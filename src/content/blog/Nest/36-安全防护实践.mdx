@@ -1,0 +1,282 @@
+---
+title: 安全防护实践
+description: NestJS 安全防护实践，包括 CORS 配置、Helmet 安全头、限流、CSRF 防护等措施
+pubDate: 2025-10-14
+toc: true
+ogImage: true
+category: Nest
+tags: [NestJS, 安全, CORS, Helmet]
+---
+
+> **环境信息**：Node.js 20.x、helmet 7.x、@nestjs/throttler 5.x
+
+## CORS 跨域配置
+
+浏览器的同源策略会阻止跨域请求，需要在服务端配置 CORS：
+
+```typescript
+// main.ts
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule)
+
+  app.enableCors({
+    origin: ['http://localhost:5173', 'https://example.com'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    credentials: true,
+  })
+
+  await app.listen(3000)
+}
+```
+
+也可以使用通配符允许所有域名（不推荐在生产环境使用）：
+
+```typescript
+app.enableCors({
+  origin: '*',
+})
+```
+
+## Helmet 安全头
+
+Helmet 通过设置 HTTP 响应头来保护应用免受常见的 Web 漏洞攻击：
+
+```shell
+pnpm add helmet -S
+```
+
+```typescript
+// main.ts
+import helmet from 'helmet'
+
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule)
+  app.use(helmet())
+  await app.listen(3000)
+}
+```
+
+Helmet 默认开启以下安全策略：
+
+- Content-Security-Policy：防止 XSS 攻击
+- X-Frame-Options：防止点击劫持
+- X-Content-Type-Options：防止 MIME 类型嗅探
+- Strict-Transport-Security：强制 HTTPS
+
+可以根据需要自定义配置：
+
+```typescript
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"],
+      },
+    },
+  })
+)
+```
+
+## 限流防护
+
+防止恶意用户频繁请求接口，可以使用 Throttler 模块：
+
+```shell
+pnpm add @nestjs/throttler -S
+```
+
+在 AppModule 中配置：
+
+```typescript
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler'
+import { APP_GUARD } from '@nestjs/core'
+
+@Module({
+  imports: [
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60000, // 时间窗口 60 秒
+        limit: 10, // 最多 10 次请求
+      },
+    ]),
+  ],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+  ],
+})
+export class AppModule {}
+```
+
+对特定接口跳过限流：
+
+```typescript
+import { SkipThrottle } from '@nestjs/throttler'
+
+@SkipThrottle()
+@Get('public')
+getPublicData() {
+  return 'public data'
+}
+```
+
+自定义接口限流规则：
+
+```typescript
+import { Throttle } from '@nestjs/throttler'
+
+@Throttle({ default: { limit: 3, ttl: 60000 } })
+@Post('login')
+login() {
+  // 登录接口每分钟最多 3 次
+}
+```
+
+## 参数校验
+
+使用 ValidationPipe 配合 class-validator 校验请求参数：
+
+```shell
+pnpm add class-validator class-transformer -S
+```
+
+全局启用校验：
+
+```typescript
+// main.ts
+import { ValidationPipe } from '@nestjs/common'
+
+app.useGlobalPipes(
+  new ValidationPipe({
+    whitelist: true, // 过滤非 DTO 定义的属性
+    forbidNonWhitelisted: true, // 存在非白名单属性时报错
+    transform: true, // 自动转换类型
+  })
+)
+```
+
+定义 DTO 校验规则：
+
+```typescript
+import { IsString, IsEmail, MinLength, IsOptional } from 'class-validator'
+
+export class CreateUserDto {
+  @IsString()
+  @MinLength(2)
+  name: string
+
+  @IsEmail()
+  email: string
+
+  @IsString()
+  @MinLength(6)
+  password: string
+
+  @IsOptional()
+  @IsString()
+  avatar?: string
+}
+```
+
+## SQL 注入防护
+
+使用 TypeORM 的参数化查询可以有效防止 SQL 注入：
+
+```typescript
+// 安全的写法
+const user = await this.userRepository.findOne({
+  where: { username },
+})
+
+// QueryBuilder 中使用参数
+const users = await this.userRepository
+  .createQueryBuilder('user')
+  .where('user.name = :name', { name })
+  .getMany()
+```
+
+避免直接拼接 SQL 字符串：
+
+```typescript
+// 危险！不要这样写
+const users = await this.userRepository.query(
+  `SELECT * FROM user WHERE name = '${name}'`
+)
+```
+
+## XSS 防护
+
+对用户输入进行转义处理：
+
+```shell
+pnpm add sanitize-html -S
+pnpm add @types/sanitize-html -D
+```
+
+```typescript
+import sanitizeHtml from 'sanitize-html'
+
+@Injectable()
+export class SanitizeService {
+  clean(dirty: string): string {
+    return sanitizeHtml(dirty, {
+      allowedTags: ['b', 'i', 'em', 'strong'],
+      allowedAttributes: {},
+    })
+  }
+}
+```
+
+## 敏感信息保护
+
+不要在响应中暴露敏感信息：
+
+```typescript
+// user.entity.ts
+import { Exclude } from 'class-transformer'
+
+@Entity()
+export class User {
+  @PrimaryGeneratedColumn()
+  id: number
+
+  @Column()
+  name: string
+
+  @Exclude()
+  @Column()
+  password: string
+}
+
+// 使用 ClassSerializerInterceptor
+@UseInterceptors(ClassSerializerInterceptor)
+@Get(':id')
+findOne(@Param('id') id: number) {
+  return this.userService.findOne(id)
+}
+```
+
+## 环境变量管理
+
+敏感配置不要硬编码在代码中：
+
+```typescript
+// .env
+DB_PASSWORD = your_secret_password
+JWT_SECRET = your_jwt_secret
+
+// 使用 ConfigService 读取
+@Injectable()
+export class AuthService {
+  constructor(private configService: ConfigService) {}
+
+  getJwtSecret() {
+    return this.configService.get('JWT_SECRET')
+  }
+}
+```
+
+确保 `.env` 文件已添加到 `.gitignore` 中，避免提交到版本库。
