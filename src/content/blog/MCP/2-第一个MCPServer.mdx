@@ -1,0 +1,360 @@
+---
+title: '搭建第一个 MCP Server'
+description: '使用 TypeScript SDK 从零搭建 MCP Server，注册 Tool 并在 Claude Desktop 中测试，掌握 MCP Server 开发的完整流程'
+pubDate: 2025-12-03
+toc: true
+ogImage: true
+category: 'MCP'
+tags: ['MCP', 'Model Context Protocol', 'TypeScript', 'Server', 'Tool']
+---
+
+上一篇我们了解了 MCP 的核心概念，现在让我们动手搭建第一个 MCP Server。这篇文章将带你完成从项目初始化到在 Claude Desktop 中测试的全过程。
+
+## 🎯 目标
+
+创建一个简单的计算器 MCP Server，让 AI 能够执行数学运算。
+
+## 环境准备
+
+**必需环境**：
+
+- Node.js 18+（推荐 20 LTS）
+- pnpm / npm / yarn
+- Claude Desktop（用于测试）
+
+检查 Node.js 版本：
+
+```bash
+node --version  # 应该 >= 18.0.0
+```
+
+## 项目初始化
+
+### 1. 创建项目目录
+
+```bash
+mkdir mcp-calculator && cd mcp-calculator
+pnpm init
+```
+
+### 2. 安装依赖
+
+```bash
+# MCP SDK 和 Zod（用于 schema 验证）
+pnpm add @modelcontextprotocol/sdk zod
+
+# TypeScript 开发依赖
+pnpm add -D typescript @types/node tsx
+```
+
+**依赖说明**：
+
+- `@modelcontextprotocol/sdk` - MCP 官方 TypeScript SDK
+- `zod` - 类型安全的 schema 验证库
+- `tsx` - 直接运行 TypeScript 文件
+
+### 3. 配置 TypeScript
+
+创建 `tsconfig.json`：
+
+```json
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "Node16",
+    "moduleResolution": "Node16",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "outDir": "./dist"
+  },
+  "include": ["src/**/*"]
+}
+```
+
+### 4. 配置 package.json
+
+```json
+{
+  "name": "mcp-calculator",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts"
+  }
+}
+```
+
+## 最小可行 Server
+
+创建 `src/index.ts`：
+
+```typescript
+// src/index.ts
+// Node.js 18+ | @modelcontextprotocol/sdk ^1.0.0
+
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
+import { z } from 'zod'
+
+// 1. 创建 Server 实例
+const server = new McpServer({
+  name: 'calculator',
+  version: '1.0.0',
+})
+
+// 2. 注册一个 Tool
+server.registerTool(
+  'add',
+  {
+    title: '加法计算',
+    description: '计算两个数字的和',
+    inputSchema: {
+      a: z.number().describe('第一个数字'),
+      b: z.number().describe('第二个数字'),
+    },
+    outputSchema: {
+      result: z.number(),
+    },
+  },
+  async ({ a, b }) => {
+    const result = a + b
+    return {
+      content: [{ type: 'text', text: `${a} + ${b} = ${result}` }],
+      structuredContent: { result },
+    }
+  }
+)
+
+// 3. 使用 stdio 传输启动 Server
+const transport = new StdioServerTransport()
+await server.connect(transport)
+console.error('Calculator MCP Server running on stdio')
+```
+
+**代码解析**：
+
+1. **创建 McpServer** - 指定 name 和 version，这些会在客户端显示
+2. **registerTool** - 注册一个名为 `add` 的工具
+   - `inputSchema` 使用 Zod 定义参数类型
+   - `outputSchema` 定义返回结构
+   - 处理函数返回 `content`（给 AI 看的文本）和 `structuredContent`（结构化数据）
+3. **StdioServerTransport** - 使用标准输入输出通信
+
+🔶 **注意**：`console.error` 用于日志输出，因为 `stdout` 被 MCP 协议占用。
+
+## 测试运行
+
+```bash
+pnpm dev
+```
+
+Server 启动后会等待 stdin 输入。现在让我们配置 Claude Desktop 来连接它。
+
+## 配置 Claude Desktop
+
+### 1. 找到配置文件
+
+- **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
+
+### 2. 添加 Server 配置
+
+```json
+{
+  "mcpServers": {
+    "calculator": {
+      "command": "npx",
+      "args": ["tsx", "/完整路径/mcp-calculator/src/index.ts"]
+    }
+  }
+}
+```
+
+或者使用编译后的版本：
+
+```json
+{
+  "mcpServers": {
+    "calculator": {
+      "command": "node",
+      "args": ["/完整路径/mcp-calculator/dist/index.js"]
+    }
+  }
+}
+```
+
+🔶 **注意**：路径必须是绝对路径。
+
+### 3. 重启 Claude Desktop
+
+重启后，在新对话中输入：
+
+> "请帮我计算 123 + 456"
+
+Claude 会识别到可用的 `add` Tool，并调用它完成计算。
+
+## 扩展：完整计算器
+
+让我们添加更多运算：
+
+```typescript
+// src/index.ts
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
+import { z } from 'zod'
+
+const server = new McpServer({
+  name: 'calculator',
+  version: '1.0.0',
+})
+
+// 通用的双参数数学运算 schema
+const mathSchema = {
+  inputSchema: {
+    a: z.number().describe('第一个数字'),
+    b: z.number().describe('第二个数字'),
+  },
+  outputSchema: {
+    result: z.number(),
+  },
+}
+
+// 加法
+server.registerTool(
+  'add',
+  { title: '加法', description: '计算 a + b', ...mathSchema },
+  async ({ a, b }) => {
+    const result = a + b
+    return {
+      content: [{ type: 'text', text: `${a} + ${b} = ${result}` }],
+      structuredContent: { result },
+    }
+  }
+)
+
+// 减法
+server.registerTool(
+  'subtract',
+  { title: '减法', description: '计算 a - b', ...mathSchema },
+  async ({ a, b }) => {
+    const result = a - b
+    return {
+      content: [{ type: 'text', text: `${a} - ${b} = ${result}` }],
+      structuredContent: { result },
+    }
+  }
+)
+
+// 乘法
+server.registerTool(
+  'multiply',
+  { title: '乘法', description: '计算 a × b', ...mathSchema },
+  async ({ a, b }) => {
+    const result = a * b
+    return {
+      content: [{ type: 'text', text: `${a} × ${b} = ${result}` }],
+      structuredContent: { result },
+    }
+  }
+)
+
+// 除法（带错误处理）
+server.registerTool(
+  'divide',
+  { title: '除法', description: '计算 a ÷ b', ...mathSchema },
+  async ({ a, b }) => {
+    if (b === 0) {
+      return {
+        content: [{ type: 'text', text: '错误：除数不能为零' }],
+        isError: true,
+      }
+    }
+    const result = a / b
+    return {
+      content: [{ type: 'text', text: `${a} ÷ ${b} = ${result}` }],
+      structuredContent: { result },
+    }
+  }
+)
+
+// 启动 Server
+const transport = new StdioServerTransport()
+await server.connect(transport)
+console.error('Calculator MCP Server running on stdio')
+```
+
+**新增内容**：
+
+1. **复用 schema** - 避免重复定义相同的输入输出结构
+2. **错误处理** - 除法检查除数为零，返回 `isError: true` 告知 AI 这是错误结果
+3. **完整的四则运算** - AI 现在可以根据用户需求选择合适的运算
+
+## 调试技巧
+
+### 1. 查看 Server 日志
+
+使用 `console.error` 输出日志，可以在 Claude Desktop 的开发者工具中查看。
+
+### 2. MCP Inspector
+
+使用官方的 MCP Inspector 调试工具：
+
+```bash
+npx @modelcontextprotocol/inspector npx tsx src/index.ts
+```
+
+这会打开一个 Web UI，让你可以手动测试 Tools。
+
+### 3. 常见问题
+
+**问题：Claude Desktop 没有显示 Tool**
+
+- 检查配置文件 JSON 语法
+- 确认路径是绝对路径
+- 重启 Claude Desktop
+
+**问题：Tool 调用失败**
+
+- 检查 `console.error` 输出
+- 确认参数类型与 schema 匹配
+
+## 项目结构
+
+完成后的项目结构：
+
+```
+mcp-calculator/
+├── src/
+│   └── index.ts          # Server 主文件
+├── dist/                  # 编译输出
+├── package.json
+├── tsconfig.json
+└── pnpm-lock.yaml
+```
+
+## 小结
+
+这篇文章我们完成了：
+
+✅ 项目初始化与依赖配置
+✅ 使用 McpServer 创建 Server
+✅ 使用 Zod 定义 Tool schema
+✅ 实现 Tool 处理函数
+✅ 配置 Claude Desktop 连接
+✅ 错误处理
+
+下一篇我们将深入探讨 Tool 的高级用法，包括：
+
+- 异步操作与长时间任务
+- 动态 Tool 管理
+- 复杂参数验证
+
+## 参考资料
+
+- [MCP TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk)
+- [Zod 文档](https://zod.dev)
+- [MCP Inspector](https://github.com/modelcontextprotocol/inspector)

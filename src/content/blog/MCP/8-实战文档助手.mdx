@@ -1,0 +1,841 @@
+---
+title: '实战：构建文档助手 MCP Server'
+description: '综合运用 MCP 知识，从零构建一个完整的 Markdown 文档助手，包含文件索引、全文搜索、智能问答等功能'
+pubDate: 2025-12-03
+toc: true
+ogImage: true
+category: 'MCP'
+tags: ['MCP', 'Model Context Protocol', 'TypeScript', '实战', '文档助手']
+---
+
+经过前面 7 篇文章的学习，我们已经掌握了 MCP 的核心概念和 API。这篇文章将综合运用所学知识，从零构建一个完整的 **Markdown 文档助手 MCP Server**。
+
+## 🎯 项目目标
+
+创建一个 MCP Server，让 AI 能够：
+
+- 浏览和读取指定目录下的 Markdown 文档
+- 全文搜索文档内容
+- 基于文档内容回答问题
+- 生成文档摘要
+
+## 功能设计
+
+### Tools（AI 可调用的操作）
+
+| Tool                | 功能             |
+| ------------------- | ---------------- |
+| `search_docs`       | 搜索文档内容     |
+| `get_doc_structure` | 获取文档目录结构 |
+
+### Resources（暴露给 AI 的数据）
+
+| Resource        | 功能             |
+| --------------- | ---------------- |
+| `docs://{path}` | 访问具体文档内容 |
+| `docs://index`  | 文档索引和统计   |
+
+### Prompts（预设交互模板）
+
+| Prompt      | 功能             |
+| ----------- | ---------------- |
+| `summarize` | 生成文档摘要     |
+| `explain`   | 解释文档中的概念 |
+| `qa`        | 基于文档问答     |
+
+## 项目初始化
+
+### 目录结构
+
+```
+mcp-docs-assistant/
+├── src/
+│   ├── index.ts          # 入口文件
+│   ├── server.ts         # MCP Server 定义
+│   ├── tools.ts          # Tools 实现
+│   ├── resources.ts      # Resources 实现
+│   ├── prompts.ts        # Prompts 实现
+│   └── utils/
+│       ├── markdown.ts   # Markdown 处理
+│       └── search.ts     # 搜索功能
+├── package.json
+└── tsconfig.json
+```
+
+### package.json
+
+```json
+{
+  "name": "mcp-docs-assistant",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "mcp-docs-assistant": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "glob": "^10.3.10",
+    "gray-matter": "^4.0.3",
+    "zod": "^3.22.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "tsx": "^4.6.0",
+    "typescript": "^5.3.0"
+  }
+}
+```
+
+### tsconfig.json
+
+```json
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "Node16",
+    "moduleResolution": "Node16",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "declaration": true
+  },
+  "include": ["src/**/*"]
+}
+```
+
+## 核心实现
+
+### 工具函数：Markdown 处理
+
+```typescript
+// src/utils/markdown.ts
+import { readFile } from 'fs/promises'
+import matter from 'gray-matter'
+
+export interface DocMeta {
+  title: string
+  description?: string
+  tags?: string[]
+  date?: string
+}
+
+export interface ParsedDoc {
+  path: string
+  meta: DocMeta
+  content: string
+  headings: string[]
+}
+
+export async function parseMarkdown(filePath: string): Promise<ParsedDoc> {
+  const raw = await readFile(filePath, 'utf-8')
+  const { data, content } = matter(raw)
+
+  // 提取标题
+  const headings = content
+    .split('\n')
+    .filter((line) => line.startsWith('#'))
+    .map((line) => line.replace(/^#+\s*/, ''))
+
+  // 提取 meta
+  const meta: DocMeta = {
+    title: data.title || headings[0] || filePath.split('/').pop() || 'Untitled',
+    description: data.description,
+    tags: data.tags,
+    date: data.date?.toString(),
+  }
+
+  return { path: filePath, meta, content, headings }
+}
+
+export function extractSummary(content: string, maxLength = 200): string {
+  // 移除 Markdown 语法
+  const plain = content
+    .replace(/^#+\s+/gm, '') // 标题
+    .replace(/\*\*|__/g, '') // 粗体
+    .replace(/\*|_/g, '') // 斜体
+    .replace(/`{1,3}[^`]*`{1,3}/g, '') // 代码
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // 链接
+    .replace(/\n+/g, ' ') // 换行
+    .trim()
+
+  if (plain.length <= maxLength) return plain
+  return plain.slice(0, maxLength).trim() + '...'
+}
+```
+
+### 工具函数：搜索功能
+
+```typescript
+// src/utils/search.ts
+import { glob } from 'glob'
+import { parseMarkdown, type ParsedDoc } from './markdown.js'
+
+export interface SearchResult {
+  path: string
+  title: string
+  matches: string[]
+  score: number
+}
+
+export class DocIndex {
+  private docs: ParsedDoc[] = []
+  private baseDir: string
+
+  constructor(baseDir: string) {
+    this.baseDir = baseDir
+  }
+
+  async build(): Promise<void> {
+    const files = await glob('**/*.md', { cwd: this.baseDir, absolute: true })
+
+    this.docs = await Promise.all(files.map((file) => parseMarkdown(file)))
+
+    console.error(`Indexed ${this.docs.length} documents`)
+  }
+
+  search(query: string, limit = 10): SearchResult[] {
+    const queryLower = query.toLowerCase()
+    const queryTerms = queryLower.split(/\s+/).filter((t) => t.length > 1)
+
+    const results: SearchResult[] = []
+
+    for (const doc of this.docs) {
+      const contentLower = doc.content.toLowerCase()
+      const titleLower = doc.meta.title.toLowerCase()
+
+      let score = 0
+      const matches: string[] = []
+
+      // 标题匹配（高权重）
+      for (const term of queryTerms) {
+        if (titleLower.includes(term)) {
+          score += 10
+        }
+      }
+
+      // 内容匹配
+      for (const term of queryTerms) {
+        const regex = new RegExp(term, 'gi')
+        const contentMatches = contentLower.match(regex)
+        if (contentMatches) {
+          score += contentMatches.length
+
+          // 提取上下文
+          const lines = doc.content.split('\n')
+          for (const line of lines) {
+            if (line.toLowerCase().includes(term) && matches.length < 3) {
+              matches.push(line.trim().slice(0, 100))
+            }
+          }
+        }
+      }
+
+      if (score > 0) {
+        results.push({
+          path: doc.path.replace(this.baseDir, '').replace(/^\//, ''),
+          title: doc.meta.title,
+          matches: [...new Set(matches)], // 去重
+          score,
+        })
+      }
+    }
+
+    return results.sort((a, b) => b.score - a.score).slice(0, limit)
+  }
+
+  getDoc(relativePath: string): ParsedDoc | undefined {
+    const fullPath = `${this.baseDir}/${relativePath}`
+    return this.docs.find((d) => d.path === fullPath)
+  }
+
+  getAllDocs(): ParsedDoc[] {
+    return this.docs
+  }
+
+  getStats() {
+    return {
+      totalDocs: this.docs.length,
+      totalWords: this.docs.reduce(
+        (sum, doc) => sum + doc.content.split(/\s+/).length,
+        0
+      ),
+      tags: [...new Set(this.docs.flatMap((d) => d.meta.tags || []))],
+    }
+  }
+}
+```
+
+### Tools 实现
+
+```typescript
+// src/tools.ts
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
+import { z } from 'zod'
+import { DocIndex } from './utils/search.js'
+
+export function registerTools(server: McpServer, index: DocIndex) {
+  // 搜索文档
+  server.registerTool(
+    'search_docs',
+    {
+      title: '搜索文档',
+      description: '在文档库中搜索包含指定关键词的内容',
+      inputSchema: {
+        query: z.string().min(1).describe('搜索关键词'),
+        limit: z
+          .number()
+          .int()
+          .min(1)
+          .max(20)
+          .default(5)
+          .describe('返回结果数量'),
+      },
+      outputSchema: {
+        results: z.array(
+          z.object({
+            path: z.string(),
+            title: z.string(),
+            matches: z.array(z.string()),
+            score: z.number(),
+          })
+        ),
+      },
+    },
+    async ({ query, limit }) => {
+      const results = index.search(query, limit)
+
+      if (results.length === 0) {
+        return {
+          content: [{ type: 'text', text: `未找到与 "${query}" 相关的文档` }],
+          structuredContent: { results: [] },
+        }
+      }
+
+      const text = results
+        .map(
+          (r, i) =>
+            `${i + 1}. **${r.title}** (${r.path})\n   ${r.matches[0] || ''}`
+        )
+        .join('\n\n')
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `找到 ${results.length} 个相关文档：\n\n${text}`,
+          },
+        ],
+        structuredContent: { results },
+      }
+    }
+  )
+
+  // 获取文档结构
+  server.registerTool(
+    'get_doc_structure',
+    {
+      title: '获取文档结构',
+      description: '获取指定文档的标题结构（目录）',
+      inputSchema: {
+        path: z.string().describe('文档路径（相对路径）'),
+      },
+    },
+    async ({ path }) => {
+      const doc = index.getDoc(path)
+
+      if (!doc) {
+        return {
+          content: [{ type: 'text', text: `文档不存在：${path}` }],
+          isError: true,
+        }
+      }
+
+      const structure = doc.headings.map((h, i) => `${i + 1}. ${h}`).join('\n')
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `## ${doc.meta.title}\n\n**目录结构：**\n${structure}`,
+          },
+        ],
+      }
+    }
+  )
+}
+```
+
+### Resources 实现
+
+```typescript
+// src/resources.ts
+import {
+  McpServer,
+  ResourceTemplate,
+} from '@modelcontextprotocol/sdk/server/mcp.js'
+import { DocIndex } from './utils/search.js'
+import { extractSummary } from './utils/markdown.js'
+
+export function registerResources(server: McpServer, index: DocIndex) {
+  // 文档索引
+  server.registerResource(
+    'docs-index',
+    'docs://index',
+    {
+      title: '文档索引',
+      description: '文档库的索引和统计信息',
+      mimeType: 'application/json',
+    },
+    async (uri) => {
+      const stats = index.getStats()
+      const docs = index.getAllDocs().map((d) => ({
+        path: d.path,
+        title: d.meta.title,
+        summary: extractSummary(d.content),
+      }))
+
+      return {
+        contents: [
+          {
+            uri: uri.href,
+            mimeType: 'application/json',
+            text: JSON.stringify({ stats, docs }, null, 2),
+          },
+        ],
+      }
+    }
+  )
+
+  // 单个文档
+  server.registerResource(
+    'doc-content',
+    new ResourceTemplate('docs://{path*}', {
+      list: async () => {
+        const docs = index.getAllDocs()
+        return {
+          resources: docs.map((d) => ({
+            uri: `docs://${d.path.split('/').slice(-1)[0]}`,
+            name: d.meta.title,
+            description: d.meta.description || extractSummary(d.content, 100),
+            mimeType: 'text/markdown',
+          })),
+        }
+      },
+    }),
+    {
+      title: '文档内容',
+      description: '访问具体的文档内容',
+    },
+    async (uri, { path }) => {
+      // 尝试多种路径匹配
+      let doc = index.getDoc(path)
+      if (!doc) {
+        doc = index.getDoc(`${path}.md`)
+      }
+      if (!doc) {
+        // 尝试文件名匹配
+        const docs = index.getAllDocs()
+        doc = docs.find(
+          (d) => d.path.endsWith(`/${path}`) || d.path.endsWith(`/${path}.md`)
+        )
+      }
+
+      if (!doc) {
+        return {
+          contents: [
+            {
+              uri: uri.href,
+              mimeType: 'text/plain',
+              text: `文档不存在：${path}`,
+            },
+          ],
+        }
+      }
+
+      const header = [
+        `# ${doc.meta.title}`,
+        doc.meta.description ? `\n> ${doc.meta.description}` : '',
+        doc.meta.tags?.length ? `\n**标签：** ${doc.meta.tags.join(', ')}` : '',
+        '\n---\n',
+      ]
+        .filter(Boolean)
+        .join('')
+
+      return {
+        contents: [
+          {
+            uri: uri.href,
+            mimeType: 'text/markdown',
+            text: header + doc.content,
+          },
+        ],
+      }
+    }
+  )
+}
+```
+
+### Prompts 实现
+
+```typescript
+// src/prompts.ts
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
+import { z } from 'zod'
+import { DocIndex } from './utils/search.js'
+import { extractSummary } from './utils/markdown.js'
+
+export function registerPrompts(server: McpServer, index: DocIndex) {
+  // 文档摘要
+  server.registerPrompt(
+    'summarize',
+    {
+      title: '文档摘要',
+      description: '生成指定文档的摘要',
+      argsSchema: {
+        path: z.string().describe('文档路径'),
+      },
+    },
+    ({ path }) => {
+      const doc = index.getDoc(path)
+
+      if (!doc) {
+        return {
+          messages: [
+            {
+              role: 'user',
+              content: { type: 'text', text: `文档不存在：${path}` },
+            },
+          ],
+        }
+      }
+
+      return {
+        messages: [
+          {
+            role: 'user',
+            content: {
+              type: 'text',
+              text: `请为以下文档生成一个简洁的摘要（不超过 200 字）：
+
+# ${doc.meta.title}
+
+${doc.content}
+
+要求：
+1. 概括文档的主要内容
+2. 列出关键要点（3-5 个）
+3. 说明目标读者`,
+            },
+          },
+        ],
+      }
+    }
+  )
+
+  // 概念解释
+  server.registerPrompt(
+    'explain',
+    {
+      title: '概念解释',
+      description: '解释文档中的特定概念',
+      argsSchema: {
+        concept: z.string().describe('要解释的概念'),
+        context: z.string().optional().describe('上下文（可选）'),
+      },
+    },
+    ({ concept, context }) => {
+      // 搜索相关文档
+      const results = index.search(concept, 3)
+
+      let docContext = ''
+      if (results.length > 0) {
+        docContext = results
+          .map((r) => {
+            const doc = index.getDoc(r.path)
+            return doc
+              ? `## ${doc.meta.title}\n${extractSummary(doc.content, 500)}`
+              : ''
+          })
+          .filter(Boolean)
+          .join('\n\n')
+      }
+
+      return {
+        messages: [
+          {
+            role: 'user',
+            content: {
+              type: 'text',
+              text: `请解释「${concept}」这个概念。
+
+${docContext ? `以下是相关文档内容供参考：\n\n${docContext}\n\n` : ''}
+${context ? `额外上下文：${context}\n\n` : ''}
+请提供：
+1. 简明定义
+2. 核心要点
+3. 实际应用示例
+4. 常见误区（如有）`,
+            },
+          },
+        ],
+      }
+    }
+  )
+
+  // 文档问答
+  server.registerPrompt(
+    'qa',
+    {
+      title: '文档问答',
+      description: '基于文档内容回答问题',
+      argsSchema: {
+        question: z.string().describe('你的问题'),
+      },
+    },
+    ({ question }) => {
+      // 搜索相关内容
+      const results = index.search(question, 5)
+
+      let context = ''
+      if (results.length > 0) {
+        context = results
+          .map((r) => {
+            const doc = index.getDoc(r.path)
+            if (!doc) return ''
+            return `### ${doc.meta.title}\n${doc.content.slice(0, 1000)}${doc.content.length > 1000 ? '...' : ''}`
+          })
+          .filter(Boolean)
+          .join('\n\n---\n\n')
+      }
+
+      return {
+        messages: [
+          {
+            role: 'user',
+            content: {
+              type: 'text',
+              text: `请根据以下文档内容回答我的问题。
+
+**问题：** ${question}
+
+${context ? `**相关文档：**\n\n${context}` : '**注意：** 未找到相关文档，请基于你的知识回答。'}
+
+请注意：
+1. 如果文档中有答案，请引用具体内容
+2. 如果文档中没有直接答案，请说明
+3. 可以补充文档之外的相关知识`,
+            },
+          },
+        ],
+      }
+    }
+  )
+}
+```
+
+### 主 Server 文件
+
+```typescript
+// src/server.ts
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
+import { DocIndex } from './utils/search.js'
+import { registerTools } from './tools.js'
+import { registerResources } from './resources.js'
+import { registerPrompts } from './prompts.js'
+
+export async function createServer(docsDir: string): Promise<McpServer> {
+  // 创建文档索引
+  const index = new DocIndex(docsDir)
+  await index.build()
+
+  // 创建 MCP Server
+  const server = new McpServer({
+    name: 'docs-assistant',
+    version: '1.0.0',
+  })
+
+  // 注册功能
+  registerTools(server, index)
+  registerResources(server, index)
+  registerPrompts(server, index)
+
+  return server
+}
+```
+
+### 入口文件
+
+```typescript
+#!/usr/bin/env node
+// src/index.ts
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
+import { createServer } from './server.js'
+import { resolve } from 'path'
+
+async function main() {
+  // 从命令行参数或环境变量获取文档目录
+  const docsDir = resolve(process.argv[2] || process.env.DOCS_DIR || './docs')
+
+  console.error(`Docs directory: ${docsDir}`)
+
+  try {
+    const server = await createServer(docsDir)
+    const transport = new StdioServerTransport()
+
+    await server.connect(transport)
+    console.error('MCP Docs Assistant is running')
+  } catch (error) {
+    console.error('Failed to start server:', error)
+    process.exit(1)
+  }
+}
+
+main()
+```
+
+## 配置与测试
+
+### 编译项目
+
+```bash
+pnpm install
+pnpm build
+```
+
+### 配置 Claude Desktop
+
+编辑配置文件：
+
+```json
+{
+  "mcpServers": {
+    "docs-assistant": {
+      "command": "node",
+      "args": [
+        "/path/to/mcp-docs-assistant/dist/index.js",
+        "/path/to/your/docs"
+      ]
+    }
+  }
+}
+```
+
+### 测试用例
+
+重启 Claude Desktop 后，尝试以下对话：
+
+1. **搜索测试**
+
+   > "搜索关于 TypeScript 的文档"
+
+2. **阅读文档**
+
+   > "请读取 README.md 的内容"
+
+3. **问答测试**
+
+   > "根据文档，如何配置 ESLint？"
+
+4. **摘要生成**
+   > "帮我总结一下 API 文档的主要内容"
+
+## 扩展思路
+
+这个基础版本可以继续扩展：
+
+### 1. 增量索引
+
+```typescript
+// 监听文件变化，增量更新索引
+import { watch } from 'fs'
+
+watch(docsDir, { recursive: true }, async (event, filename) => {
+  if (filename?.endsWith('.md')) {
+    await index.updateDoc(filename)
+    // 发送资源变更通知
+    await server.notification({
+      method: 'notifications/resources/list_changed',
+    })
+  }
+})
+```
+
+### 2. 语义搜索
+
+集成向量数据库实现语义搜索：
+
+```typescript
+import { embed } from './utils/embeddings.js'
+import { vectorStore } from './utils/vector-store.js'
+
+async function semanticSearch(query: string) {
+  const queryVector = await embed(query)
+  return vectorStore.search(queryVector, 10)
+}
+```
+
+### 3. 支持更多格式
+
+```typescript
+// 支持 MDX、RST、AsciiDoc 等
+const SUPPORTED_EXTENSIONS = ['.md', '.mdx', '.rst', '.adoc']
+```
+
+### 4. 文档写入
+
+添加 Tool 支持创建/编辑文档：
+
+```typescript
+server.registerTool(
+  'create_doc',
+  {
+    // ...
+  },
+  async ({ path, content }) => {
+    await writeFile(path, content)
+    await index.updateDoc(path)
+    return { content: [{ type: 'text', text: `已创建文档：${path}` }] }
+  }
+)
+```
+
+## 小结
+
+通过这个实战项目，我们综合运用了：
+
+✅ **Tools** - 搜索文档、获取结构
+✅ **Resources** - 暴露文档索引和内容
+✅ **Prompts** - 预设摘要、解释、问答模板
+✅ **Transport** - stdio 传输
+✅ **实用工具** - Markdown 解析、全文搜索
+
+这个文档助手可以作为你自己项目的起点，根据实际需求进行扩展。
+
+## 系列总结
+
+至此，MCP 系列教程全部完成。我们从入门到实战，覆盖了：
+
+1. MCP 基础概念与架构
+2. Server 开发与 Tools 实现
+3. Resources 数据暴露
+4. Prompts 交互模板
+5. Transport 与部署
+6. Client 集成与 LLM 协作
+7. 完整实战项目
+
+希望这个系列能帮助你快速上手 MCP，构建更强大的 AI 应用！
+
+## 参考资料
+
+- [MCP 官方文档](https://modelcontextprotocol.io)
+- [MCP TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk)
+- [官方 Server 示例](https://github.com/modelcontextprotocol/servers)
+- [gray-matter](https://github.com/jonschlinkert/gray-matter) - Frontmatter 解析

@@ -1,0 +1,674 @@
+---
+title: 'MCP Prompts：预定义 AI 交互模板'
+description: '学习 MCP Prompts 的设计与实现，创建可复用的 AI 交互模板，提升用户与 AI 协作效率'
+pubDate: 2025-12-03
+toc: true
+ogImage: true
+category: 'MCP'
+tags: ['MCP', 'Model Context Protocol', 'TypeScript', 'Prompts', 'AI']
+---
+
+Prompt 是 MCP 的第三个核心原语。它让你可以预定义 AI 交互模板，用户只需选择模板并填入参数，就能快速启动特定类型的对话。
+
+## 🎯 Prompt 的作用
+
+想象这些场景：
+
+- 每次让 AI 审查代码都要写一大段说明
+- 希望 AI 用固定格式生成文档
+- 需要 AI 按特定步骤分析数据
+
+Prompt 让这些"标准化交互"变成一键可用的模板。
+
+```
+┌─────────────────┐    选择 Prompt    ┌─────────────┐
+│  用户界面       │ ───────────────► │ MCP Server  │
+│  (Claude等)     │ ◄─────────────── │             │
+└─────────────────┘    返回消息模板    └─────────────┘
+```
+
+## 基础 Prompt
+
+注册一个简单的 Prompt：
+
+```typescript
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
+import { z } from 'zod'
+
+const server = new McpServer({
+  name: 'prompt-server',
+  version: '1.0.0',
+})
+
+server.registerPrompt(
+  'explain-code',
+  {
+    title: '代码解释',
+    description: '解释一段代码的功能和实现原理',
+    argsSchema: {
+      code: z.string().describe('要解释的代码'),
+      language: z.string().optional().describe('编程语言'),
+    },
+  },
+  ({ code, language }) => ({
+    messages: [
+      {
+        role: 'user',
+        content: {
+          type: 'text',
+          text: `请解释以下${language ? ` ${language} ` : ''}代码的功能和实现原理：
+
+\`\`\`${language || ''}
+${code}
+\`\`\`
+
+请从以下几个方面进行解释：
+1. 代码的主要功能
+2. 关键实现逻辑
+3. 使用的设计模式或技术
+4. 潜在的改进点`,
+        },
+      },
+    ],
+  })
+)
+```
+
+**参数说明**：
+
+- **name** - Prompt 的唯一标识
+- **title** - 显示名称
+- **description** - 描述，帮助用户理解何时使用
+- **argsSchema** - 参数定义（使用 Zod）
+- **处理函数** - 返回消息数组
+
+## 多消息 Prompt
+
+Prompt 可以返回多条消息，包括系统消息：
+
+```typescript
+server.registerPrompt(
+  'code-review',
+  {
+    title: '代码审查',
+    description: '对代码进行专业审查，给出改进建议',
+    argsSchema: {
+      code: z.string().describe('要审查的代码'),
+      focus: z
+        .enum(['security', 'performance', 'readability', 'all'])
+        .default('all')
+        .describe('审查重点'),
+    },
+  },
+  ({ code, focus }) => {
+    const focusMap = {
+      security: '安全性问题（注入、XSS、敏感信息泄露等）',
+      performance: '性能问题（算法复杂度、内存使用、缓存策略等）',
+      readability: '可读性问题（命名、注释、代码结构等）',
+      all: '安全性、性能和可读性',
+    }
+
+    return {
+      messages: [
+        {
+          role: 'user',
+          content: {
+            type: 'text',
+            text: `请对以下代码进行专业审查，重点关注${focusMap[focus]}：
+
+\`\`\`
+${code}
+\`\`\`
+
+请按以下格式输出：
+
+## 总体评价
+[简要评价代码质量]
+
+## 发现的问题
+[按严重程度列出问题]
+
+## 改进建议
+[具体的改进建议和示例代码]
+
+## 优点
+[代码中值得肯定的地方]`,
+          },
+        },
+      ],
+    }
+  }
+)
+```
+
+## 嵌入资源内容
+
+Prompt 可以嵌入 Resource 内容，让 AI 在特定上下文中工作：
+
+```typescript
+server.registerPrompt(
+  'analyze-config',
+  {
+    title: '配置分析',
+    description: '分析项目配置文件，给出优化建议',
+  },
+  () => ({
+    messages: [
+      {
+        role: 'user',
+        content: {
+          type: 'resource',
+          resource: {
+            uri: 'config://package.json',
+            mimeType: 'application/json',
+            text: '...', // 实际使用时由 Server 填充
+          },
+        },
+      },
+      {
+        role: 'user',
+        content: {
+          type: 'text',
+          text: '请分析这个 package.json 配置，检查是否有以下问题：\n1. 过时的依赖\n2. 不必要的依赖\n3. 版本冲突风险\n4. 脚本配置优化建议',
+        },
+      },
+    ],
+  })
+)
+```
+
+## 动态 Prompt 生成
+
+Prompt 处理函数可以是异步的，支持动态生成内容：
+
+```typescript
+server.registerPrompt(
+  'daily-report',
+  {
+    title: '日报生成',
+    description: '根据今日 Git 提交生成工作日报',
+    argsSchema: {
+      author: z.string().optional().describe('筛选特定作者'),
+    },
+  },
+  async ({ author }) => {
+    // 获取今日 Git 提交
+    const commits = await getTodayCommits(author)
+
+    if (commits.length === 0) {
+      return {
+        messages: [
+          {
+            role: 'user',
+            content: {
+              type: 'text',
+              text: '今天没有提交记录，无法生成日报。',
+            },
+          },
+        ],
+      }
+    }
+
+    const commitList = commits
+      .map((c) => `- ${c.message} (${c.hash.slice(0, 7)})`)
+      .join('\n')
+
+    return {
+      messages: [
+        {
+          role: 'user',
+          content: {
+            type: 'text',
+            text: `请根据以下 Git 提交记录生成工作日报：
+
+${commitList}
+
+日报格式：
+## 今日完成
+[根据提交内容总结]
+
+## 主要工作
+[详细描述主要工作内容]
+
+## 遇到的问题
+[如果能从提交中推断出问题，列出来]
+
+## 明日计划
+[根据当前进度推测]`,
+          },
+        },
+      ],
+    }
+  }
+)
+
+async function getTodayCommits(author?: string) {
+  // 实际实现：调用 git log
+  return [
+    { hash: 'abc1234', message: 'feat: 添加用户认证模块' },
+    { hash: 'def5678', message: 'fix: 修复登录页面样式问题' },
+  ]
+}
+```
+
+## 带补全的参数
+
+为 Prompt 参数提供自动补全建议：
+
+```typescript
+server.registerPrompt(
+  'team-greeting',
+  {
+    title: '团队问候',
+    description: '生成针对特定团队的问候消息',
+    argsSchema: {
+      team: z.string().describe('团队名称'),
+      occasion: z.string().describe('场合'),
+    },
+    complete: {
+      team: async (value) => {
+        const teams = ['前端组', '后端组', '产品组', '设计组', 'QA组']
+        return teams.filter((t) => t.includes(value))
+      },
+      occasion: async (value) => {
+        const occasions = [
+          '周会',
+          '项目启动',
+          '版本发布',
+          '团建活动',
+          '年终总结',
+        ]
+        return occasions.filter((o) => o.includes(value))
+      },
+    },
+  },
+  ({ team, occasion }) => ({
+    messages: [
+      {
+        role: 'user',
+        content: {
+          type: 'text',
+          text: `请为${team}的${occasion}写一段开场白，要求：
+1. 简洁有力
+2. 符合场合氛围
+3. 鼓舞团队士气`,
+        },
+      },
+    ],
+  })
+)
+```
+
+## 复杂场景：多角色对话
+
+Prompt 可以预设多轮对话，适合需要特定上下文的场景：
+
+```typescript
+server.registerPrompt(
+  'sql-assistant',
+  {
+    title: 'SQL 助手',
+    description: '帮助编写和优化 SQL 查询',
+    argsSchema: {
+      schema: z.string().describe('数据库表结构'),
+      question: z.string().describe('你的问题或需求'),
+    },
+  },
+  ({ schema, question }) => ({
+    messages: [
+      {
+        role: 'user',
+        content: {
+          type: 'text',
+          text: `我有以下数据库表结构：
+
+\`\`\`sql
+${schema}
+\`\`\`
+
+请记住这个表结构，后续我会问你相关的 SQL 问题。`,
+        },
+      },
+      {
+        role: 'assistant',
+        content: {
+          type: 'text',
+          text: '我已经了解了你的数据库表结构。请问有什么 SQL 相关的问题？',
+        },
+      },
+      {
+        role: 'user',
+        content: {
+          type: 'text',
+          text: question,
+        },
+      },
+    ],
+  })
+)
+```
+
+## Prompt 与 Tool/Resource 协作
+
+Prompt 可以引导用户使用特定的 Tool 或 Resource：
+
+```typescript
+// 注册相关的 Tool
+server.registerTool(
+  'run_sql',
+  {
+    title: '执行 SQL',
+    description: '在数据库中执行 SQL 查询',
+    inputSchema: {
+      sql: z.string().describe('SQL 语句'),
+    },
+  },
+  async ({ sql }) => {
+    const result = await executeSQL(sql)
+    return {
+      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+      structuredContent: result,
+    }
+  }
+)
+
+// Prompt 引导使用 Tool
+server.registerPrompt(
+  'data-analysis',
+  {
+    title: '数据分析',
+    description: '分析数据库中的数据',
+    argsSchema: {
+      table: z.string().describe('要分析的表名'),
+      goal: z.string().describe('分析目标'),
+    },
+  },
+  ({ table, goal }) => ({
+    messages: [
+      {
+        role: 'user',
+        content: {
+          type: 'text',
+          text: `我想分析 ${table} 表中的数据。
+
+分析目标：${goal}
+
+请使用 run_sql 工具执行必要的查询，然后给我分析结果。注意：
+1. 先了解表结构
+2. 分步执行查询
+3. 用图表或表格展示关键数据
+4. 给出你的分析结论和建议`,
+        },
+      },
+    ],
+  })
+)
+```
+
+## 完整示例：开发助手 Prompts
+
+```typescript
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
+import { z } from 'zod'
+
+const server = new McpServer({
+  name: 'dev-prompts',
+  version: '1.0.0',
+})
+
+// 代码审查 Prompt
+server.registerPrompt(
+  'review',
+  {
+    title: '代码审查',
+    description: '全面审查代码质量',
+    argsSchema: {
+      code: z.string(),
+      language: z.string().optional(),
+    },
+  },
+  ({ code, language }) => ({
+    messages: [
+      {
+        role: 'user',
+        content: {
+          type: 'text',
+          text: `审查以下${language || ''}代码：
+
+\`\`\`${language || ''}
+${code}
+\`\`\`
+
+检查：安全性、性能、可维护性、最佳实践。`,
+        },
+      },
+    ],
+  })
+)
+
+// Bug 分析 Prompt
+server.registerPrompt(
+  'debug',
+  {
+    title: 'Bug 分析',
+    description: '分析代码中的 Bug',
+    argsSchema: {
+      code: z.string().describe('有问题的代码'),
+      error: z.string().describe('错误信息或现象'),
+      expected: z.string().optional().describe('期望的行为'),
+    },
+  },
+  ({ code, error, expected }) => ({
+    messages: [
+      {
+        role: 'user',
+        content: {
+          type: 'text',
+          text: `请帮我分析这个 Bug：
+
+**代码：**
+\`\`\`
+${code}
+\`\`\`
+
+**错误/问题：**
+${error}
+
+${expected ? `**期望行为：**\n${expected}` : ''}
+
+请分析：
+1. 问题的根本原因
+2. 修复方案
+3. 如何避免类似问题`,
+        },
+      },
+    ],
+  })
+)
+
+// 单元测试生成 Prompt
+server.registerPrompt(
+  'generate-tests',
+  {
+    title: '生成单元测试',
+    description: '为代码生成单元测试',
+    argsSchema: {
+      code: z.string().describe('要测试的代码'),
+      framework: z.enum(['jest', 'vitest', 'mocha']).default('vitest'),
+    },
+  },
+  ({ code, framework }) => ({
+    messages: [
+      {
+        role: 'user',
+        content: {
+          type: 'text',
+          text: `为以下代码生成 ${framework} 单元测试：
+
+\`\`\`
+${code}
+\`\`\`
+
+要求：
+1. 覆盖正常情况
+2. 覆盖边界情况
+3. 覆盖错误处理
+4. 使用 describe/it 结构
+5. 添加必要的注释`,
+        },
+      },
+    ],
+  })
+)
+
+// 文档生成 Prompt
+server.registerPrompt(
+  'generate-docs',
+  {
+    title: '生成文档',
+    description: '为代码生成文档',
+    argsSchema: {
+      code: z.string().describe('要文档化的代码'),
+      style: z.enum(['jsdoc', 'tsdoc', 'markdown']).default('tsdoc'),
+    },
+  },
+  ({ code, style }) => {
+    const styleGuide = {
+      jsdoc: 'JSDoc 格式的注释',
+      tsdoc: 'TSDoc 格式的注释',
+      markdown: 'Markdown 格式的 API 文档',
+    }
+
+    return {
+      messages: [
+        {
+          role: 'user',
+          content: {
+            type: 'text',
+            text: `为以下代码生成${styleGuide[style]}：
+
+\`\`\`
+${code}
+\`\`\`
+
+要求：
+1. 描述函数/类的用途
+2. 说明参数和返回值
+3. 提供使用示例
+4. 标注可能的异常`,
+          },
+        },
+      ],
+    }
+  }
+)
+
+// 重构建议 Prompt
+server.registerPrompt(
+  'refactor',
+  {
+    title: '重构建议',
+    description: '给出代码重构建议',
+    argsSchema: {
+      code: z.string().describe('要重构的代码'),
+      goal: z
+        .enum(['simplify', 'performance', 'testability', 'solid'])
+        .describe('重构目标'),
+    },
+  },
+  ({ code, goal }) => {
+    const goalDesc = {
+      simplify: '简化代码，提高可读性',
+      performance: '优化性能',
+      testability: '提高可测试性',
+      solid: '遵循 SOLID 原则',
+    }
+
+    return {
+      messages: [
+        {
+          role: 'user',
+          content: {
+            type: 'text',
+            text: `请对以下代码提出重构建议，目标是：${goalDesc[goal]}
+
+\`\`\`
+${code}
+\`\`\`
+
+请提供：
+1. 当前代码的问题分析
+2. 具体的重构步骤
+3. 重构后的代码示例
+4. 重构带来的改进`,
+          },
+        },
+      ],
+    }
+  }
+)
+
+// 启动 Server
+const transport = new StdioServerTransport()
+await server.connect(transport)
+console.error('Dev Prompts Server running')
+```
+
+## 设计原则
+
+### 1. 明确的使用场景
+
+```typescript
+// ✅ 好：场景明确
+{
+  title: 'API 错误处理审查',
+  description: '检查 REST API 的错误处理是否完善'
+}
+
+// ❌ 不好：过于通用
+{
+  title: '代码检查',
+  description: '检查代码'
+}
+```
+
+### 2. 必要的引导
+
+```typescript
+// ✅ 好：提供结构化引导
+text: `请按以下格式输出：
+## 问题列表
+## 修复建议
+## 代码示例`
+
+// ❌ 不好：过于开放
+text: `看看这段代码有什么问题`
+```
+
+### 3. 合理的默认值
+
+```typescript
+argsSchema: {
+  language: z.string().default('typescript'),
+  detail: z.enum(['brief', 'detailed']).default('detailed')
+}
+```
+
+## 小结
+
+这篇文章我们学习了 MCP Prompts：
+
+✅ Prompt 的作用与使用场景
+✅ 单消息与多消息 Prompt
+✅ 嵌入 Resource 内容
+✅ 动态 Prompt 生成
+✅ 参数自动补全
+✅ 与 Tool/Resource 的协作
+✅ 设计原则与最佳实践
+
+下一篇我们将深入 MCP 的传输层，学习如何部署 MCP Server 到生产环境。
+
+## 参考资料
+
+- [MCP Prompts 规范](https://modelcontextprotocol.io/docs/concepts/prompts)

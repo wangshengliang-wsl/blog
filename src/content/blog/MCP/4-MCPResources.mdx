@@ -1,0 +1,554 @@
+---
+title: 'MCP Resources：向 AI 暴露数据'
+description: '学习 MCP Resources 的设计与实现，掌握静态资源、动态模板、URI 设计和参数补全等核心概念'
+pubDate: 2025-12-03
+toc: true
+ogImage: true
+category: 'MCP'
+tags: ['MCP', 'Model Context Protocol', 'TypeScript', 'Resources', 'URI']
+---
+
+Tool 让 AI 能够"做事"，而 Resource 让 AI 能够"看到"数据。这篇文章将介绍如何通过 MCP Resources 向 AI 暴露你的数据。
+
+## 🎯 Resource vs Tool
+
+在深入之前，先理清 Resource 和 Tool 的区别：
+
+| 特性         | Resource                | Tool               |
+| ------------ | ----------------------- | ------------------ |
+| **触发方式** | 应用/用户主动选择       | AI 决定调用        |
+| **数据流向** | Server → Client（只读） | 双向（可写）       |
+| **典型用途** | 暴露配置、日志、文档    | 执行操作、修改数据 |
+| **安全级别** | 相对安全                | 需要确认           |
+
+🤔 **何时用 Resource？**
+
+- 数据是"被动"提供的，AI 不需要"请求"
+- 数据量可能很大，不适合放在对话上下文中
+- 需要按 URI 结构化组织数据
+
+## 静态 Resource
+
+最简单的 Resource 是固定 URI 的静态数据：
+
+```typescript
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
+
+const server = new McpServer({
+  name: 'config-server',
+  version: '1.0.0',
+})
+
+// 注册静态 Resource
+server.registerResource(
+  'app-config', // 资源标识（内部使用）
+  'config://app/settings', // URI（客户端使用）
+  {
+    title: '应用配置',
+    description: '当前应用的配置信息',
+    mimeType: 'application/json',
+  },
+  async (uri) => ({
+    contents: [
+      {
+        uri: uri.href,
+        mimeType: 'application/json',
+        text: JSON.stringify(
+          {
+            theme: 'dark',
+            language: 'zh-CN',
+            version: '2.0.0',
+          },
+          null,
+          2
+        ),
+      },
+    ],
+  })
+)
+```
+
+**参数说明**：
+
+1. **资源标识** (`'app-config'`) - Server 内部使用的唯一 ID
+2. **URI** (`'config://app/settings'`) - 客户端请求时使用的地址
+3. **元数据** - title、description、mimeType
+4. **处理函数** - 返回资源内容
+
+### 多种内容类型
+
+```typescript
+// 文本内容
+{
+  contents: [
+    {
+      uri: 'file:///readme.md',
+      mimeType: 'text/markdown',
+      text: '# Hello World\n\nThis is a readme.',
+    },
+  ]
+}
+
+// 二进制内容（Base64）
+{
+  contents: [
+    {
+      uri: 'image://logo.png',
+      mimeType: 'image/png',
+      blob: 'iVBORw0KGgoAAAANSUhEUgAA...', // Base64 编码
+    },
+  ]
+}
+```
+
+## 动态 Resource（ResourceTemplate）
+
+实际应用中，Resource 通常是动态的，需要根据参数返回不同数据。这时使用 `ResourceTemplate`：
+
+```typescript
+import {
+  McpServer,
+  ResourceTemplate,
+} from '@modelcontextprotocol/sdk/server/mcp.js'
+
+const server = new McpServer({
+  name: 'user-server',
+  version: '1.0.0',
+})
+
+// 动态用户资源
+server.registerResource(
+  'user-profile',
+  new ResourceTemplate('users://{userId}/profile', { list: undefined }),
+  {
+    title: '用户资料',
+    description: '获取指定用户的资料信息',
+  },
+  async (uri, { userId }) => {
+    // userId 从 URI 模板中提取
+    const user = await fetchUser(userId)
+
+    return {
+      contents: [
+        {
+          uri: uri.href,
+          mimeType: 'application/json',
+          text: JSON.stringify(user, null, 2),
+        },
+      ],
+    }
+  }
+)
+
+// 模拟数据获取
+async function fetchUser(userId: string) {
+  return {
+    id: userId,
+    name: `用户 ${userId}`,
+    email: `user${userId}@example.com`,
+    createdAt: new Date().toISOString(),
+  }
+}
+```
+
+### URI 模板语法
+
+URI 模板遵循 RFC 6570 简化规范：
+
+```
+users://{userId}/profile        → 匹配 users://123/profile
+files://{path*}                 → 匹配 files:///a/b/c（path = "a/b/c"）
+repos://{owner}/{repo}/issues   → 匹配 repos://microsoft/vscode/issues
+```
+
+### 列出可用资源
+
+通过 `list` 参数，客户端可以发现可用的资源：
+
+```typescript
+server.registerResource(
+  'log-files',
+  new ResourceTemplate('logs://{date}', {
+    list: async () => {
+      // 返回最近 7 天的日志
+      const dates = getLast7Days()
+      return {
+        resources: dates.map((date) => ({
+          uri: `logs://${date}`,
+          name: `${date} 日志`,
+          description: `${date} 的系统日志`,
+        })),
+      }
+    },
+  }),
+  {
+    title: '日志文件',
+    description: '按日期查看系统日志',
+  },
+  async (uri, { date }) => {
+    const logs = await readLogFile(date)
+    return {
+      contents: [
+        {
+          uri: uri.href,
+          text: logs,
+        },
+      ],
+    }
+  }
+)
+```
+
+## 参数自动补全
+
+为提升用户体验，可以为 URI 参数提供自动补全：
+
+```typescript
+server.registerResource(
+  'repository',
+  new ResourceTemplate('github://repos/{owner}/{repo}', {
+    list: undefined,
+    complete: {
+      // owner 参数的补全
+      owner: async (value) => {
+        const orgs = ['microsoft', 'google', 'facebook', 'anthropics']
+        return orgs.filter((o) => o.startsWith(value))
+      },
+      // repo 参数的补全（上下文感知）
+      repo: async (value, context) => {
+        const owner = context?.arguments?.['owner']
+        // 根据 owner 返回其仓库
+        const repos = await fetchReposByOwner(owner)
+        return repos.filter((r) => r.startsWith(value))
+      },
+    },
+  }),
+  {
+    title: 'GitHub 仓库',
+    description: '访问 GitHub 仓库信息',
+  },
+  async (uri, { owner, repo }) => {
+    const repoInfo = await fetchRepoInfo(owner, repo)
+    return {
+      contents: [
+        {
+          uri: uri.href,
+          mimeType: 'application/json',
+          text: JSON.stringify(repoInfo, null, 2),
+        },
+      ],
+    }
+  }
+)
+```
+
+**补全函数参数**：
+
+- `value` - 用户当前输入的值
+- `context` - 包含已解析的其他参数
+
+## 资源订阅与变更通知
+
+Resource 支持订阅机制，当数据变化时通知客户端：
+
+```typescript
+const server = new McpServer({
+  name: 'live-data',
+  version: '1.0.0',
+})
+
+// 注册可订阅的资源
+server.registerResource(
+  'metrics',
+  'metrics://system/current',
+  {
+    title: '系统指标',
+    description: '实时系统指标数据',
+  },
+  async (uri) => ({
+    contents: [
+      {
+        uri: uri.href,
+        mimeType: 'application/json',
+        text: JSON.stringify(getCurrentMetrics()),
+      },
+    ],
+  })
+)
+
+// 定期发送变更通知
+setInterval(async () => {
+  // 通知客户端资源已更新
+  await server.server.notification({
+    method: 'notifications/resources/updated',
+    params: {
+      uri: 'metrics://system/current',
+    },
+  })
+}, 5000) // 每 5 秒通知一次
+```
+
+客户端收到通知后可以决定是否重新获取资源。
+
+## URI 设计最佳实践
+
+### 1. 使用有意义的 scheme
+
+```typescript
+// ✅ 好：scheme 表明资源类型
+'config://app/settings' // 配置
+'file:///path/to/file' // 文件
+'db://users/123' // 数据库记录
+'api://weather/beijing' // API 数据
+'log://2024-01-15/errors' // 日志
+
+// ❌ 不好：通用或无意义的 scheme
+'resource://1234'
+'data://xyz'
+```
+
+### 2. 层级化路径
+
+```typescript
+// ✅ 好：清晰的层级结构
+'users://{userId}'
+'users://{userId}/posts'
+'users://{userId}/posts/{postId}'
+'users://{userId}/posts/{postId}/comments'
+
+// ❌ 不好：扁平或混乱的结构
+'user-post://123-456'
+'data://user_123_post_456'
+```
+
+### 3. 参数命名
+
+```typescript
+// ✅ 好：描述性的参数名
+'repos://{owner}/{repository}'
+'logs://{date}/{level}'
+
+// ❌ 不好：单字母或无意义
+'repos://{o}/{r}'
+'logs://{d}/{l}'
+```
+
+## 完整示例：文件系统资源
+
+```typescript
+import {
+  McpServer,
+  ResourceTemplate,
+} from '@modelcontextprotocol/sdk/server/mcp.js'
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
+import { readFile, readdir, stat } from 'fs/promises'
+import { join, resolve, extname } from 'path'
+
+const server = new McpServer({
+  name: 'filesystem-resources',
+  version: '1.0.0',
+})
+
+const BASE_DIR = process.env.MCP_BASE_DIR || process.cwd()
+
+// MIME 类型映射
+const MIME_TYPES: Record<string, string> = {
+  '.txt': 'text/plain',
+  '.md': 'text/markdown',
+  '.json': 'application/json',
+  '.js': 'text/javascript',
+  '.ts': 'text/typescript',
+  '.html': 'text/html',
+  '.css': 'text/css',
+  '.yaml': 'text/yaml',
+  '.yml': 'text/yaml',
+}
+
+function getMimeType(filePath: string): string {
+  return MIME_TYPES[extname(filePath)] || 'text/plain'
+}
+
+// 目录列表资源
+server.registerResource(
+  'directory',
+  new ResourceTemplate('file:///{path*}', {
+    list: async () => {
+      // 列出根目录内容
+      const entries = await readdir(BASE_DIR, { withFileTypes: true })
+      return {
+        resources: entries.map((entry) => ({
+          uri: `file:///${entry.name}`,
+          name: entry.name,
+          description: entry.isDirectory() ? '目录' : '文件',
+          mimeType: entry.isDirectory() ? undefined : getMimeType(entry.name),
+        })),
+      }
+    },
+  }),
+  {
+    title: '文件系统',
+    description: '访问文件系统中的文件和目录',
+  },
+  async (uri, { path }) => {
+    const fullPath = resolve(BASE_DIR, path || '')
+
+    // 安全检查
+    if (!fullPath.startsWith(BASE_DIR)) {
+      throw new Error('访问被拒绝')
+    }
+
+    const stats = await stat(fullPath)
+
+    if (stats.isDirectory()) {
+      // 返回目录列表
+      const entries = await readdir(fullPath, { withFileTypes: true })
+      const listing = entries
+        .map((e) => `${e.isDirectory() ? '📁' : '📄'} ${e.name}`)
+        .join('\n')
+
+      return {
+        contents: [
+          {
+            uri: uri.href,
+            mimeType: 'text/plain',
+            text: `目录：${path || '/'}\n\n${listing}`,
+          },
+        ],
+      }
+    } else {
+      // 返回文件内容
+      const content = await readFile(fullPath, 'utf-8')
+      return {
+        contents: [
+          {
+            uri: uri.href,
+            mimeType: getMimeType(fullPath),
+            text: content,
+          },
+        ],
+      }
+    }
+  }
+)
+
+// 配置文件资源（特定文件快捷访问）
+server.registerResource(
+  'package-json',
+  'config://package.json',
+  {
+    title: 'package.json',
+    description: '项目的 package.json 配置文件',
+    mimeType: 'application/json',
+  },
+  async (uri) => {
+    try {
+      const content = await readFile(join(BASE_DIR, 'package.json'), 'utf-8')
+      return {
+        contents: [
+          {
+            uri: uri.href,
+            mimeType: 'application/json',
+            text: content,
+          },
+        ],
+      }
+    } catch {
+      return {
+        contents: [
+          {
+            uri: uri.href,
+            mimeType: 'text/plain',
+            text: '未找到 package.json',
+          },
+        ],
+      }
+    }
+  }
+)
+
+// 启动 Server
+const transport = new StdioServerTransport()
+await server.connect(transport)
+console.error('Filesystem Resources Server running')
+```
+
+## Resource 与 Tool 协作
+
+实际应用中，Resource 和 Tool 常常配合使用：
+
+```typescript
+// Resource：暴露可用的报告列表
+server.registerResource(
+  'reports',
+  new ResourceTemplate('reports://{year}/{month}', {
+    list: async () => {
+      const reports = await getAvailableReports()
+      return {
+        resources: reports.map((r) => ({
+          uri: `reports://${r.year}/${r.month}`,
+          name: `${r.year}年${r.month}月报告`,
+        })),
+      }
+    },
+  }),
+  { title: '月度报告', description: '查看月度报告' },
+  async (uri, { year, month }) => {
+    const report = await getReport(year, month)
+    return { contents: [{ uri: uri.href, text: report }] }
+  }
+)
+
+// Tool：生成新报告
+server.registerTool(
+  'generate_report',
+  {
+    title: '生成报告',
+    description: '生成指定月份的报告',
+    inputSchema: {
+      year: z.number().int().min(2020).max(2030),
+      month: z.number().int().min(1).max(12),
+    },
+  },
+  async ({ year, month }) => {
+    await generateReport(year, month)
+
+    // 通知客户端有新资源可用
+    await server.server.notification({
+      method: 'notifications/resources/list_changed',
+    })
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `已生成 ${year}年${month}月 报告`,
+        },
+        {
+          type: 'resource_link',
+          uri: `reports://${year}/${month}`,
+          name: `${year}年${month}月报告`,
+        },
+      ],
+    }
+  }
+)
+```
+
+## 小结
+
+这篇文章我们学习了 MCP Resources 的核心概念：
+
+✅ Resource 与 Tool 的区别与适用场景
+✅ 静态 Resource 注册
+✅ 动态 ResourceTemplate 与 URI 模板
+✅ 参数自动补全（completion）
+✅ 资源订阅与变更通知
+✅ URI 设计最佳实践
+✅ Resource 与 Tool 的协作模式
+
+下一篇我们将学习 MCP 的第三个原语——Prompts。
+
+## 参考资料
+
+- [MCP Resources 规范](https://modelcontextprotocol.io/docs/concepts/resources)
+- [URI Template RFC 6570](https://datatracker.ietf.org/doc/html/rfc6570)

@@ -1,0 +1,620 @@
+---
+title: '构建 MCP Client：集成到你的应用'
+description: '学习如何使用 MCP TypeScript SDK 构建 Client，连接 MCP Server，调用 Tools、读取 Resources，并与 LLM 集成'
+pubDate: 2025-12-03
+toc: true
+ogImage: true
+category: 'MCP'
+tags: ['MCP', 'Model Context Protocol', 'TypeScript', 'Client', 'LLM']
+---
+
+前面的文章我们都在构建 MCP Server。现在让我们换个视角——学习如何构建 MCP Client，将 MCP Server 的能力集成到你自己的应用中。
+
+## 🎯 Client 的角色
+
+```
+┌─────────────────────────────────────────┐
+│           你的应用（Host）               │
+│                                         │
+│  ┌─────────┐  ┌─────────┐  ┌─────────┐  │
+│  │ Client A│  │ Client B│  │ Client C│  │
+│  └────┬────┘  └────┬────┘  └────┬────┘  │
+└───────┼────────────┼────────────┼───────┘
+        │            │            │
+        ▼            ▼            ▼
+   ┌─────────┐  ┌─────────┐  ┌─────────┐
+   │ Server  │  │ Server  │  │ Server  │
+   │ (文件)   │  │ (数据库) │  │ (API)   │
+   └─────────┘  └─────────┘  └─────────┘
+```
+
+Client 负责：
+
+- 连接并管理 MCP Server
+- 调用 Server 提供的 Tools
+- 读取 Server 暴露的 Resources
+- 获取 Server 定义的 Prompts
+- 为 Server 提供 LLM 采样能力
+
+## 连接本地 Server（stdio）
+
+### 基础连接
+
+```typescript
+// client.ts
+import { Client } from '@modelcontextprotocol/sdk/client/index.js'
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
+
+async function main() {
+  // 创建 Client
+  const client = new Client({
+    name: 'my-app',
+    version: '1.0.0',
+  })
+
+  // 配置 stdio 传输（启动 Server 进程）
+  const transport = new StdioClientTransport({
+    command: 'node',
+    args: ['path/to/server.js'],
+  })
+
+  // 连接
+  await client.connect(transport)
+  console.log('Connected to MCP Server')
+
+  // 使用完毕后关闭
+  await client.close()
+}
+
+main()
+```
+
+### 获取 Server 信息
+
+```typescript
+// 连接后可以获取 Server 的能力信息
+const serverInfo = client.getServerVersion()
+console.log(`Server: ${serverInfo?.name} v${serverInfo?.version}`)
+
+// 获取 Server 支持的能力
+const capabilities = client.getServerCapabilities()
+console.log('Capabilities:', capabilities)
+```
+
+## 连接远程 Server（HTTP）
+
+```typescript
+import { Client } from '@modelcontextprotocol/sdk/client/index.js'
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
+
+const client = new Client({
+  name: 'my-app',
+  version: '1.0.0',
+})
+
+const transport = new StreamableHTTPClientTransport(
+  new URL('http://localhost:3000/mcp')
+)
+
+await client.connect(transport)
+```
+
+### 带认证的连接
+
+```typescript
+const transport = new StreamableHTTPClientTransport(
+  new URL('https://api.example.com/mcp'),
+  {
+    requestInit: {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  }
+)
+```
+
+## 调用 Tools
+
+### 列出可用 Tools
+
+```typescript
+const toolsResult = await client.listTools()
+
+console.log('Available tools:')
+for (const tool of toolsResult.tools) {
+  console.log(`  - ${tool.name}: ${tool.description}`)
+}
+```
+
+### 调用 Tool
+
+```typescript
+// 调用 Tool
+const result = await client.callTool({
+  name: 'add',
+  arguments: { a: 5, b: 3 },
+})
+
+// 处理结果
+for (const content of result.content) {
+  if (content.type === 'text') {
+    console.log('Result:', content.text)
+  }
+}
+
+// 获取结构化输出（如果有）
+if (result.structuredContent) {
+  console.log('Structured:', result.structuredContent)
+}
+
+// 检查是否出错
+if (result.isError) {
+  console.error('Tool returned an error')
+}
+```
+
+### 带进度的 Tool 调用
+
+```typescript
+// 监听进度通知
+client.setNotificationHandler('notifications/progress', (notification) => {
+  const { progress, total, message } = notification.params
+  console.log(`Progress: ${progress}/${total} - ${message}`)
+})
+
+// 调用可能耗时的 Tool
+const result = await client.callTool({
+  name: 'process_files',
+  arguments: { files: ['a.txt', 'b.txt', 'c.txt'] },
+})
+```
+
+## 读取 Resources
+
+### 列出可用 Resources
+
+```typescript
+const resourcesResult = await client.listResources()
+
+console.log('Available resources:')
+for (const resource of resourcesResult.resources) {
+  console.log(`  - ${resource.uri}: ${resource.name}`)
+}
+```
+
+### 读取 Resource 内容
+
+```typescript
+const resourceData = await client.readResource({
+  uri: 'config://app/settings',
+})
+
+for (const content of resourceData.contents) {
+  console.log(`URI: ${content.uri}`)
+  console.log(`Content: ${content.text}`)
+}
+```
+
+### 订阅 Resource 变更
+
+```typescript
+// 订阅资源变更通知
+await client.subscribeResource({ uri: 'metrics://system/current' })
+
+// 处理变更通知
+client.setNotificationHandler(
+  'notifications/resources/updated',
+  async (notification) => {
+    const { uri } = notification.params
+    console.log(`Resource updated: ${uri}`)
+
+    // 重新读取更新后的资源
+    const data = await client.readResource({ uri })
+    console.log('New content:', data.contents[0].text)
+  }
+)
+```
+
+## 获取 Prompts
+
+### 列出可用 Prompts
+
+```typescript
+const promptsResult = await client.listPrompts()
+
+console.log('Available prompts:')
+for (const prompt of promptsResult.prompts) {
+  console.log(`  - ${prompt.name}: ${prompt.description}`)
+  if (prompt.arguments) {
+    console.log(
+      `    Arguments: ${prompt.arguments.map((a) => a.name).join(', ')}`
+    )
+  }
+}
+```
+
+### 获取 Prompt 内容
+
+```typescript
+const promptResult = await client.getPrompt({
+  name: 'code-review',
+  arguments: {
+    code: 'function add(a, b) { return a + b; }',
+    focus: 'performance',
+  },
+})
+
+// promptResult.messages 包含生成的消息
+for (const message of promptResult.messages) {
+  console.log(`[${message.role}]: ${message.content.text}`)
+}
+```
+
+### 参数自动补全
+
+```typescript
+const completions = await client.complete({
+  ref: { type: 'ref/prompt', name: 'team-greeting' },
+  argument: { name: 'department', value: 'eng' },
+  context: { arguments: {} },
+})
+
+console.log('Suggestions:', completions.completion.values)
+```
+
+## 与 LLM 集成
+
+将 MCP Client 与 LLM（如 OpenAI、Anthropic）集成，实现 AI Agent。
+
+### 架构示意
+
+```
+用户输入
+    ↓
+┌─────────┐     ┌─────────┐
+│  LLM    │ ←─→ │  你的   │ ←─→ MCP Server
+│(Claude) │     │  应用   │
+└─────────┘     └─────────┘
+```
+
+### 完整示例：OpenAI + MCP
+
+```typescript
+import { Client } from '@modelcontextprotocol/sdk/client/index.js'
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
+import OpenAI from 'openai'
+
+const openai = new OpenAI()
+
+// 1. 连接 MCP Server
+const mcpClient = new Client({ name: 'agent', version: '1.0.0' })
+const transport = new StdioClientTransport({
+  command: 'node',
+  args: ['server.js'],
+})
+await mcpClient.connect(transport)
+
+// 2. 获取 Tools 并转换为 OpenAI 格式
+const { tools } = await mcpClient.listTools()
+
+const openaiTools = tools.map((tool) => ({
+  type: 'function' as const,
+  function: {
+    name: tool.name,
+    description: tool.description,
+    parameters: tool.inputSchema,
+  },
+}))
+
+// 3. 对话循环
+async function chat(userMessage: string) {
+  const messages: OpenAI.ChatCompletionMessageParam[] = [
+    { role: 'user', content: userMessage },
+  ]
+
+  while (true) {
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4-turbo-preview',
+      messages,
+      tools: openaiTools,
+    })
+
+    const choice = response.choices[0]
+    messages.push(choice.message)
+
+    // 如果没有 tool_calls，返回最终响应
+    if (!choice.message.tool_calls || choice.finish_reason === 'stop') {
+      return choice.message.content
+    }
+
+    // 处理 tool calls
+    for (const toolCall of choice.message.tool_calls) {
+      const { name, arguments: args } = toolCall.function
+
+      console.log(`Calling tool: ${name}`)
+      const result = await mcpClient.callTool({
+        name,
+        arguments: JSON.parse(args),
+      })
+
+      // 将结果添加到消息中
+      messages.push({
+        role: 'tool',
+        tool_call_id: toolCall.id,
+        content: result.content
+          .map((c) => (c.type === 'text' ? c.text : JSON.stringify(c)))
+          .join('\n'),
+      })
+    }
+  }
+}
+
+// 使用
+const response = await chat('帮我计算 123 + 456')
+console.log('AI:', response)
+
+await mcpClient.close()
+```
+
+### Anthropic Claude 集成
+
+```typescript
+import Anthropic from '@anthropic-ai/sdk'
+import { Client } from '@modelcontextprotocol/sdk/client/index.js'
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
+
+const anthropic = new Anthropic()
+
+// 连接 MCP Server
+const mcpClient = new Client({ name: 'claude-agent', version: '1.0.0' })
+await mcpClient.connect(
+  new StdioClientTransport({
+    command: 'node',
+    args: ['server.js'],
+  })
+)
+
+// 获取并转换 Tools
+const { tools } = await mcpClient.listTools()
+
+const claudeTools = tools.map((tool) => ({
+  name: tool.name,
+  description: tool.description || '',
+  input_schema: tool.inputSchema,
+}))
+
+async function chat(userMessage: string) {
+  const messages: Anthropic.MessageParam[] = [
+    { role: 'user', content: userMessage },
+  ]
+
+  while (true) {
+    const response = await anthropic.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 4096,
+      tools: claudeTools,
+      messages,
+    })
+
+    // 处理响应内容
+    let hasToolUse = false
+    const assistantContent: Anthropic.ContentBlock[] = []
+    const toolResults: Anthropic.ToolResultBlockParam[] = []
+
+    for (const block of response.content) {
+      assistantContent.push(block)
+
+      if (block.type === 'tool_use') {
+        hasToolUse = true
+
+        console.log(`Calling tool: ${block.name}`)
+        const result = await mcpClient.callTool({
+          name: block.name,
+          arguments: block.input as Record<string, unknown>,
+        })
+
+        toolResults.push({
+          type: 'tool_result',
+          tool_use_id: block.id,
+          content: result.content
+            .map((c) => (c.type === 'text' ? c.text : JSON.stringify(c)))
+            .join('\n'),
+        })
+      }
+    }
+
+    messages.push({ role: 'assistant', content: assistantContent })
+
+    if (!hasToolUse || response.stop_reason === 'end_turn') {
+      // 提取文本响应
+      return response.content
+        .filter((b) => b.type === 'text')
+        .map((b) => (b as Anthropic.TextBlock).text)
+        .join('\n')
+    }
+
+    // 添加 tool results
+    messages.push({ role: 'user', content: toolResults })
+  }
+}
+```
+
+## LLM Sampling：让 Server 调用 Client 的 LLM
+
+MCP 的高级特性——Server 可以请求 Client 进行 LLM 采样：
+
+```typescript
+// Client 端：提供 sampling 能力
+const client = new Client(
+  { name: 'sampling-client', version: '1.0.0' },
+  {
+    capabilities: {
+      sampling: {}, // 声明支持 sampling
+    },
+  }
+)
+
+// 处理 Server 的 sampling 请求
+client.setRequestHandler('sampling/createMessage', async (request) => {
+  const { messages, maxTokens } = request.params
+
+  // 使用你的 LLM 生成响应
+  const response = await openai.chat.completions.create({
+    model: 'gpt-4-turbo-preview',
+    messages: messages.map((m) => ({
+      role: m.role as 'user' | 'assistant',
+      content: m.content.type === 'text' ? m.content.text : '',
+    })),
+    max_tokens: maxTokens,
+  })
+
+  return {
+    role: 'assistant',
+    content: {
+      type: 'text',
+      text: response.choices[0].message.content || '',
+    },
+    model: 'gpt-4-turbo-preview',
+    stopReason: 'endTurn',
+  }
+})
+```
+
+现在 Server 端的 Tool 可以调用 LLM：
+
+```typescript
+// Server 端
+server.registerTool(
+  'summarize',
+  {
+    title: '文本摘要',
+    description: '使用 AI 生成文本摘要',
+    inputSchema: { text: z.string() },
+  },
+  async ({ text }) => {
+    // 请求 Client 的 LLM 能力
+    const response = await server.server.createMessage({
+      messages: [
+        {
+          role: 'user',
+          content: { type: 'text', text: `请用一句话总结：\n\n${text}` },
+        },
+      ],
+      maxTokens: 100,
+    })
+
+    return {
+      content: [{ type: 'text', text: response.content.text }],
+    }
+  }
+)
+```
+
+## 多 Server 管理
+
+```typescript
+class McpManager {
+  private clients = new Map<string, Client>()
+
+  async connect(name: string, config: ServerConfig) {
+    const client = new Client({ name: 'manager', version: '1.0.0' })
+
+    const transport =
+      config.type === 'stdio'
+        ? new StdioClientTransport(config)
+        : new StreamableHTTPClientTransport(new URL(config.url))
+
+    await client.connect(transport)
+    this.clients.set(name, client)
+
+    return client
+  }
+
+  getClient(name: string) {
+    return this.clients.get(name)
+  }
+
+  async callTool(
+    serverName: string,
+    toolName: string,
+    args: Record<string, unknown>
+  ) {
+    const client = this.clients.get(serverName)
+    if (!client) throw new Error(`Server ${serverName} not found`)
+
+    return client.callTool({ name: toolName, arguments: args })
+  }
+
+  async disconnectAll() {
+    for (const [name, client] of this.clients) {
+      await client.close()
+      console.log(`Disconnected from ${name}`)
+    }
+    this.clients.clear()
+  }
+}
+
+// 使用
+const manager = new McpManager()
+
+await manager.connect('files', {
+  type: 'stdio',
+  command: 'node',
+  args: ['file-server.js'],
+})
+
+await manager.connect('db', {
+  type: 'http',
+  url: 'http://localhost:3000/mcp',
+})
+
+const result = await manager.callTool('files', 'read_file', {
+  path: 'config.json',
+})
+```
+
+## 错误处理
+
+```typescript
+import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js'
+
+try {
+  await client.callTool({ name: 'unknown', arguments: {} })
+} catch (error) {
+  if (error instanceof McpError) {
+    switch (error.code) {
+      case ErrorCode.MethodNotFound:
+        console.error('Tool not found')
+        break
+      case ErrorCode.InvalidParams:
+        console.error('Invalid parameters')
+        break
+      default:
+        console.error(`MCP Error: ${error.message}`)
+    }
+  } else {
+    console.error('Unexpected error:', error)
+  }
+}
+```
+
+## 小结
+
+这篇文章我们学习了 MCP Client 的构建：
+
+✅ 使用 stdio 和 HTTP Transport 连接 Server
+✅ 调用 Tools、读取 Resources、获取 Prompts
+✅ 订阅 Resource 变更通知
+✅ 与 OpenAI/Anthropic LLM 集成
+✅ LLM Sampling 机制
+✅ 多 Server 管理
+✅ 错误处理
+
+下一篇是本系列的最后一篇——实战项目，我们将综合运用所学知识构建一个完整的文档助手 MCP Server。
+
+## 参考资料
+
+- [MCP Client 文档](https://modelcontextprotocol.io/docs/concepts/clients)
+- [OpenAI Function Calling](https://platform.openai.com/docs/guides/function-calling)
+- [Anthropic Tool Use](https://docs.anthropic.com/claude/docs/tool-use)
