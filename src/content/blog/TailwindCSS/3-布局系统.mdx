@@ -531,6 +531,61 @@ row-end-{n}   : 在第 n 行结束
 
 预设值：`z-0`, `z-10`, `z-20`, `z-30`, `z-40`, `z-50`, `z-auto`
 
+### 3D 变换与透视
+
+v4 新增了完整的 3D 变换支持：
+
+```html
+<!-- 透视容器 -->
+<div class="perspective-dramatic">
+  <!-- dramatic: 近距离视角，3D 效果强烈 -->
+  <div class="rotate-y-12 translate-z-8">3D 卡片</div>
+</div>
+
+<div class="perspective-normal">
+  <!-- normal: 正常视角 -->
+  <div class="rotate-x-6 -translate-z-4">3D 元素</div>
+</div>
+```
+
+3D 变换工具类：
+
+| 类名              | 说明                     |
+| ----------------- | ------------------------ |
+| `perspective-*`   | 设置透视距离             |
+| `translate-z-*`   | Z 轴位移（正值向前）     |
+| `rotate-x-*`      | X 轴旋转                 |
+| `rotate-y-*`      | Y 轴旋转                 |
+| `transform-3d`    | 启用 3D 变换空间         |
+| `backface-hidden` | 隐藏背面（翻转卡片常用） |
+
+3D 翻转卡片示例：
+
+```tsx
+function FlipCard({
+  front,
+  back,
+}: {
+  front: React.ReactNode
+  back: React.ReactNode
+}) {
+  return (
+    <div className="group perspective-normal w-64 h-40">
+      <div className="relative w-full h-full transition-transform duration-500 transform-3d group-hover:rotate-y-180">
+        {/* 正面 */}
+        <div className="absolute inset-0 backface-hidden bg-white rounded-xl shadow-lg p-4">
+          {front}
+        </div>
+        {/* 背面 */}
+        <div className="absolute inset-0 backface-hidden rotate-y-180 bg-blue-500 text-white rounded-xl shadow-lg p-4">
+          {back}
+        </div>
+      </div>
+    </div>
+  )
+}
+```
+
 ### 粘性定位示例
 
 ```tsx

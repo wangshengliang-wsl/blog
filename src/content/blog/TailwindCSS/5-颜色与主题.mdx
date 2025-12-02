@@ -504,64 +504,29 @@ function Layout({ children }: { children: React.ReactNode }) {
 
 ## 实战：品牌主题配置
 
-```tsx
-// 完整的主题配置示例
-interface Theme {
-  name: string
-  colors: {
-    primary: string
-    primaryHover: string
-    background: string
-    surface: string
-    text: string
-    textSecondary: string
-    border: string
-  }
-}
+结合 CSS 变量和 JavaScript 实现动态主题切换：
 
-const themes: Record<string, Theme> = {
+```tsx
+const themes = {
   light: {
-    name: '浅色主题',
-    colors: {
-      primary: 'oklch(0.55 0.18 250)',
-      primaryHover: 'oklch(0.48 0.16 250)',
-      background: 'oklch(1 0 0)',
-      surface: 'oklch(0.98 0 0)',
-      text: 'oklch(0.2 0 0)',
-      textSecondary: 'oklch(0.45 0 0)',
-      border: 'oklch(0.9 0 0)',
-    },
+    primary: 'oklch(0.55 0.18 250)',
+    background: 'oklch(1 0 0)',
+    text: 'oklch(0.2 0 0)',
   },
   dark: {
-    name: '深色主题',
-    colors: {
-      primary: 'oklch(0.65 0.18 250)',
-      primaryHover: 'oklch(0.72 0.16 250)',
-      background: 'oklch(0.15 0 0)',
-      surface: 'oklch(0.2 0 0)',
-      text: 'oklch(0.95 0 0)',
-      textSecondary: 'oklch(0.7 0 0)',
-      border: 'oklch(0.3 0 0)',
-    },
+    primary: 'oklch(0.65 0.18 250)',
+    background: 'oklch(0.15 0 0)',
+    text: 'oklch(0.95 0 0)',
   },
 }
 
-function applyTheme(themeName: string) {
+function applyTheme(themeName: keyof typeof themes) {
   const theme = themes[themeName]
   const root = document.documentElement
-
-  Object.entries(theme.colors).forEach(([key, value]) => {
+  Object.entries(theme).forEach(([key, value]) => {
     root.style.setProperty(`--theme-${key}`, value)
   })
-
-  // 保存到 localStorage
   localStorage.setItem('theme', themeName)
-}
-
-// 页面加载时恢复主题
-function initTheme() {
-  const saved = localStorage.getItem('theme') || 'light'
-  applyTheme(saved)
 }
 ```
 
@@ -569,13 +534,15 @@ function initTheme() {
 /* 使用主题变量 */
 @theme {
   --color-primary: var(--theme-primary, oklch(0.55 0.18 250));
-  --color-primary-hover: var(--theme-primaryHover, oklch(0.48 0.16 250));
   --color-background: var(--theme-background, oklch(1 0 0));
-  --color-surface: var(--theme-surface, oklch(0.98 0 0));
   --color-text: var(--theme-text, oklch(0.2 0 0));
-  --color-text-secondary: var(--theme-textSecondary, oklch(0.45 0 0));
-  --color-border: var(--theme-border, oklch(0.9 0 0));
 }
+```
+
+```html
+<div class="bg-background text-text">
+  <button class="bg-primary">主题按钮</button>
+</div>
 ```
 
 ---

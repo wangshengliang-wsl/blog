@@ -510,19 +510,12 @@ function LoadingSkeleton() {
 
 ### 自定义动画
 
-在 CSS 中定义自定义动画：
+使用 `@utility` 和 `@keyframes` 定义自定义动画：
 
 ```css
 @import 'tailwindcss';
 
-@theme {
-  /* 自定义动画 */
-  --animate-fade-in: fade-in 0.5s ease-out;
-  --animate-slide-up: slide-up 0.3s ease-out;
-  --animate-slide-down: slide-down 0.3s ease-out;
-  --animate-scale-in: scale-in 0.2s ease-out;
-}
-
+/* 定义关键帧 */
 @keyframes fade-in {
   from {
     opacity: 0;
@@ -543,17 +536,6 @@ function LoadingSkeleton() {
   }
 }
 
-@keyframes slide-down {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
 @keyframes scale-in {
   from {
     opacity: 0;
@@ -564,6 +546,19 @@ function LoadingSkeleton() {
     transform: scale(1);
   }
 }
+
+/* 使用 @utility 定义动画工具类 */
+@utility animate-fade-in {
+  animation: fade-in 0.5s ease-out;
+}
+
+@utility animate-slide-up {
+  animation: slide-up 0.3s ease-out;
+}
+
+@utility animate-scale-in {
+  animation: scale-in 0.2s ease-out;
+}
 ```
 
 使用自定义动画：
@@ -572,6 +567,26 @@ function LoadingSkeleton() {
 <div class="animate-fade-in">淡入</div>
 <div class="animate-slide-up">上滑</div>
 <div class="animate-scale-in">缩放</div>
+
+<!-- 配合变体使用 -->
+<div class="hover:animate-scale-in">悬停时动画</div>
+<div class="md:animate-slide-up">响应式动画</div>
+```
+
+### 功能性动画工具类
+
+创建可配置的动画：
+
+```css
+/* 定义可配置时长的动画 */
+@utility animate-fade-in-* {
+  animation: fade-in --value(integer) ms ease-out;
+}
+```
+
+```html
+<div class="animate-fade-in-300">300ms 淡入</div>
+<div class="animate-fade-in-500">500ms 淡入</div>
 ```
 
 ### 任意值动画

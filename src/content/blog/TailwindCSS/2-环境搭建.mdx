@@ -318,36 +318,48 @@ Settings → Languages & Frameworks → Style Sheets → Tailwind CSS
 
 ## 常用工具库集成
 
-### clsx / class-variance-authority
+### cn 工具函数
 
-处理条件类名的常用库：
+处理条件类名和类名冲突的标准方案：
 
 ```bash
-pnpm add clsx class-variance-authority
+pnpm add clsx tailwind-merge
+```
+
+```ts
+// src/lib/utils.ts
+import { clsx, type ClassValue } from 'clsx'
+import { twMerge } from 'tailwind-merge'
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs))
+}
 ```
 
 使用示例：
 
 ```tsx
-import { clsx } from 'clsx'
+// 条件类名 + 类名覆盖
+<div
+  className={cn(
+    'p-4 bg-white rounded-lg',
+    isActive && 'bg-blue-500 text-white',
+    className // 允许外部覆盖
+  )}
+/>
+```
+
+### class-variance-authority (可选)
+
+用于创建组件变体系统：
+
+```bash
+pnpm add class-variance-authority
+```
+
+```tsx
 import { cva, type VariantProps } from 'class-variance-authority'
 
-// clsx: 条件类名
-function Button({ isActive, className }) {
-  return (
-    <button
-      className={clsx(
-        'px-4 py-2 rounded-lg font-medium transition-colors',
-        isActive ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700',
-        className
-      )}
-    >
-      按钮
-    </button>
-  )
-}
-
-// cva: 变体管理
 const buttonVariants = cva(
   'inline-flex items-center justify-center rounded-lg font-medium transition-colors',
   {
@@ -355,18 +367,14 @@ const buttonVariants = cva(
       variant: {
         primary: 'bg-blue-500 text-white hover:bg-blue-600',
         secondary: 'bg-gray-100 text-gray-900 hover:bg-gray-200',
-        ghost: 'hover:bg-gray-100',
       },
       size: {
         sm: 'h-8 px-3 text-sm',
-        md: 'h-10 px-4 text-base',
+        md: 'h-10 px-4',
         lg: 'h-12 px-6 text-lg',
       },
     },
-    defaultVariants: {
-      variant: 'primary',
-      size: 'md',
-    },
+    defaultVariants: { variant: 'primary', size: 'md' },
   }
 )
 
@@ -378,45 +386,6 @@ function Button({ variant, size, children }: ButtonProps) {
   return (
     <button className={buttonVariants({ variant, size })}>{children}</button>
   )
-}
-```
-
-### tailwind-merge
-
-解决类名冲突的工具：
-
-```bash
-pnpm add tailwind-merge
-```
-
-```tsx
-import { twMerge } from 'tailwind-merge'
-
-// 后面的类会覆盖前面冲突的类
-twMerge('px-4 py-2', 'px-6')
-// 结果: 'py-2 px-6'
-
-// 常见封装：cn 函数
-import { clsx, type ClassValue } from 'clsx'
-import { twMerge } from 'tailwind-merge'
-
-export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
-}
-
-// 使用
-;<div className={cn('p-4 bg-white', isActive && 'bg-blue-500', className)} />
-```
-
-创建一个工具函数文件 `src/lib/utils.ts`：
-
-```ts
-// src/lib/utils.ts
-import { clsx, type ClassValue } from 'clsx'
-import { twMerge } from 'tailwind-merge'
-
-export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
 }
 ```
 
@@ -472,40 +441,55 @@ my-tailwind-app/
 └── package.json
 ```
 
+## 自定义工具类：@utility 指令
+
+v4 引入了 `@utility` 指令来定义自定义工具类，替代了 v3 的 `@layer utilities`：
+
+```css
+/* v3 写法（已过时）*/
+@layer utilities {
+  .content-auto {
+    content-visibility: auto;
+  }
+}
+
+/* v4 写法 */
+@utility content-auto {
+  content-visibility: auto;
+}
+```
+
+`@utility` 的优势：
+
+- 自动集成到 Tailwind 的工具类层
+- 自动支持所有变体（`hover:`、`md:` 等）
+- 按属性数量智能排序，便于覆盖
+
+### 功能性工具类
+
+使用通配符创建接受参数的工具类：
+
+```css
+/* 定义功能性工具类 */
+@utility tab-* {
+  tab-size: --value(--tab-size-*);
+}
+```
+
+```html
+<!-- 使用 -->
+<pre class="tab-4">代码缩进 4 空格</pre>
+<pre class="tab-8">代码缩进 8 空格</pre>
+```
+
 ## v4 兼容模式
 
-如果你需要渐进式迁移，或依赖某些 v3 特性，可以使用兼容配置：
+如果你需要渐进式迁移，或依赖某些 v3 插件，可以保留传统配置文件：
 
 ```css
 /* globals.css */
 @import 'tailwindcss';
-
-/* 启用 v3 兼容的 @apply */
 @config "./tailwind.config.ts";
-```
-
-创建传统配置文件 `tailwind.config.ts`：
-
-```ts
-// tailwind.config.ts
-import type { Config } from 'tailwindcss'
-
-const config: Config = {
-  content: ['./src/**/*.{js,ts,jsx,tsx,mdx}'],
-  theme: {
-    extend: {
-      colors: {
-        brand: {
-          50: '#f0f9ff',
-          // ... 其他色阶
-        },
-      },
-    },
-  },
-  plugins: [],
-}
-
-export default config
 ```
 
 但推荐尽量使用 v4 的 CSS 优先配置，享受更好的性能和开发体验。
