@@ -1,20 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npm run build:*)",
-      "Bash(cat:*)",
-      "Bash(pnpm sync:*)",
-      "Bash(pnpm dev)",
-      "Bash(pnpm lint:*)",
-      "Bash(git add:*)",
-      "WebFetch(domain:es6.ruanyifeng.com)",
-      "Bash(find:*)",
-      "mcp__ide__getDiagnostics",
-      "Bash(pnpm build:*)",
-      "Bash(xargs:*)",
-      "WebSearch",
-      "Bash(node --version:*)",
-      "Bash(rm:*)"
+      "Bash(done)",
+      "mcp__context7__resolve-library-id",
+      "mcp__context7__get-library-docs",
+      "Bash(pnpm check:*)"
     ],
     "deny": [],
     "ask": []

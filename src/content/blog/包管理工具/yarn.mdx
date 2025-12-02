@@ -5,11 +5,12 @@ pubDate: 2025-11-09
 toc: true
 ogImage: true
 category: 包管理工具
+tags: ['Yarn', 'Node.js', '包管理器', 'JavaScript', 'Monorepo']
 ---
 
 Yarn 由 Facebook 于 2016 年发布，旨在解决当时 npm 的性能和一致性问题。如今 Yarn 分为两个主要版本线：Yarn Classic（1.x）和 Yarn Berry（2.x+，也称 Yarn Modern）。两者在架构和使用方式上有显著差异。
 
-> 本文基于 Yarn v1.22.x（Classic）和 Yarn v4.x（Berry）编写，Node.js v20.x 环境。
+🎯 **环境说明**：本文基于 Yarn v1.22.x（Classic）和 Yarn v4.x（Berry）编写，Node.js v20.x 环境。
 
 ## Yarn Classic vs Yarn Berry
 
@@ -21,7 +22,7 @@ Yarn 由 Facebook 于 2016 年发布，旨在解决当时 npm 的性能和一致
 | 配置文件     | .yarnrc            | .yarnrc.yml         |
 | 锁文件       | yarn.lock (v1)     | yarn.lock (v8)      |
 
-如果项目对兼容性要求较高，建议使用 Yarn Classic；追求更激进的优化可尝试 Yarn Berry。
+🤔 如果项目对兼容性要求较高，建议使用 Yarn Classic；追求更激进的优化可尝试 Yarn Berry。
 
 ## 安装 Yarn
 
@@ -156,7 +157,7 @@ $ yarn upgrade-interactive
 
 `yarn.lock` 锁定依赖的精确版本。与 npm 的 `package-lock.json` 类似，但格式不同。
 
-**重要：** 务必将 `yarn.lock` 提交到版本控制，确保团队环境一致。
+🔶 **重要**：务必将 `yarn.lock` 提交到版本控制，确保团队环境一致。
 
 ```bash
 # 若 lock 文件与 package.json 冲突，重新生成
@@ -200,13 +201,15 @@ Yarn Berry 默认启用 Plug'n'Play 模式，不再生成 `node_modules` 目录�
 
 ### PnP 的优势
 
-- **安装速度快**：无需写入大量小文件
-- **零安装**：可将 `.yarn/cache/` 提交到 Git，团队成员无需执行 `yarn install`
-- **确定性**：杜绝幽灵依赖（Phantom Dependencies）
+✅ **安装速度快**：无需写入大量小文件
+
+✅ **零安装**：可将 `.yarn/cache/` 提交到 Git，团队成员无需执行 `yarn install`
+
+✅ **确定性**：杜绝幽灵依赖（Phantom Dependencies）
 
 ### 兼容性问题
 
-部分工具不支持 PnP，需要配置 SDK 或回退到 node_modules：
+🔶 部分工具不支持 PnP，需要配置 SDK 或回退到 node_modules：
 
 ```bash
 # 安装 IDE SDK（VS Code、WebStorm 等）
@@ -282,6 +285,31 @@ $ yarn workspaces foreach run build
 
 # Yarn Berry 语法
 $ yarn workspaces foreach -A run build
+```
+
+### 聚焦安装（Yarn Berry）
+
+`yarn workspaces focus` 可以只安装指定 workspace 及其依赖：
+
+```bash
+# 只安装指定 workspace 的依赖
+$ yarn workspaces focus @my-org/app
+
+# 安装所有 workspace，但只安装生产依赖
+$ yarn workspaces focus -A --production
+```
+
+### 批量执行命令
+
+```bash
+# 并行执行，按拓扑顺序
+$ yarn workspaces foreach --all -pt npm publish
+
+# 只对有变更的 workspace 执行
+$ yarn workspaces foreach --since run lint
+
+# 递归执行（包含依赖的 workspace）
+$ yarn workspaces foreach -R run build
 ```
 
 ### 跨 Workspace 依赖

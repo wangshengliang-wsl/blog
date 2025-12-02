@@ -5,11 +5,12 @@ pubDate: 2025-11-09
 toc: true
 ogImage: true
 category: 包管理工具
+tags: ['Bun', 'JavaScript', '包管理器', 'TypeScript', '运行时']
 ---
 
 Bun 是一款用 Zig 语言编写的全能 JavaScript 工具链，集运行时、包管理器、构建器、测试器于一体。它的包管理器速度比 npm 快 25 倍以上，是目前最快的 JavaScript 包管理解决方案。
 
-> 本文基于 Bun v1.1.x 编写。
+🎯 **环境说明**：本文基于 Bun v1.2.x 编写。
 
 ## Bun 是什么
 
@@ -39,7 +40,7 @@ _数据基于典型中型项目，实际速度因项目而异_
 
 ### 兼容性
 
-Bun 高度兼容 Node.js 生态：
+✅ Bun 高度兼容 Node.js 生态：
 
 - 支持 `package.json`
 - 支持 `node_modules`
@@ -49,7 +50,7 @@ Bun 高度兼容 Node.js 生态：
 
 ### 开箱即用
 
-无需配置即可运行 TypeScript、JSX：
+✅ 无需配置即可运行 TypeScript、JSX：
 
 ```bash
 $ bun run index.ts   # 直接运行 TypeScript
@@ -152,6 +153,15 @@ $ bun update lodash
 
 # 更新所有包
 $ bun update
+
+# 交互式更新
+$ bun update -i
+
+# 递归更新所有 workspace
+$ bun update -r
+
+# 交互式递归更新（Monorepo 推荐）
+$ bun update -i -r
 ```
 
 ## bun.lockb
@@ -215,7 +225,16 @@ Bun 支持 npm/yarn 风格的 workspaces：
 ```json
 {
   "name": "my-monorepo",
+  "private": true,
   "workspaces": ["packages/*", "apps/*"]
+}
+```
+
+支持 glob 排除模式：
+
+```json
+{
+  "workspaces": ["packages/**", "!packages/**/test/**"]
 }
 ```
 
@@ -226,6 +245,46 @@ $ bun install
 ```
 
 Bun 会解析所有 workspace 的依赖并统一安装。
+
+### workspace 协议
+
+使用 `workspace:` 协议引用本地包：
+
+```json
+{
+  "name": "pkg-a",
+  "dependencies": {
+    "pkg-b": "workspace:*"
+  }
+}
+```
+
+| 协议          | 发布时转换           |
+| ------------- | -------------------- |
+| `workspace:*` | 当前版本，如 `1.2.3` |
+| `workspace:^` | `^1.2.3`             |
+| `workspace:~` | `~1.2.3`             |
+
+### 过滤安装
+
+使用 `--filter` 选择性安装：
+
+```bash
+# 只安装指定 workspace 的依赖
+$ bun install --filter pkg-a
+
+# 使用路径
+$ bun install --filter "./packages/pkg-a"
+
+# 通配符匹配
+$ bun install --filter "pkg-*"
+
+# 排除指定包
+$ bun install --filter "!pkg-c"
+
+# 组合使用
+$ bun install --filter "pkg-*" --filter "!pkg-c"
+```
 
 ### Workspace 命令
 
@@ -289,6 +348,8 @@ Bun 实现了大部分 Node.js API，但仍有差异：
 - 大多数 npm 包
 
 ### 部分支持 / 不支持
+
+🔶 以下功能存在兼容性限制：
 
 - `worker_threads`（部分支持）
 - `vm` 模块（部分支持）
@@ -375,12 +436,14 @@ $ bun build ./src/index.ts --outdir ./dist
 | `bun add -g <pkg>` | 全局安装     |
 | `bun remove <pkg>` | 移除依赖     |
 | `bun update`       | 更新依赖     |
+| `bun update -i`    | 交互式更新   |
 | `bun run <script>` | 运行脚本     |
 | `bun <file>`       | 运行文件     |
 | `bunx <pkg>`       | 执行包命令   |
 | `bun test`         | 运行测试     |
 | `bun build`        | 构建打包     |
 | `bun upgrade`      | 升级 Bun     |
+| `bun pm cache rm`  | 清理缓存     |
 
 ## npm vs yarn vs pnpm vs Bun
 
@@ -415,7 +478,7 @@ $ bun install --yarn
 
 ### 生产环境建议
 
-Bun 仍在快速迭代中，对于关键生产环境：
+🔶 Bun 仍在快速迭代中，对于关键生产环境：
 
 - 确保充分测试
 - 关注 Bun 的 changelog

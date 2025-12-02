@@ -5,11 +5,12 @@ pubDate: 2025-11-09
 toc: true
 ogImage: true
 category: 包管理工具
+tags: ['nvm', 'Node.js', '版本管理', 'JavaScript']
 ---
 
 nvm（Node Version Manager）是最早也是最流行的 Node.js 版本管理工具。它允许在同一台机器上安装和切换多个 Node.js 版本，解决了不同项目依赖不同 Node 版本的问题。
 
-> 本文基于 nvm v0.40.x 编写，仅适用于 macOS 和 Linux。Windows 用户请使用 [nvm-windows](https://github.com/coreybutler/nvm-windows) 或 fnm。
+🎯 **环境说明**：本文基于 nvm v0.40.x 编写，仅适用于 macOS 和 Linux。Windows 用户请使用 [nvm-windows](https://github.com/coreybutler/nvm-windows) 或 fnm。
 
 ## 安装 nvm
 
@@ -245,7 +246,7 @@ cdnvm "$PWD" || exit
 
 ## 全局包管理
 
-每个 Node 版本有独立的全局包目录。切换版本后，全局包不会自动迁移。
+🔶 每个 Node 版本有独立的全局包目录。切换版本后，全局包不会自动迁移。
 
 ### 迁移全局包
 
@@ -303,7 +304,7 @@ export NVM_NODEJS_ORG_MIRROR=https://npmmirror.com/mirrors/node
 
 ## 性能优化
 
-nvm 每次打开终端都需要加载大量 Shell 脚本，可能导致终端启动变慢。
+🔶 nvm 每次打开终端都需要加载大量 Shell 脚本，可能导致终端启动变慢。
 
 ### 延迟加载
 
@@ -340,9 +341,18 @@ npx() {
 
 这样只有在首次使用 nvm/node/npm 时才会加载。
 
+### 跳过自动使用默认版本
+
+加载 nvm 时跳过自动使用默认版本：
+
+```bash
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh" --no-use
+```
+
 ### 更好的选择
 
-如果对终端启动速度有要求，建议迁移到 fnm。fnm 使用 Rust 编写，启动速度快 40 倍以上，且命令兼容 nvm。
+🤔 如果对终端启动速度有要求，建议迁移到 fnm。fnm 使用 Rust 编写，启动速度快 40 倍以上，且命令兼容 nvm。
 
 ## 卸载 nvm
 

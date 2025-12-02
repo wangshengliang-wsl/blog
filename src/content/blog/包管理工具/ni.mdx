@@ -5,21 +5,22 @@ pubDate: 2025-11-09
 toc: true
 ogImage: true
 category: 包管理工具
+tags: ['ni', 'Node.js', '包管理器', 'JavaScript', 'antfu']
 ---
 
 ni 是由 [Anthony Fu](https://github.com/antfu) 开发的命令行工具，能够自动检测项目使用的包管理器（npm/yarn/pnpm/bun），并使用对应的命令执行操作。在多项目、多包管理器环境下，不再需要记忆各种命令差异。
 
-> 本文基于 @antfu/ni v0.23.x 编写。
+🎯 **环境说明**：本文基于 @antfu/ni v0.23.x 编写。
 
 ## 为什么需要 ni
 
-不同项目可能使用不同的包管理器。每次切换项目都要想一下：
+🙋 不同项目可能使用不同的包管理器。每次切换项目都要想一下：
 
 - 这个项目用的是 npm 还是 pnpm？
 - pnpm 的安装命令是 `pnpm add` 还是 `pnpm install`？
 - yarn 运行脚本要不要 `run`？
 
-ni 解决了这个问题。只需记住一套命令，ni 会根据 lockfile 自动识别包管理器并调用对应命令。
+✅ ni 解决了这个问题。只需记住一套命令，ni 会根据 lockfile 自动识别包管理器并调用对应命令。
 
 ```bash
 # 无论项目用的是 npm/yarn/pnpm/bun
@@ -51,15 +52,17 @@ $ ni --version
 
 ni 提供了一组简短的命令，对应不同包管理器的常用操作：
 
-| ni 命令  | npm             | yarn           | pnpm           | bun           |
-| -------- | --------------- | -------------- | -------------- | ------------- |
-| `ni`     | `npm install`   | `yarn install` | `pnpm install` | `bun install` |
-| `ni pkg` | `npm i pkg`     | `yarn add pkg` | `pnpm add pkg` | `bun add pkg` |
-| `nr`     | `npm run`       | `yarn run`     | `pnpm run`     | `bun run`     |
-| `nu`     | `npm update`    | `yarn upgrade` | `pnpm update`  | `bun update`  |
-| `nun`    | `npm uninstall` | `yarn remove`  | `pnpm remove`  | `bun remove`  |
-| `nlx`    | `npx`           | `yarn dlx`     | `pnpm dlx`     | `bunx`        |
-| `na`     | `npm`           | `yarn`         | `pnpm`         | `bun`         |
+| ni 命令  | npm             | yarn            | pnpm            | bun            | deno            |
+| -------- | --------------- | --------------- | --------------- | -------------- | --------------- |
+| `ni`     | `npm install`   | `yarn install`  | `pnpm install`  | `bun install`  | `deno install`  |
+| `ni pkg` | `npm i pkg`     | `yarn add pkg`  | `pnpm add pkg`  | `bun add pkg`  | `deno add pkg`  |
+| `nr`     | `npm run`       | `yarn run`      | `pnpm run`      | `bun run`      | `deno task`     |
+| `nu`     | `npm update`    | `yarn upgrade`  | `pnpm update`   | `bun update`   | `deno upgrade`  |
+| `nup`    | `npm upgrade`   | `yarn up`       | `pnpm update`   | `bun update`   | `deno upgrade`  |
+| `nun`    | `npm uninstall` | `yarn remove`   | `pnpm remove`   | `bun remove`   | `deno remove`   |
+| `nci`    | `npm ci`        | `yarn --frozen` | `pnpm --frozen` | `bun --frozen` | `deno cache`    |
+| `nlx`    | `npx`           | `yarn dlx`      | `pnpm dlx`      | `bunx`         | `deno run npm:` |
+| `na`     | `npm`           | `yarn`          | `pnpm`          | `bun`          | `deno`          |
 
 ## ni - 安装依赖
 
@@ -138,6 +141,30 @@ $ nu lodash
 $ nu -i
 ```
 
+## nup - 升级依赖
+
+```bash
+# 升级依赖
+$ nup
+
+# 交互式升级（不支持 npm/bun/deno）
+$ nup -i
+```
+
+## nci - 清洁安装
+
+用于 CI 环境，基于 lockfile 安装精确版本：
+
+```bash
+$ nci
+
+# npm ci
+# yarn install --frozen-lockfile
+# pnpm install --frozen-lockfile
+# bun install --frozen-lockfile
+# deno cache --reload
+```
+
 ## nun - 卸载包
 
 ```bash
@@ -167,6 +194,25 @@ $ nlx eslint src
 $ na cache clean
 $ na audit
 $ na outdated
+```
+
+## 全局标志
+
+ni 支持一些全局标志：
+
+```bash
+# 打印将要执行的命令（不执行）
+$ ni vite ?
+
+# 切换到指定目录执行
+$ ni -C packages/foo vite
+$ nr -C playground dev
+
+# 显示版本
+$ ni -v
+
+# 显示帮助
+$ ni -h
 ```
 
 ## 全局安装
@@ -294,13 +340,19 @@ ni 的优势在于跨包管理器的统一体验。
 | `ni -D <pkg>` | 安装开发依赖         |
 | `ni -g <pkg>` | 全局安装             |
 | `ni --frozen` | 冻结安装（CI）       |
+| `ni -i`       | 交互式搜索安装       |
+| `nci`         | 清洁安装（CI 推荐）  |
 | `nr`          | 交互式运行脚本       |
 | `nr <script>` | 运行指定脚本         |
 | `nu`          | 更新依赖             |
 | `nu <pkg>`    | 更新指定包           |
+| `nup`         | 升级依赖             |
+| `nup -i`      | 交互式升级           |
 | `nun <pkg>`   | 卸载包               |
+| `nun -m`      | 交互式多选卸载       |
 | `nlx <pkg>`   | 执行包命令           |
 | `na <cmd>`    | 调用原生包管理器命令 |
+| `ni -C <dir>` | 切换目录后执行       |
 
 ## 常见问题
 

@@ -6,40 +6,90 @@ interface Props {
   pubDate: string
   lastModDate: string | undefined
   minutesRead: number
+  tags?: string[]
 }
 
-const { pubDate, lastModDate, minutesRead } = Astro.props
+const { pubDate, lastModDate, minutesRead, tags = [] } = Astro.props
 
 const isMinimal = UI.postMetaStyle === 'minimal'
 ---
 
-{
-  isMinimal ? (
-    <div class="mt--6! op-50">
-      <time datetime={pubDate}>{formatDate(pubDate)}</time>
-      {minutesRead !== 0 && <span> · {minutesRead} min</span>}
-      {lastModDate && (
-        <time class="lt-sm:hidden" datetime={lastModDate}>
-          · Updated {formatDate(lastModDate)}
-        </time>
-      )}
-    </div>
-  ) : (
-    <div class="flex justify-start items-center gap-4 mt--6! op-50">
-      <div>
-        <span class="i-ri-calendar-line mr-1.2" />
+<div class="post-meta-wrapper">
+  {
+    isMinimal ? (
+      <div class="op-50">
         <time datetime={pubDate}>{formatDate(pubDate)}</time>
+        {minutesRead !== 0 && <span> · {minutesRead} min</span>}
+        {lastModDate && (
+          <time class="lt-sm:hidden" datetime={lastModDate}>
+            · Updated {formatDate(lastModDate)}
+          </time>
+        )}
       </div>
-      {lastModDate && (
-        <div class="lt-sm:hidden">
-          <span class="i-ri-history-fill mr-1.2" />
-          <time datetime={lastModDate}>{formatDate(lastModDate)}</time>
+    ) : (
+      <div class="flex flex-wrap justify-start items-center gap-x-4 gap-y-2 op-50">
+        <div class="flex items-center">
+          <span class="i-ri-calendar-line mr-1.2" />
+          <time datetime={pubDate}>{formatDate(pubDate)}</time>
         </div>
-      )}
-      <div>
-        <span class="i-ri-timer-line mr-1.2 ml--0.6" />
-        {minutesRead !== 0 && <span>{minutesRead} min read</span>}
+        {lastModDate && (
+          <div class="flex items-center lt-sm:hidden">
+            <span class="i-ri-history-fill mr-1.2" />
+            <time datetime={lastModDate}>{formatDate(lastModDate)}</time>
+          </div>
+        )}
+        {minutesRead !== 0 && (
+          <div class="flex items-center">
+            <span class="i-ri-timer-line mr-1.2" />
+            <span>{minutesRead} min read</span>
+          </div>
+        )}
       </div>
-    </div>
-  )
-}
+    )
+  }
+
+  {
+    tags && tags.length > 0 && (
+      <div class="flex flex-wrap items-center gap-2 mt-3">
+        <span class="i-ri-price-tag-3-line op-40 text-sm" />
+        {tags.map((tag) => (
+          <span class="tag-item">{tag}</span>
+        ))}
+      </div>
+    )
+  }
+</div>
+
+<style>
+  .post-meta-wrapper {
+    margin-top: -1.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .tag-item {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.2rem 0.65rem;
+    font-size: 0.8rem;
+    font-weight: 500;
+    border-radius: 9999px;
+    background: rgba(0, 0, 0, 0.06);
+    color: rgba(0, 0, 0, 0.65);
+    transition: all 0.2s ease;
+  }
+
+  .tag-item:hover {
+    background: rgba(0, 0, 0, 0.1);
+    color: rgba(0, 0, 0, 0.85);
+  }
+
+  :global(.dark) .tag-item {
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.65);
+  }
+
+  :global(.dark) .tag-item:hover {
+    background: rgba(255, 255, 255, 0.18);
+    color: rgba(255, 255, 255, 0.9);
+  }
+</style>

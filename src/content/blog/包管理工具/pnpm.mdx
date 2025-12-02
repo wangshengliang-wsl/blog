@@ -5,27 +5,28 @@ pubDate: 2025-11-09
 toc: true
 ogImage: true
 category: 包管理工具
+tags: ['pnpm', 'Node.js', '包管理器', 'JavaScript', 'Monorepo']
 ---
 
 pnpm（Performant npm）通过硬链接和内容寻址存储机制，解决了 npm/yarn 重复安装依赖、磁盘占用大的问题。在大型项目和 Monorepo 场景下，pnpm 的优势尤为明显。
 
-> 本文基于 pnpm v9.x 编写，Node.js v20.x 环境。
+🎯 **环境说明**：本文基于 pnpm v9.x 编写，Node.js v20.x 环境。
 
 ## 为什么选择 pnpm
 
 ### 磁盘空间节省
 
-传统包管理器为每个项目复制一份完整的依赖。假设 10 个项目都用了 lodash，磁盘上就有 10 份相同的文件。
+✅ 传统包管理器为每个项目复制一份完整的依赖。假设 10 个项目都用了 lodash，磁盘上就有 10 份相同的文件。
 
 pnpm 采用内容寻址存储：所有包只在全局 store 中保存一份，项目中通过硬链接引用。同样 10 个项目，lodash 实际只占用一份磁盘空间。
 
 ### 安装速度快
 
-由于大部分文件已在 store 中，pnpm 安装依赖时只需创建硬链接，无需复制文件。在有缓存的情况下，安装速度比 npm/yarn 快 2-3 倍。
+✅ 由于大部分文件已在 store 中，pnpm 安装依赖时只需创建硬链接，无需复制文件。在有缓存的情况下，安装速度比 npm/yarn 快 2-3 倍。
 
 ### 严格的依赖结构
 
-npm/yarn 的扁平化 `node_modules` 允许项目访问未声明的依赖（幽灵依赖）。pnpm 默认使用非扁平结构，只有显式声明的依赖才能被访问，从根本上杜绝了幽灵依赖问题。
+✅ npm/yarn 的扁平化 `node_modules` 允许项目访问未声明的依赖（幽灵依赖）。pnpm 默认使用非扁平结构，只有显式声明的依赖才能被访问，从根本上杜绝了幽灵依赖问题。
 
 ## 安装 pnpm
 
@@ -143,7 +144,7 @@ node_modules/
 
 ### 处理兼容性问题
 
-部分老旧包依赖扁平化结构，可能无法正常工作。解决方案：
+🔶 部分老旧包依赖扁平化结构，可能无法正常工作。解决方案：
 
 **1. 提升指定包**
 
@@ -156,7 +157,7 @@ public-hoist-pattern[]=*prettier*
 
 **2. 使用 shamefully-hoist**
 
-将所有包提升到顶层（不推荐，失去严格依赖的优势）：
+🔶 将所有包提升到顶层（不推荐，失去严格依赖的优势）：
 
 ```ini
 shamefully-hoist=true
@@ -381,12 +382,15 @@ pnpm 支持直接修补 node_modules 中的包：
 
 ```bash
 # 准备修补
-$ pnpm patch lodash
+$ pnpm patch lodash@4.17.21
 
 # 编辑 <临时目录> 中的文件...
 
 # 提交修补
 $ pnpm patch-commit <临时目录>
+
+# 忽略已有补丁重新修补
+$ pnpm patch lodash@4.17.21 --ignore-existing
 ```
 
 修补内容保存在 `patches/` 目录，并记录在 `package.json` 中：
@@ -400,6 +404,64 @@ $ pnpm patch-commit <临时目录>
   }
 }
 ```
+
+## Catalogs（版本目录）
+
+pnpm v9+ 引入了 Catalogs 功能，用于在 Monorepo 中统一管理依赖版本。
+
+### 定义 Catalog
+
+在 `pnpm-workspace.yaml` 中定义：
+
+```yaml
+packages:
+  - 'packages/*'
+
+# 默认 catalog
+catalog:
+  react: ^18.3.1
+  redux: ^5.0.1
+
+# 命名 catalogs
+catalogs:
+  react17:
+    react: ^17.0.2
+    react-dom: ^17.0.2
+  react18:
+    react: ^18.2.0
+    react-dom: ^18.2.0
+```
+
+### 使用 Catalog
+
+在 `package.json` 中引用：
+
+```json
+{
+  "name": "@example/app",
+  "dependencies": {
+    "react": "catalog:",
+    "redux": "catalog:"
+  }
+}
+```
+
+使用命名 catalog：
+
+```json
+{
+  "dependencies": {
+    "react": "catalog:react18",
+    "react-dom": "catalog:react18"
+  }
+}
+```
+
+Catalogs 的优势：
+
+- 统一管理 Monorepo 中所有包的依赖版本
+- 避免版本不一致问题
+- 简化依赖升级流程
 
 ## 常用命令速查
 

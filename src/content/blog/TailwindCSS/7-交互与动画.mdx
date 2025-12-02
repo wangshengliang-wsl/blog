@@ -1,0 +1,845 @@
+---
+title: 交互与动画
+description: 掌握 TailwindCSS v4 的状态变体、过渡效果与动画系统，打造流畅的交互体验
+pubDate: 2025-12-02
+toc: true
+ogImage: true
+category: TailwindCSS
+---
+
+良好的交互反馈是优秀用户体验的关键。TailwindCSS 提供了完整的状态变体和动画工具类，让你无需编写 CSS 就能创建流畅的悬停效果、焦点样式和过渡动画。v4 在这方面的能力更加强大，支持更复杂的状态组合。
+
+## 状态变体
+
+### hover 悬停状态
+
+```html
+<!-- 基础悬停 -->
+<button class="bg-blue-500 hover:bg-blue-600 text-white">悬停变深</button>
+
+<!-- 多属性悬停 -->
+<div
+  class="
+  bg-white
+  hover:bg-gray-50
+  hover:shadow-lg
+  hover:scale-105
+  transition-all
+"
+>
+  悬停时多重效果
+</div>
+
+<!-- 悬停显示元素 -->
+<div class="group relative">
+  <img src="/image.jpg" alt="" class="w-full" />
+  <div
+    class="
+    absolute inset-0
+    bg-black/50
+    opacity-0
+    hover:opacity-100
+    transition-opacity
+    flex items-center justify-center
+  "
+  >
+    <span class="text-white">查看详情</span>
+  </div>
+</div>
+```
+
+### focus 焦点状态
+
+```html
+<!-- 输入框焦点 -->
+<input
+  type="text"
+  class="
+    border border-gray-300
+    focus:border-blue-500
+    focus:ring-2
+    focus:ring-blue-500/20
+    outline-none
+    rounded-lg px-4 py-2
+  "
+  placeholder="输入内容"
+/>
+
+<!-- 按钮焦点 -->
+<button
+  class="
+  px-4 py-2
+  bg-blue-500 text-white rounded-lg
+  focus:outline-none
+  focus:ring-2
+  focus:ring-blue-500
+  focus:ring-offset-2
+"
+>
+  可访问性按钮
+</button>
+```
+
+focus 相关变体：
+
+- `focus`: 元素获得焦点
+- `focus-within`: 子元素获得焦点
+- `focus-visible`: 键盘焦点（不响应鼠标点击）
+
+```html
+<!-- focus-visible: 仅键盘导航时显示焦点环 -->
+<button
+  class="
+  focus:outline-none
+  focus-visible:ring-2
+  focus-visible:ring-blue-500
+"
+>
+  键盘友好按钮
+</button>
+
+<!-- focus-within: 子元素获得焦点时改变父元素 -->
+<div
+  class="
+  border border-gray-200
+  focus-within:border-blue-500
+  focus-within:ring-2
+  focus-within:ring-blue-500/20
+  rounded-lg p-2
+"
+>
+  <input type="text" class="w-full outline-none" />
+</div>
+```
+
+### active 激活状态
+
+```html
+<!-- 按下效果 -->
+<button
+  class="
+  bg-blue-500
+  hover:bg-blue-600
+  active:bg-blue-700
+  active:scale-95
+  text-white px-4 py-2 rounded-lg
+  transition-all
+"
+>
+  按下变小
+</button>
+```
+
+### disabled 禁用状态
+
+```html
+<button
+  disabled
+  class="
+    bg-blue-500
+    disabled:bg-gray-300
+    disabled:cursor-not-allowed
+    disabled:opacity-50
+    text-white px-4 py-2 rounded-lg
+  "
+>
+  禁用按钮
+</button>
+
+<!-- 禁用时阻止悬停效果 -->
+<button
+  class="
+  bg-blue-500
+  hover:bg-blue-600
+  disabled:hover:bg-gray-300
+  disabled:bg-gray-300
+  disabled:cursor-not-allowed
+"
+>
+  智能禁用
+</button>
+```
+
+### 其他状态变体
+
+```html
+<!-- checked: 选中状态 -->
+<input type="checkbox" class="checked:bg-blue-500" />
+
+<!-- required/invalid/valid: 表单验证状态 -->
+<input
+  required
+  class="
+    border
+    invalid:border-red-500
+    valid:border-green-500
+  "
+/>
+
+<!-- placeholder-shown: 显示占位符时 -->
+<input
+  class="
+  placeholder-shown:border-gray-300
+  border-blue-500
+"
+/>
+
+<!-- read-only: 只读状态 -->
+<input readonly class="read-only:bg-gray-100" />
+
+<!-- first/last: 首个/末个子元素 -->
+<li class="first:pt-0 last:pb-0 py-2">列表项</li>
+
+<!-- odd/even: 奇偶子元素 -->
+<tr class="odd:bg-gray-50 even:bg-white">
+  表格行
+</tr>
+
+<!-- empty: 空元素 -->
+<div class="empty:hidden">有内容才显示</div>
+```
+
+## group 和 peer 修饰符
+
+### group: 父元素状态影响子元素
+
+```html
+<!-- 悬停父元素时改变子元素 -->
+<div class="group p-4 hover:bg-gray-50 rounded-lg cursor-pointer">
+  <h3 class="font-bold group-hover:text-blue-500">标题</h3>
+  <p class="text-gray-600 group-hover:text-gray-900">描述文字</p>
+  <span
+    class="
+    opacity-0
+    group-hover:opacity-100
+    transition-opacity
+  "
+  >
+    →
+  </span>
+</div>
+```
+
+实际应用：卡片悬停效果
+
+```tsx
+function ProductCard({ product }: { product: Product }) {
+  return (
+    <article className="group bg-white rounded-xl shadow-sm overflow-hidden">
+      {/* 图片区域 */}
+      <div className="relative overflow-hidden">
+        <img
+          src={product.image}
+          alt={product.name}
+          className="w-full aspect-square object-cover group-hover:scale-110 transition-transform duration-500"
+        />
+        {/* 悬停时显示的操作按钮 */}
+        <div
+          className="
+          absolute inset-0
+          bg-black/40
+          opacity-0
+          group-hover:opacity-100
+          transition-opacity
+          flex items-center justify-center gap-4
+        "
+        >
+          <button className="p-3 bg-white rounded-full hover:bg-gray-100">
+            ❤️
+          </button>
+          <button className="p-3 bg-white rounded-full hover:bg-gray-100">
+            🛒
+          </button>
+        </div>
+      </div>
+
+      {/* 信息区域 */}
+      <div className="p-4">
+        <h3 className="font-bold group-hover:text-blue-500 transition-colors">
+          {product.name}
+        </h3>
+        <p className="text-gray-600 mt-1">{product.price}</p>
+      </div>
+    </article>
+  )
+}
+```
+
+### 嵌套 group
+
+使用命名 group 处理嵌套场景：
+
+```html
+<div class="group/card p-4 hover:bg-gray-50">
+  <div class="group/button">
+    <button
+      class="
+      group-hover/card:visible
+      group-hover/button:bg-blue-600
+      bg-blue-500 text-white px-4 py-2 rounded
+    "
+    >
+      按钮
+    </button>
+  </div>
+</div>
+```
+
+### peer: 兄弟元素状态影响
+
+```html
+<!-- 输入框状态影响标签 -->
+<div class="relative">
+  <input
+    type="email"
+    id="email"
+    placeholder=" "
+    class="peer w-full px-4 py-2 border rounded-lg focus:border-blue-500"
+  />
+  <label
+    for="email"
+    class="
+      absolute left-4 top-2
+      text-gray-500
+      transition-all
+      peer-placeholder-shown:top-2
+      peer-placeholder-shown:text-base
+      peer-focus:-top-2.5
+      peer-focus:text-sm
+      peer-focus:text-blue-500
+      -top-2.5
+      text-sm
+      bg-white px-1
+    "
+  >
+    邮箱地址
+  </label>
+</div>
+```
+
+浮动标签输入框完整实现：
+
+```tsx
+function FloatingInput({ label, type = 'text', ...props }: InputProps) {
+  const id = useId()
+
+  return (
+    <div className="relative">
+      <input
+        type={type}
+        id={id}
+        placeholder=" "
+        className="
+          peer
+          w-full px-4 pt-5 pb-2
+          border border-gray-300 rounded-lg
+          focus:border-blue-500 focus:ring-1 focus:ring-blue-500
+          outline-none
+          transition-colors
+        "
+        {...props}
+      />
+      <label
+        htmlFor={id}
+        className="
+          absolute left-4 top-4
+          text-gray-500
+          pointer-events-none
+          transition-all duration-200
+          peer-placeholder-shown:top-4
+          peer-placeholder-shown:text-base
+          peer-focus:top-1
+          peer-focus:text-xs
+          peer-focus:text-blue-500
+          peer-[:not(:placeholder-shown)]:top-1
+          peer-[:not(:placeholder-shown)]:text-xs
+        "
+      >
+        {label}
+      </label>
+    </div>
+  )
+}
+```
+
+## 过渡效果
+
+### transition 基础
+
+```html
+<!-- 颜色过渡 -->
+<button class="bg-blue-500 hover:bg-blue-600 transition-colors">
+  颜色渐变
+</button>
+
+<!-- 透明度过渡 -->
+<div class="opacity-50 hover:opacity-100 transition-opacity">透明度渐变</div>
+
+<!-- 变换过渡 -->
+<div class="scale-100 hover:scale-105 transition-transform">缩放渐变</div>
+
+<!-- 阴影过渡 -->
+<div class="shadow-sm hover:shadow-lg transition-shadow">阴影渐变</div>
+
+<!-- 全部属性过渡 -->
+<div class="transition-all hover:bg-blue-500 hover:scale-105 hover:shadow-lg">
+  全部渐变
+</div>
+```
+
+过渡工具类：
+
+| 类名                   | 过渡属性                                                          |
+| ---------------------- | ----------------------------------------------------------------- |
+| `transition-none`      | 无                                                                |
+| `transition-all`       | 所有属性                                                          |
+| `transition`           | 常用属性（color, background, border, opacity, shadow, transform） |
+| `transition-colors`    | 颜色相关                                                          |
+| `transition-opacity`   | 透明度                                                            |
+| `transition-shadow`    | 阴影                                                              |
+| `transition-transform` | 变换                                                              |
+
+### 过渡时长
+
+```html
+<div class="transition duration-75">75ms</div>
+<div class="transition duration-100">100ms</div>
+<div class="transition duration-150">150ms（默认）</div>
+<div class="transition duration-200">200ms</div>
+<div class="transition duration-300">300ms</div>
+<div class="transition duration-500">500ms</div>
+<div class="transition duration-700">700ms</div>
+<div class="transition duration-1000">1000ms</div>
+```
+
+### 过渡时机函数
+
+```html
+<div class="transition ease-linear">线性</div>
+<div class="transition ease-in">加速</div>
+<div class="transition ease-out">减速</div>
+<div class="transition ease-in-out">加速再减速</div>
+```
+
+### 过渡延迟
+
+```html
+<div class="transition delay-75">延迟 75ms</div>
+<div class="transition delay-150">延迟 150ms</div>
+<div class="transition delay-300">延迟 300ms</div>
+<div class="transition delay-500">延迟 500ms</div>
+```
+
+交错动画效果：
+
+```tsx
+function StaggeredList({ items }: { items: string[] }) {
+  return (
+    <ul className="space-y-2">
+      {items.map((item, index) => (
+        <li
+          key={item}
+          className="
+            opacity-0 translate-y-4
+            animate-[fadeInUp_0.5s_forwards]
+          "
+          style={{ animationDelay: `${index * 100}ms` }}
+        >
+          {item}
+        </li>
+      ))}
+    </ul>
+  )
+}
+```
+
+## 动画
+
+### 内置动画
+
+```html
+<!-- 旋转 -->
+<div
+  class="animate-spin size-8 border-4 border-blue-500 border-t-transparent rounded-full"
+></div>
+
+<!-- 心跳 -->
+<div class="animate-ping size-4 bg-red-500 rounded-full"></div>
+
+<!-- 脉冲 -->
+<div class="animate-pulse bg-gray-200 h-4 w-32 rounded"></div>
+
+<!-- 弹跳 -->
+<div class="animate-bounce text-4xl">⬇️</div>
+```
+
+加载状态示例：
+
+```tsx
+function LoadingSpinner({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) {
+  const sizeClass = {
+    sm: 'size-4 border-2',
+    md: 'size-8 border-4',
+    lg: 'size-12 border-4',
+  }[size]
+
+  return (
+    <div
+      className={`
+        animate-spin
+        ${sizeClass}
+        border-blue-500
+        border-t-transparent
+        rounded-full
+      `}
+    />
+  )
+}
+
+function LoadingSkeleton() {
+  return (
+    <div className="space-y-4">
+      <div className="animate-pulse bg-gray-200 h-8 w-3/4 rounded"></div>
+      <div className="animate-pulse bg-gray-200 h-4 w-full rounded"></div>
+      <div className="animate-pulse bg-gray-200 h-4 w-5/6 rounded"></div>
+      <div className="animate-pulse bg-gray-200 h-4 w-4/6 rounded"></div>
+    </div>
+  )
+}
+```
+
+### 自定义动画
+
+在 CSS 中定义自定义动画：
+
+```css
+@import 'tailwindcss';
+
+@theme {
+  /* 自定义动画 */
+  --animate-fade-in: fade-in 0.5s ease-out;
+  --animate-slide-up: slide-up 0.3s ease-out;
+  --animate-slide-down: slide-down 0.3s ease-out;
+  --animate-scale-in: scale-in 0.2s ease-out;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-down {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+```
+
+使用自定义动画：
+
+```html
+<div class="animate-fade-in">淡入</div>
+<div class="animate-slide-up">上滑</div>
+<div class="animate-scale-in">缩放</div>
+```
+
+### 任意值动画
+
+```html
+<!-- 使用任意 keyframes -->
+<div class="animate-[wiggle_1s_ease-in-out_infinite]">摇摆动画</div>
+
+<!-- 需要先定义 keyframes -->
+<style>
+  @keyframes wiggle {
+    0%,
+    100% {
+      transform: rotate(-3deg);
+    }
+    50% {
+      transform: rotate(3deg);
+    }
+  }
+</style>
+```
+
+## 变换效果
+
+### 缩放
+
+```html
+<div class="scale-50">缩小到 50%</div>
+<div class="scale-75">缩小到 75%</div>
+<div class="scale-100">原始大小</div>
+<div class="scale-105">放大到 105%</div>
+<div class="scale-110">放大到 110%</div>
+<div class="scale-125">放大到 125%</div>
+<div class="scale-150">放大到 150%</div>
+
+<!-- 单轴缩放 -->
+<div class="scale-x-150">水平放大</div>
+<div class="scale-y-150">垂直放大</div>
+
+<!-- 悬停缩放 -->
+<div class="hover:scale-105 transition-transform">悬停放大</div>
+```
+
+### 旋转
+
+```html
+<div class="rotate-0">不旋转</div>
+<div class="rotate-45">旋转 45°</div>
+<div class="rotate-90">旋转 90°</div>
+<div class="rotate-180">旋转 180°</div>
+<div class="-rotate-45">逆时针 45°</div>
+
+<!-- 悬停旋转 -->
+<div class="hover:rotate-12 transition-transform">悬停旋转</div>
+```
+
+### 位移
+
+```html
+<div class="translate-x-4">右移 16px</div>
+<div class="-translate-x-4">左移 16px</div>
+<div class="translate-y-4">下移 16px</div>
+<div class="-translate-y-4">上移 16px</div>
+
+<!-- 百分比位移 -->
+<div class="translate-x-1/2">右移 50%</div>
+<div class="-translate-y-full">上移 100%</div>
+
+<!-- 居中技巧 -->
+<div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
+  绝对居中
+</div>
+```
+
+### 倾斜
+
+```html
+<div class="skew-x-12">水平倾斜</div>
+<div class="skew-y-6">垂直倾斜</div>
+<div class="-skew-x-12">反向倾斜</div>
+```
+
+### 变换原点
+
+```html
+<div class="origin-center scale-150">中心缩放</div>
+<div class="origin-top scale-150">顶部缩放</div>
+<div class="origin-bottom-right scale-150">右下角缩放</div>
+```
+
+## 实战：交互组件
+
+### 按钮交互
+
+```tsx
+const buttonVariants = {
+  primary: `
+    bg-blue-500 text-white
+    hover:bg-blue-600
+    active:bg-blue-700 active:scale-95
+    focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2
+    disabled:bg-gray-300 disabled:cursor-not-allowed disabled:scale-100
+  `,
+  secondary: `
+    bg-gray-100 text-gray-900
+    hover:bg-gray-200
+    active:bg-gray-300 active:scale-95
+    focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2
+    disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed
+  `,
+  ghost: `
+    bg-transparent text-gray-600
+    hover:bg-gray-100 hover:text-gray-900
+    active:bg-gray-200
+    focus:outline-none focus:ring-2 focus:ring-gray-500
+  `,
+}
+
+function Button({ variant = 'primary', children, ...props }: ButtonProps) {
+  return (
+    <button
+      className={`
+        px-4 py-2 rounded-lg font-medium
+        transition-all duration-150
+        ${buttonVariants[variant]}
+      `}
+      {...props}
+    >
+      {children}
+    </button>
+  )
+}
+```
+
+### 下拉菜单
+
+```tsx
+function Dropdown({ trigger, items }: DropdownProps) {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen(!open)}
+        className="px-4 py-2 bg-white border rounded-lg hover:bg-gray-50"
+      >
+        {trigger}
+      </button>
+
+      {open && (
+        <div
+          className="
+          absolute top-full left-0 mt-2
+          w-48 py-2
+          bg-white rounded-lg shadow-lg border
+          animate-[slideDown_0.15s_ease-out]
+        "
+        >
+          {items.map((item, index) => (
+            <button
+              key={index}
+              className="
+                w-full px-4 py-2 text-left
+                hover:bg-gray-50
+                transition-colors
+              "
+              onClick={item.onClick}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+```
+
+### 开关组件
+
+```tsx
+function Switch({ checked, onChange }: SwitchProps) {
+  return (
+    <button
+      role="switch"
+      aria-checked={checked}
+      onClick={() => onChange(!checked)}
+      className={`
+        relative w-11 h-6 rounded-full
+        transition-colors duration-200
+        focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2
+        ${checked ? 'bg-blue-500' : 'bg-gray-200'}
+      `}
+    >
+      <span
+        className={`
+          absolute top-0.5 left-0.5
+          size-5 bg-white rounded-full shadow
+          transition-transform duration-200
+          ${checked ? 'translate-x-5' : 'translate-x-0'}
+        `}
+      />
+    </button>
+  )
+}
+```
+
+### Toast 通知
+
+```tsx
+function Toast({ message, type, onClose }: ToastProps) {
+  const bgColor = {
+    success: 'bg-green-500',
+    error: 'bg-red-500',
+    warning: 'bg-yellow-500',
+    info: 'bg-blue-500',
+  }[type]
+
+  return (
+    <div
+      className={`
+      ${bgColor} text-white
+      px-6 py-4 rounded-lg shadow-lg
+      flex items-center gap-4
+      animate-[slideUp_0.3s_ease-out]
+    `}
+    >
+      <span>{message}</span>
+      <button onClick={onClose} className="hover:opacity-75 transition-opacity">
+        ✕
+      </button>
+    </div>
+  )
+}
+```
+
+## 性能优化
+
+### will-change
+
+对复杂动画使用 `will-change` 提示浏览器：
+
+```html
+<div class="will-change-transform hover:scale-110 transition-transform">
+  优化的缩放动画
+</div>
+```
+
+### 减少重排
+
+优先使用 `transform` 和 `opacity`，它们不触发布局重排：
+
+```html
+<!-- 好：使用 transform -->
+<div class="hover:scale-105 transition-transform">优</div>
+
+<!-- 避免：改变尺寸属性 -->
+<div class="hover:w-64 transition-all">避免</div>
+```
+
+### 使用 GPU 加速
+
+3D 变换会触发 GPU 加速：
+
+```html
+<div class="transform-gpu hover:scale-105">GPU 加速</div>
+```
+
+---
+
+交互与动画为界面注入生命力。合理使用状态变体和过渡效果，可以让用户操作获得即时反馈，提升整体体验。至此，TailwindCSS v4 的核心功能已经介绍完毕。在实际项目中，建议从简单的过渡效果开始，逐步添加更复杂的动画，保持界面的流畅与克制。

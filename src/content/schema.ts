@@ -160,6 +160,12 @@ export const postSchema = z.object({
     .describe(
       'Specifies the category of the post. If not provided, defaults to "杂谈".'
     ),
+  tags: z
+    .array(z.string())
+    .default([])
+    .describe(
+      'Specifies tags for the post. Used for categorization and filtering.'
+    ),
 })
 
 export type PostSchema = z.infer<typeof postSchema>

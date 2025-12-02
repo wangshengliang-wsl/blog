@@ -5,11 +5,12 @@ pubDate: 2025-11-09
 toc: true
 ogImage: true
 category: 包管理工具
+tags: ['npm', 'Node.js', '包管理器', 'JavaScript']
 ---
 
 npm（Node Package Manager）随 Node.js 一同安装，是 JavaScript 生态中使用最广泛的包管理器。截至 2024 年，npm registry 托管了超过 200 万个包，每周下载量达数十亿次。
 
-> 本文基于 npm v10.x 编写，Node.js v20.x 环境。
+🎯 **环境说明**：本文基于 npm v10.x 编写，Node.js v20.x 环境。
 
 ## 安装与版本管理
 
@@ -189,7 +190,7 @@ $ npm run test -- --watch --coverage
 
 `package-lock.json` 记录依赖树的精确版本，确保团队成员和 CI 环境安装一致的依赖。
 
-**不要手动编辑此文件**，它由 npm 自动维护。
+🔶 **不要手动编辑此文件**，它由 npm 自动维护。
 
 若遇到依赖问题，可尝试删除后重新安装：
 
@@ -334,6 +335,8 @@ $ npm init --scope=myorg
 组织级私有包需要付费订阅 npm Pro 或使用私有 registry（如 Verdaccio、Nexus）。
 
 ## 安全与审计
+
+🔶 定期检查项目依赖的安全漏洞：
 
 ```bash
 # 检查已知漏洞

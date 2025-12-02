@@ -1,0 +1,561 @@
+---
+title: 环境搭建与配置
+description: 在 Next.js 15 项目中完整配置 TailwindCSS v4，包括 PostCSS、编辑器插件和开发工具链
+pubDate: 2025-12-02
+toc: true
+ogImage: true
+category: TailwindCSS
+---
+
+TailwindCSS v4 带来了全新的安装体验。相比 v3 需要配置 `tailwind.config.js`，v4 采用 CSS 优先的配置方式，整个流程更加简洁。本文将从零开始，在 Next.js 15 项目中完整配置 TailwindCSS v4，并搭建高效的开发环境。
+
+## 环境要求
+
+开始之前，确保你的开发环境满足以下条件：
+
+```bash
+# 检查 Node.js 版本（需要 18.0 或更高）
+node --version
+# v18.0.0+
+
+# 检查包管理器
+pnpm --version  # 推荐使用 pnpm
+# 或
+npm --version
+yarn --version
+```
+
+TailwindCSS v4 的环境要求：
+
+| 依赖          | 最低版本   | 推荐版本                     |
+| ------------- | ---------- | ---------------------------- |
+| Node.js       | 18.0       | 20.x LTS                     |
+| npm/pnpm/yarn | -          | pnpm 8+                      |
+| 浏览器        | 现代浏览器 | Chrome/Firefox/Safari 最新版 |
+
+## 创建 Next.js 项目
+
+如果你还没有 Next.js 项目，可以使用官方脚手架快速创建：
+
+```bash
+# 使用 pnpm 创建（推荐）
+pnpm create next-app@latest my-tailwind-app
+
+# 或使用 npx
+npx create-next-app@latest my-tailwind-app
+```
+
+在交互式提示中，选择以下配置：
+
+```
+✔ Would you like to use TypeScript? Yes
+✔ Would you like to use ESLint? Yes
+✔ Would you like to use Tailwind CSS? Yes  # 这里选 Yes，脚手架会自动配置
+✔ Would you like your code inside a `src/` directory? Yes
+✔ Would you like to use App Router? Yes
+✔ Would you like to use Turbopack for next dev? Yes
+✔ Would you like to customize the import alias? No
+```
+
+如果在创建时选择了 Tailwind CSS，脚手架会自动完成基础配置。但为了深入理解配置过程，接下来我们手动在已有项目中安装配置。
+
+## 手动安装 TailwindCSS v4
+
+### 步骤 1：安装依赖
+
+在项目根目录执行：
+
+```bash
+# 安装 TailwindCSS v4 和 PostCSS 插件
+pnpm add tailwindcss @tailwindcss/postcss
+
+# 如果使用 npm
+npm install tailwindcss @tailwindcss/postcss
+```
+
+v4 的依赖结构相比 v3 更加精简：
+
+| v3 依赖      | v4 依赖              | 说明             |
+| ------------ | -------------------- | ---------------- |
+| tailwindcss  | tailwindcss          | 核心包           |
+| postcss      | 内置                 | 不再需要单独安装 |
+| autoprefixer | 内置                 | 自动前缀已集成   |
+| -            | @tailwindcss/postcss | PostCSS 插件     |
+
+### 步骤 2：配置 PostCSS
+
+在项目根目录创建 `postcss.config.mjs`：
+
+```js
+// postcss.config.mjs
+export default {
+  plugins: {
+    '@tailwindcss/postcss': {},
+  },
+}
+```
+
+这是 v4 的标准 PostCSS 配置。注意这里使用的是 `@tailwindcss/postcss` 而不是 v3 的 `tailwindcss`。
+
+### 步骤 3：创建 CSS 入口文件
+
+编辑 `src/app/globals.css`（或你的全局样式文件）：
+
+```css
+/* src/app/globals.css */
+@import 'tailwindcss';
+```
+
+是的，v4 只需要这一行。这与 v3 需要写三个指令形成鲜明对比：
+
+```css
+/* v3 的写法（已过时）*/
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+```
+
+### 步骤 4：配置内容检测
+
+TailwindCSS 需要知道在哪些文件中查找类名。在 `src/app/globals.css` 中添加配置：
+
+```css
+/* src/app/globals.css */
+@import 'tailwindcss';
+
+@source "../**/*.{js,ts,jsx,tsx,mdx}";
+```
+
+`@source` 指令告诉 Tailwind 扫描哪些文件。上面的配置会扫描 `src` 目录下所有相关文件。
+
+对于 Next.js 项目，通常需要包含以下路径：
+
+```css
+@import 'tailwindcss';
+
+/* 扫描 src 目录下的所有组件 */
+@source "../**/*.{js,ts,jsx,tsx,mdx}";
+
+/* 如果有 components 目录在根目录 */
+@source "../../components/**/*.{js,ts,jsx,tsx}";
+```
+
+### 步骤 5：验证安装
+
+在 `src/app/page.tsx` 中添加一些 Tailwind 类来测试：
+
+```tsx
+// src/app/page.tsx
+export default function Home() {
+  return (
+    <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-500 to-purple-600">
+      <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md mx-4">
+        <h1 className="text-3xl font-bold text-gray-900 mb-4">
+          TailwindCSS v4
+        </h1>
+        <p className="text-gray-600 mb-6">
+          恭喜！你已成功配置 TailwindCSS v4。
+        </p>
+        <button className="w-full py-3 px-6 bg-blue-500 text-white font-medium rounded-lg hover:bg-blue-600 transition-colors">
+          开始使用
+        </button>
+      </div>
+    </main>
+  )
+}
+```
+
+启动开发服务器：
+
+```bash
+pnpm dev
+```
+
+访问 `http://localhost:3000`，你应该能看到一个带有渐变背景和白色卡片的页面。
+
+## 配置主题和设计令牌
+
+v4 使用 `@theme` 指令在 CSS 中直接配置设计令牌：
+
+```css
+/* src/app/globals.css */
+@import 'tailwindcss';
+
+@source "../**/*.{js,ts,jsx,tsx,mdx}";
+
+@theme {
+  /* 自定义颜色 */
+  --color-brand-50: oklch(0.97 0.02 250);
+  --color-brand-100: oklch(0.93 0.04 250);
+  --color-brand-200: oklch(0.86 0.08 250);
+  --color-brand-300: oklch(0.76 0.12 250);
+  --color-brand-400: oklch(0.66 0.16 250);
+  --color-brand-500: oklch(0.55 0.2 250);
+  --color-brand-600: oklch(0.48 0.18 250);
+  --color-brand-700: oklch(0.4 0.15 250);
+  --color-brand-800: oklch(0.33 0.12 250);
+  --color-brand-900: oklch(0.27 0.09 250);
+  --color-brand-950: oklch(0.2 0.06 250);
+
+  /* 自定义字体 */
+  --font-display: 'Inter', 'Noto Sans SC', sans-serif;
+  --font-body: 'Inter', 'Noto Sans SC', sans-serif;
+
+  /* 自定义间距 */
+  --spacing-18: 4.5rem;
+  --spacing-22: 5.5rem;
+
+  /* 自定义断点 */
+  --breakpoint-3xl: 1920px;
+
+  /* 自定义圆角 */
+  --radius-4xl: 2rem;
+
+  /* 自定义阴影 */
+  --shadow-soft:
+    0 2px 15px -3px oklch(0 0 0 / 0.1), 0 4px 6px -4px oklch(0 0 0 / 0.1);
+}
+```
+
+配置后，你可以直接使用这些自定义值：
+
+```html
+<div class="bg-brand-500 text-brand-50 font-display rounded-4xl shadow-soft">
+  使用自定义设计令牌
+</div>
+```
+
+## 编辑器配置
+
+良好的编辑器支持能大幅提升开发体验。
+
+### VS Code 配置
+
+安装官方扩展：
+
+```
+Tailwind CSS IntelliSense
+```
+
+扩展 ID：`bradlc.vscode-tailwindcss`
+
+这个扩展提供：
+
+- 类名自动补全
+- 悬停预览 CSS
+- 语法高亮
+- Lint 检查
+
+在 VS Code 设置中添加以下配置（`.vscode/settings.json`）：
+
+```json
+{
+  "tailwindCSS.includeLanguages": {
+    "typescript": "javascript",
+    "typescriptreact": "javascript"
+  },
+  "editor.quickSuggestions": {
+    "strings": "on"
+  },
+  "tailwindCSS.experimental.classRegex": [
+    ["clsx\\(([^)]*)\\)", "(?:'|\"|`)([^']*)(?:'|\"|`)"],
+    ["cn\\(([^)]*)\\)", "(?:'|\"|`)([^']*)(?:'|\"|`)"],
+    ["cva\\(([^)]*)\\)", "[\"'`]([^\"'`]*).*?[\"'`]"]
+  ],
+  "files.associations": {
+    "*.css": "tailwindcss"
+  }
+}
+```
+
+### 类名排序
+
+安装 Prettier 插件实现类名自动排序：
+
+```bash
+pnpm add -D prettier prettier-plugin-tailwindcss
+```
+
+创建 `.prettierrc`：
+
+```json
+{
+  "semi": false,
+  "singleQuote": true,
+  "tabWidth": 2,
+  "trailingComma": "es5",
+  "plugins": ["prettier-plugin-tailwindcss"]
+}
+```
+
+这个插件会按照官方推荐的顺序自动排列类名，保持代码风格一致。
+
+排序前：
+
+```html
+<div
+  class="p-4 flex bg-white items-center shadow-lg rounded-xl justify-between"
+></div>
+```
+
+排序后：
+
+```html
+<div
+  class="flex items-center justify-between rounded-xl bg-white p-4 shadow-lg"
+></div>
+```
+
+### WebStorm / JetBrains IDE
+
+JetBrains IDE 内置了 Tailwind 支持，确保在设置中启用：
+
+```
+Settings → Languages & Frameworks → Style Sheets → Tailwind CSS
+```
+
+勾选 "Enable Tailwind CSS support"。
+
+## 常用工具库集成
+
+### clsx / class-variance-authority
+
+处理条件类名的常用库：
+
+```bash
+pnpm add clsx class-variance-authority
+```
+
+使用示例：
+
+```tsx
+import { clsx } from 'clsx'
+import { cva, type VariantProps } from 'class-variance-authority'
+
+// clsx: 条件类名
+function Button({ isActive, className }) {
+  return (
+    <button
+      className={clsx(
+        'px-4 py-2 rounded-lg font-medium transition-colors',
+        isActive ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700',
+        className
+      )}
+    >
+      按钮
+    </button>
+  )
+}
+
+// cva: 变体管理
+const buttonVariants = cva(
+  'inline-flex items-center justify-center rounded-lg font-medium transition-colors',
+  {
+    variants: {
+      variant: {
+        primary: 'bg-blue-500 text-white hover:bg-blue-600',
+        secondary: 'bg-gray-100 text-gray-900 hover:bg-gray-200',
+        ghost: 'hover:bg-gray-100',
+      },
+      size: {
+        sm: 'h-8 px-3 text-sm',
+        md: 'h-10 px-4 text-base',
+        lg: 'h-12 px-6 text-lg',
+      },
+    },
+    defaultVariants: {
+      variant: 'primary',
+      size: 'md',
+    },
+  }
+)
+
+interface ButtonProps extends VariantProps<typeof buttonVariants> {
+  children: React.ReactNode
+}
+
+function Button({ variant, size, children }: ButtonProps) {
+  return (
+    <button className={buttonVariants({ variant, size })}>{children}</button>
+  )
+}
+```
+
+### tailwind-merge
+
+解决类名冲突的工具：
+
+```bash
+pnpm add tailwind-merge
+```
+
+```tsx
+import { twMerge } from 'tailwind-merge'
+
+// 后面的类会覆盖前面冲突的类
+twMerge('px-4 py-2', 'px-6')
+// 结果: 'py-2 px-6'
+
+// 常见封装：cn 函数
+import { clsx, type ClassValue } from 'clsx'
+import { twMerge } from 'tailwind-merge'
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs))
+}
+
+// 使用
+;<div className={cn('p-4 bg-white', isActive && 'bg-blue-500', className)} />
+```
+
+创建一个工具函数文件 `src/lib/utils.ts`：
+
+```ts
+// src/lib/utils.ts
+import { clsx, type ClassValue } from 'clsx'
+import { twMerge } from 'tailwind-merge'
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs))
+}
+```
+
+## TypeScript 类型支持
+
+### 配置 TypeScript
+
+确保 `tsconfig.json` 包含正确的路径映射：
+
+```json
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  }
+}
+```
+
+### 类名类型检查
+
+使用 `tailwindcss` 提供的类型（可选的严格模式）：
+
+```bash
+pnpm add -D @tailwindcss/typography
+```
+
+在需要严格类型检查的场景，可以使用第三方库 `tailwind-variants` 或 `cva`。
+
+## 完整项目结构
+
+配置完成后，项目结构应该类似：
+
+```
+my-tailwind-app/
+├── src/
+│   ├── app/
+│   │   ├── globals.css      # Tailwind 入口 + 主题配置
+│   │   ├── layout.tsx
+│   │   └── page.tsx
+│   ├── components/
+│   │   └── ui/
+│   │       └── button.tsx
+│   └── lib/
+│       └── utils.ts          # cn 函数等工具
+├── .vscode/
+│   └── settings.json         # VS Code 配置
+├── postcss.config.mjs        # PostCSS 配置
+├── .prettierrc               # Prettier 配置
+├── tailwind.config.ts        # 可选：传统配置文件
+├── tsconfig.json
+└── package.json
+```
+
+## v4 兼容模式
+
+如果你需要渐进式迁移，或依赖某些 v3 特性，可以使用兼容配置：
+
+```css
+/* globals.css */
+@import 'tailwindcss';
+
+/* 启用 v3 兼容的 @apply */
+@config "./tailwind.config.ts";
+```
+
+创建传统配置文件 `tailwind.config.ts`：
+
+```ts
+// tailwind.config.ts
+import type { Config } from 'tailwindcss'
+
+const config: Config = {
+  content: ['./src/**/*.{js,ts,jsx,tsx,mdx}'],
+  theme: {
+    extend: {
+      colors: {
+        brand: {
+          50: '#f0f9ff',
+          // ... 其他色阶
+        },
+      },
+    },
+  },
+  plugins: [],
+}
+
+export default config
+```
+
+但推荐尽量使用 v4 的 CSS 优先配置，享受更好的性能和开发体验。
+
+## 常见问题排查
+
+### 样式不生效
+
+1. 检查 `@source` 路径是否正确覆盖了所有组件文件
+2. 确认 PostCSS 配置使用的是 `@tailwindcss/postcss`
+3. 重启开发服务器
+
+### 类名自动补全不工作
+
+1. 确认安装了 Tailwind CSS IntelliSense 扩展
+2. 检查 VS Code 设置中的 `files.associations`
+3. 重启 VS Code
+
+### 构建报错
+
+```bash
+# 清除缓存后重新构建
+rm -rf .next node_modules/.cache
+pnpm build
+```
+
+### 热更新延迟
+
+v4 的 Oxide 引擎应该非常快。如果感到延迟：
+
+1. 检查是否使用了 Turbopack（`next dev --turbo`）
+2. 确认 `@source` 没有包含 `node_modules`
+
+## 开发脚本
+
+在 `package.json` 中添加常用脚本：
+
+```json
+{
+  "scripts": {
+    "dev": "next dev --turbo",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
+    "type-check": "tsc --noEmit"
+  }
+}
+```
+
+---
+
+环境搭建完成后，你已经拥有了一个配置完善的 TailwindCSS v4 + Next.js 15 开发环境。下一篇文章，我们将深入探索 Tailwind 的布局系统，包括 Flexbox、Grid、Container 等核心布局工具类的使用。

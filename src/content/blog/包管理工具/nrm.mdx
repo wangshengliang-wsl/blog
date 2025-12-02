@@ -5,11 +5,12 @@ pubDate: 2025-11-09
 toc: true
 ogImage: true
 category: 包管理工具
+tags: ['nrm', 'npm', 'registry', '镜像源', 'Node.js']
 ---
 
 nrm（NPM Registry Manager）用于快速切换 npm 源。国内开发者经常需要在 npm 官方源和国内镜像之间切换，手动修改配置繁琐且易出错，nrm 提供了简洁的命令行方式解决这个问题。
 
-> 本文基于 nrm v1.2.6 编写，适用于 npm、yarn、pnpm。
+🎯 **环境说明**：本文基于 nrm v1.2.6 编写，适用于 npm、yarn、pnpm。
 
 ## 为什么需要 nrm
 
@@ -170,7 +171,7 @@ $ nrm home taobao
 | 华为云              | https://repo.huaweicloud.com/repository/npm/ | 华为云加速             |
 | cnpm                | https://r.cnpmjs.org                         | 阿里巴巴               |
 
-**注意：** 淘宝源域名已从 `registry.npm.taobao.org` 迁移到 `registry.npmmirror.com`，老域名仍可用但建议更新。
+🔶 **注意**：淘宝源域名已从 `registry.npm.taobao.org` 迁移到 `registry.npmmirror.com`，老域名仍可用但建议更新。
 
 ## 配合 yarn/pnpm 使用
 
@@ -202,7 +203,7 @@ registry=https://registry.npmmirror.com
 
 ## 项目级源配置
 
-若不想全局切换源，可在项目根目录创建 `.npmrc`：
+🤔 若不想全局切换源，可在项目根目录创建 `.npmrc`：
 
 ```ini
 registry=https://registry.npmmirror.com

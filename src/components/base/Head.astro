@@ -1,20 +1,17 @@
 ---
 import { ClientRouter } from 'astro:transitions'
-import { basename } from 'node:path'
 
-import { checkFileExistsInDir } from '../../../plugins/remark-generate-og-image'
 import { withBasePath } from '~/utils/path'
 import { SITE } from '~/config'
 
 interface Props {
   title?: string
   description?: string
-  ogImage?: string | boolean
   pubDate?: string
   lastModDate?: string
 }
 
-const { title, description, ogImage, pubDate, lastModDate } = Astro.props
+const { title, description, pubDate, lastModDate } = Astro.props
 
 const siteName = new URL(SITE.website).hostname
 
@@ -25,26 +22,9 @@ const pageDescription = description || SITE.description
 
 const canonicalURL = new URL(Astro.url.pathname, Astro.site)
 
-const generatedOgImage = checkFileExistsInDir(
-  'public/og-images',
-  `${basename(Astro.url.pathname)}.png`
-)
-  ? withBasePath('og-images', `${basename(Astro.url.pathname)}.png`)
-  : undefined
-
-const assignedOgImage =
-  ogImage &&
-  ogImage !== true &&
-  checkFileExistsInDir('public/og-images', ogImage)
-    ? withBasePath('og-images', ogImage)
-    : undefined
-
-const ogImageURL = new URL(
-  assignedOgImage ||
-    generatedOgImage ||
-    withBasePath('og-images', 'og-image.png'),
-  Astro.url
-).href
+// 使用默认的 OG 图片
+const ogImageURL = new URL(withBasePath('og-images', 'og-image.png'), Astro.url)
+  .href
 
 // https://jsonld.com/blog-post/
 const blogPostingData = {
