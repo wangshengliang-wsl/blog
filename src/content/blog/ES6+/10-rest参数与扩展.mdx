@@ -1,0 +1,397 @@
+---
+title: 'rest 参数与扩展运算符'
+description: '全面理解 ES6 rest 参数收集和扩展运算符展开的语法与应用场景'
+pubDate: 2024-01-10
+toc: true
+ogImage: true
+category: 'ES6+'
+tags: ['ES6', 'rest参数', '扩展运算符', '函数']
+---
+
+ES6 引入了 `...` 语法，根据上下文有两种用途：收集（rest）和展开（spread）。
+
+## rest 参数
+
+### 基本语法
+
+用 `...` 将剩余参数收集为数组：
+
+```javascript
+function sum(...numbers) {
+  return numbers.reduce((a, b) => a + b, 0)
+}
+
+sum(1, 2, 3) // 6
+sum(1, 2, 3, 4, 5) // 15
+```
+
+### 与普通参数结合
+
+```javascript
+function log(level, ...messages) {
+  console.log(`[${level}]`, ...messages)
+}
+
+log('INFO', '用户登录', '张三') // [INFO] 用户登录 张三
+log('ERROR', '请求失败', 404, '资源不存在') // [ERROR] 请求失败 404 资源不存在
+```
+
+🔶 rest 参数必须是最后一个：
+
+```javascript
+// function bad(...rest, last) {} // SyntaxError
+```
+
+### 替代 arguments
+
+```javascript
+// ES5 使用 arguments
+function oldWay() {
+  // arguments 是类数组，不是真正的数组
+  var args = Array.prototype.slice.call(arguments)
+  return args.join('-')
+}
+
+// ES6 使用 rest
+function newWay(...args) {
+  // args 是真正的数组
+  return args.join('-')
+}
+
+oldWay(1, 2, 3) // '1-2-3'
+newWay(1, 2, 3) // '1-2-3'
+```
+
+rest 参数的优势：
+
+```javascript
+// rest 参数是真正的数组
+function test(...args) {
+  args.forEach(console.log) // ✅ 直接使用数组方法
+  args.map((x) => x * 2) // ✅
+  args.filter((x) => x > 0) // ✅
+}
+
+// arguments 不是数组
+function oldTest() {
+  // arguments.forEach(console.log); // ❌ TypeError
+  Array.from(arguments).forEach(console.log) // 需要转换
+}
+```
+
+### 解构中的 rest
+
+```javascript
+// 数组解构
+const [first, second, ...rest] = [1, 2, 3, 4, 5]
+console.log(first) // 1
+console.log(second) // 2
+console.log(rest) // [3, 4, 5]
+
+// 对象解构
+const { name, ...others } = { name: '张三', age: 25, city: '北京' }
+console.log(name) // '张三'
+console.log(others) // { age: 25, city: '北京' }
+```
+
+## 扩展运算符
+
+### 数组展开
+
+```javascript
+const arr = [1, 2, 3]
+
+// 展开为参数
+Math.max(...arr) // 3
+
+// 展开为数组元素
+const newArr = [0, ...arr, 4]
+console.log(newArr) // [0, 1, 2, 3, 4]
+
+// 合并数组
+const a = [1, 2]
+const b = [3, 4]
+const merged = [...a, ...b] // [1, 2, 3, 4]
+```
+
+### 数组复制
+
+```javascript
+const original = [1, 2, 3]
+
+// 浅复制
+const copy = [...original]
+copy.push(4)
+
+console.log(original) // [1, 2, 3]
+console.log(copy) // [1, 2, 3, 4]
+
+// 🔶 注意：只是浅复制
+const nested = [[1], [2]]
+const nestedCopy = [...nested]
+nestedCopy[0].push(10)
+console.log(nested[0]) // [1, 10]（原数组也被修改）
+```
+
+### 字符串展开
+
+```javascript
+const str = 'hello'
+const chars = [...str]
+console.log(chars) // ['h', 'e', 'l', 'l', 'o']
+
+// 正确处理 Unicode
+const emoji = '👨‍👩‍👧'
+console.log([...emoji]) // ['👨', '‍', '👩', '‍', '👧']
+```
+
+### 对象展开
+
+ES2018 开始支持对象展开：
+
+```javascript
+const obj = { a: 1, b: 2 }
+
+// 复制对象
+const copy = { ...obj }
+console.log(copy) // { a: 1, b: 2 }
+
+// 合并对象
+const merged = { ...obj, c: 3 }
+console.log(merged) // { a: 1, b: 2, c: 3 }
+
+// 后面的属性覆盖前面的
+const overwrite = { ...obj, b: 20 }
+console.log(overwrite) // { a: 1, b: 20 }
+```
+
+🔶 对象展开只复制可枚举的自有属性：
+
+```javascript
+const proto = { inherited: true }
+const obj = Object.create(proto)
+obj.own = true
+Object.defineProperty(obj, 'nonEnum', {
+  value: 'hidden',
+  enumerable: false,
+})
+
+const copy = { ...obj }
+console.log(copy) // { own: true }
+// 没有 inherited（继承属性）
+// 没有 nonEnum（不可枚举属性）
+```
+
+## 实战应用
+
+### 函数柯里化
+
+```javascript
+function curry(fn) {
+  return function curried(...args) {
+    if (args.length >= fn.length) {
+      return fn.apply(this, args)
+    }
+    return function (...more) {
+      return curried.apply(this, [...args, ...more])
+    }
+  }
+}
+
+const add = (a, b, c) => a + b + c
+const curriedAdd = curry(add)
+
+curriedAdd(1)(2)(3) // 6
+curriedAdd(1, 2)(3) // 6
+curriedAdd(1)(2, 3) // 6
+```
+
+### 数组去重
+
+```javascript
+const arr = [1, 2, 2, 3, 3, 3]
+const unique = [...new Set(arr)]
+console.log(unique) // [1, 2, 3]
+```
+
+### 数组最大最小值
+
+```javascript
+const numbers = [5, 2, 8, 1, 9]
+
+// 传统方式
+Math.max.apply(null, numbers) // 9
+
+// 扩展运算符
+Math.max(...numbers) // 9
+Math.min(...numbers) // 1
+```
+
+### 将类数组转为数组
+
+```javascript
+// NodeList
+const divs = document.querySelectorAll('div')
+const divsArray = [...divs]
+
+// arguments（箭头函数没有 arguments）
+function toArray() {
+  return [...arguments]
+}
+
+// 类数组对象
+const arrayLike = { 0: 'a', 1: 'b', 2: 'c', length: 3 }
+// [...arrayLike]; // TypeError: 不可迭代
+Array.from(arrayLike) // ['a', 'b', 'c']
+```
+
+### 深层属性更新（不可变更新）
+
+```javascript
+const state = {
+  user: {
+    name: '张三',
+    settings: {
+      theme: 'light',
+      language: 'zh',
+    },
+  },
+}
+
+// 更新深层属性
+const newState = {
+  ...state,
+  user: {
+    ...state.user,
+    settings: {
+      ...state.user.settings,
+      theme: 'dark',
+    },
+  },
+}
+
+console.log(state.user.settings.theme) // 'light'（原对象不变）
+console.log(newState.user.settings.theme) // 'dark'
+```
+
+### 条件属性
+
+```javascript
+const isDev = true
+const config = {
+  api: '/api',
+  ...(isDev && { debug: true }),
+  ...(isDev ? { sourcemap: true } : {}),
+}
+
+console.log(config)
+// { api: '/api', debug: true, sourcemap: true }
+```
+
+### 函数参数转发
+
+```javascript
+function log(fn) {
+  return function (...args) {
+    console.log('调用参数:', args)
+    const result = fn(...args)
+    console.log('返回结果:', result)
+    return result
+  }
+}
+
+const add = (a, b) => a + b
+const loggedAdd = log(add)
+loggedAdd(1, 2)
+// 调用参数: [1, 2]
+// 返回结果: 3
+```
+
+### 合并默认配置
+
+```javascript
+function createRequest(options) {
+  const defaults = {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    timeout: 5000,
+  }
+
+  return {
+    ...defaults,
+    ...options,
+    headers: {
+      ...defaults.headers,
+      ...options.headers,
+    },
+  }
+}
+
+createRequest({
+  url: '/api/users',
+  headers: { Authorization: 'Bearer token' },
+})
+// {
+//   method: 'GET',
+//   headers: {
+//     'Content-Type': 'application/json',
+//     'Authorization': 'Bearer token'
+//   },
+//   timeout: 5000,
+//   url: '/api/users'
+// }
+```
+
+### 数组操作
+
+```javascript
+// 插入元素
+function insert(arr, index, ...items) {
+  return [...arr.slice(0, index), ...items, ...arr.slice(index)]
+}
+insert([1, 2, 5], 2, 3, 4) // [1, 2, 3, 4, 5]
+
+// 移除元素
+function remove(arr, index) {
+  return [...arr.slice(0, index), ...arr.slice(index + 1)]
+}
+remove([1, 2, 3, 4], 2) // [1, 2, 4]
+
+// 替换元素
+function replace(arr, index, item) {
+  return [...arr.slice(0, index), item, ...arr.slice(index + 1)]
+}
+replace([1, 2, 3, 4], 2, 'X') // [1, 2, 'X', 4]
+```
+
+## rest 与 spread 对比
+
+| 特性       | rest 参数             | 扩展运算符                 |
+| ---------- | --------------------- | -------------------------- |
+| 语法       | `...name`             | `...expr`                  |
+| 位置       | 函数参数、解构        | 数组、对象字面量、函数调用 |
+| 作用       | 收集多个值为数组/对象 | 展开数组/对象为单独的值    |
+| 必须在末尾 | 是                    | 否                         |
+
+```javascript
+// rest：收集
+function collect(...items) {
+  // 收集参数为数组
+  return items
+}
+
+// spread：展开
+const arr = [1, 2, 3]
+console.log(...arr) // 展开数组为单独的值
+```
+
+## 小结
+
+`...` 语法让数组和对象操作更加简洁：
+
+- **rest 参数**：收集剩余参数/元素为数组，替代 `arguments`
+- **扩展运算符**：展开数组/对象，简化复制、合并、传参
+
+这两个特性是现代 JavaScript 开发中使用频率极高的语法，熟练掌握可以写出更简洁优雅的代码。

@@ -1,0 +1,381 @@
+---
+title: 'BigInt 大整数'
+description: '深入理解 ES2020 BigInt 类型：创建方式、运算规则与实际使用场景'
+pubDate: 2024-01-08
+toc: true
+ogImage: true
+category: 'ES6+'
+tags: ['ES2020', 'BigInt', '大整数', '数值']
+---
+
+JavaScript 的 Number 类型只能安全表示 -(2^53 - 1) 到 2^53 - 1 之间的整数。ES2020 引入了 BigInt 类型，可以表示任意大的整数。
+
+## 🎯 为什么需要 BigInt
+
+```javascript
+// Number 的安全整数范围
+console.log(Number.MAX_SAFE_INTEGER) // 9007199254740991
+
+// 超出范围会丢失精度
+console.log(9007199254740992 === 9007199254740993) // true（危险！）
+console.log(9007199254740992 + 1) // 9007199254740992（错误结果）
+console.log(9007199254740992 + 2) // 9007199254740994
+
+// 实际场景：Twitter ID、数据库主键、加密运算
+const twitterId = 1453486895483658244 // 会丢失精度
+```
+
+## 创建 BigInt
+
+### 字面量语法
+
+在数字后加 `n`：
+
+```javascript
+const big = 9007199254740993n
+console.log(big) // 9007199254740993n
+console.log(typeof big) // 'bigint'
+
+// 可以表示任意大的整数
+const huge = 123456789012345678901234567890n
+console.log(huge) // 123456789012345678901234567890n
+```
+
+### BigInt() 构造函数
+
+```javascript
+// 从数字创建（必须是整数）
+BigInt(123) // 123n
+// BigInt(1.5); // RangeError
+
+// 从字符串创建
+BigInt('9007199254740993') // 9007199254740993n
+
+// 不同进制
+BigInt('0xff') // 255n
+BigInt('0o17') // 15n
+BigInt('0b1010') // 10n
+```
+
+🔶 注意：不能使用 `new BigInt()`：
+
+```javascript
+// new BigInt(1); // TypeError: BigInt is not a constructor
+```
+
+## 运算规则
+
+### 算术运算
+
+```javascript
+const a = 100n
+const b = 30n
+
+a + b // 130n
+a - b // 70n
+a * b // 3000n
+a / b // 3n（整除，向零取整）
+a % b // 10n
+a ** 2n // 10000n
+
+// 一元运算
+;-a // -100n
+// +a; // TypeError（不支持一元+）
+```
+
+### 🔶 不能与 Number 混合运算
+
+```javascript
+// 10n + 5; // TypeError: Cannot mix BigInt and other types
+
+// 必须显式转换
+10n + BigInt(5) // 15n
+Number(10n) + 5 // 15
+```
+
+### 比较运算
+
+BigInt 可以与 Number 比较：
+
+```javascript
+// 相等比较
+10n == 10 // true（宽松相等）
+10n === 10 // false（严格相等，类型不同）
+
+// 大小比较
+10n > 5 // true
+10n < 20 // true
+
+// 排序
+const mixed = [4n, 6, -12n, 10, 4, 0, 0n]
+mixed.sort() // [-12n, 0, 0n, 4n, 4, 6, 10]
+```
+
+### 位运算
+
+```javascript
+const a = 0b1010n // 10n
+const b = 0b1100n // 12n
+
+a & b // 8n (0b1000)
+a | b // 14n (0b1110)
+a ^ b // 6n (0b0110)
+~a // -11n
+a << 2n // 40n
+a >> 1n // 5n
+
+// 🔶 位移量必须是 BigInt
+// a << 2; // TypeError
+```
+
+### 🔶 不支持的运算
+
+```javascript
+// 不支持一元 +
+// +10n; // TypeError
+
+// 不支持 Math 方法
+// Math.sqrt(16n); // TypeError
+// Math.max(1n, 2n); // TypeError
+
+// 不支持无符号右移
+// 10n >>> 1n; // TypeError
+```
+
+## 类型转换
+
+### 转为其他类型
+
+```javascript
+const big = 123n
+
+// 转字符串
+String(big) // '123'
+big.toString() // '123'
+big.toString(16) // '7b'（十六进制）
+
+// 转数字（可能丢失精度）
+Number(big) // 123
+Number(9007199254740993n) // 9007199254740992（丢失精度！）
+
+// 转布尔值
+Boolean(0n) // false
+Boolean(1n) // true
+```
+
+### JSON 序列化
+
+🔶 BigInt 不能直接 JSON 序列化：
+
+```javascript
+// JSON.stringify({ id: 123n }); // TypeError
+
+// 方案1：转为字符串
+JSON.stringify({ id: 123n }, (key, value) =>
+  typeof value === 'bigint' ? value.toString() : value
+)
+// '{"id":"123"}'
+
+// 方案2：自定义 toJSON
+BigInt.prototype.toJSON = function () {
+  return this.toString()
+}
+JSON.stringify({ id: 123n }) // '{"id":"123"}'
+```
+
+## 实际应用
+
+### 处理大 ID
+
+```javascript
+// API 返回的大 ID（字符串形式）
+const response = {
+  id: '9007199254740993',
+  name: '用户',
+}
+
+// 转为 BigInt 进行计算
+const id = BigInt(response.id)
+const nextId = id + 1n
+console.log(nextId.toString()) // '9007199254740994'
+```
+
+### 精确的整数运算
+
+```javascript
+// 计算大数阶乘
+function factorial(n) {
+  let result = 1n
+  for (let i = 2n; i <= n; i++) {
+    result *= i
+  }
+  return result
+}
+
+factorial(50n)
+// 30414093201713378043612608166064768844377641568960512000000000000n
+
+// 计算大数幂
+function power(base, exp) {
+  let result = 1n
+  base = BigInt(base)
+  while (exp > 0n) {
+    if (exp % 2n === 1n) {
+      result *= base
+    }
+    exp /= 2n
+    base *= base
+  }
+  return result
+}
+
+power(2, 100n)
+// 1267650600228229401496703205376n
+```
+
+### 加密运算
+
+```javascript
+// 简单的模幂运算（用于 RSA 等算法）
+function modPow(base, exp, mod) {
+  base = BigInt(base)
+  exp = BigInt(exp)
+  mod = BigInt(mod)
+
+  let result = 1n
+  base = base % mod
+
+  while (exp > 0n) {
+    if (exp % 2n === 1n) {
+      result = (result * base) % mod
+    }
+    exp = exp / 2n
+    base = (base * base) % mod
+  }
+
+  return result
+}
+
+modPow(2, 10, 1000) // 24n (2^10 % 1000 = 1024 % 1000)
+```
+
+### 时间戳处理
+
+```javascript
+// 纳秒级时间戳
+const nanoTimestamp = 1699000000000000000n
+
+// 转换为毫秒
+const msTimestamp = nanoTimestamp / 1000000n
+const date = new Date(Number(msTimestamp))
+
+// 高精度时间差
+function hrtime() {
+  const [seconds, nanoseconds] = process.hrtime()
+  return BigInt(seconds) * 1000000000n + BigInt(nanoseconds)
+}
+```
+
+### 数据库 ID 处理
+
+```javascript
+// Snowflake ID 解析（Twitter/Discord 使用的 ID 格式）
+function parseSnowflake(id) {
+  const snowflake = BigInt(id)
+
+  // 时间戳（毫秒，从 Discord 纪元开始）
+  const timestamp = (snowflake >> 22n) + 1420070400000n
+
+  // 内部 Worker ID
+  const workerId = (snowflake & 0x3e0000n) >> 17n
+
+  // 内部进程 ID
+  const processId = (snowflake & 0x1f000n) >> 12n
+
+  // 自增序列
+  const sequence = snowflake & 0xfffn
+
+  return {
+    timestamp: new Date(Number(timestamp)),
+    workerId: Number(workerId),
+    processId: Number(processId),
+    sequence: Number(sequence),
+  }
+}
+
+parseSnowflake('1453486895483658244')
+```
+
+## 兼容性处理
+
+```javascript
+// 检查是否支持 BigInt
+const hasBigInt = typeof BigInt !== 'undefined'
+
+// 安全的大数处理
+function safeBigNumber(value) {
+  if (hasBigInt) {
+    return BigInt(value)
+  }
+  // 降级方案：使用字符串或第三方库
+  return value.toString()
+}
+
+// 比较大小（兼容模式）
+function compareBigNumbers(a, b) {
+  if (hasBigInt) {
+    const bigA = BigInt(a)
+    const bigB = BigInt(b)
+    if (bigA > bigB) return 1
+    if (bigA < bigB) return -1
+    return 0
+  }
+  // 字符串比较（同位数情况）
+  if (a.length !== b.length) {
+    return a.length - b.length
+  }
+  return a.localeCompare(b)
+}
+```
+
+## 常见问题
+
+### 🙋 什么时候使用 BigInt？
+
+- 处理超过 `Number.MAX_SAFE_INTEGER` 的整数
+- 需要精确整数运算的场景
+- 处理来自外部系统的大 ID（数据库、第三方 API）
+- 加密和哈希运算
+
+### 🙋 为什么不默认使用 BigInt？
+
+- 性能比 Number 稍差
+- 不能与 Number 直接混合运算
+- 不支持 Math 方法
+- JSON 序列化需要额外处理
+
+### 🙋 如何安全地转换为 Number？
+
+```javascript
+function bigIntToNumber(big) {
+  if (
+    big > BigInt(Number.MAX_SAFE_INTEGER) ||
+    big < BigInt(Number.MIN_SAFE_INTEGER)
+  ) {
+    throw new Error('BigInt 值超出 Number 安全范围')
+  }
+  return Number(big)
+}
+```
+
+## 小结
+
+| 特性 | 说明                                |
+| ---- | ----------------------------------- |
+| 创建 | `123n` 或 `BigInt('123')`           |
+| 运算 | 支持算术、比较、位运算              |
+| 限制 | 不能与 Number 混合运算              |
+| 转换 | `String()`、`Number()`、`Boolean()` |
+| JSON | 需要自定义序列化                    |
+
+BigInt 解决了 JavaScript 长期以来的大整数处理难题，在处理数据库 ID、加密运算等场景下非常有用。

@@ -1,0 +1,393 @@
+---
+title: '函数默认参数'
+description: '深入理解 ES6 函数默认参数的语法、作用域规则与最佳实践'
+pubDate: 2024-01-09
+toc: true
+ogImage: true
+category: 'ES6+'
+tags: ['ES6', '函数', '默认参数', '参数']
+---
+
+ES6 允许为函数参数设置默认值，大大简化了参数处理逻辑。
+
+## 基本语法
+
+### ES5 的做法
+
+```javascript
+// ES5 处理默认值
+function greet(name, greeting) {
+  name = name || '朋友'
+  greeting = greeting || '你好'
+  console.log(greeting + '，' + name)
+}
+
+greet() // '你好，朋友'
+greet('张三') // '你好，张三'
+
+// 🔶 问题：无法区分 undefined 和 falsy 值
+greet('张三', '') // '你好，张三'（空字符串被当作 false）
+```
+
+### ES6 默认参数
+
+```javascript
+function greet(name = '朋友', greeting = '你好') {
+  console.log(`${greeting}，${name}`)
+}
+
+greet() // '你好，朋友'
+greet('张三') // '你好，张三'
+greet('张三', '') // '，张三'（空字符串有效）
+greet('张三', undefined) // '你好，张三'（undefined 触发默认值）
+```
+
+🤔 只有 `undefined` 会触发默认值，`null` 和其他 falsy 值不会：
+
+```javascript
+function test(a = 1, b = 2) {
+  console.log(a, b)
+}
+
+test(undefined, null) // 1 null
+test(0, '') // 0 ''
+test(false, NaN) // false NaN
+```
+
+## 表达式作为默认值
+
+默认值可以是任意表达式，惰性求值：
+
+```javascript
+function getDefault() {
+  console.log('计算默认值')
+  return 100
+}
+
+function test(value = getDefault()) {
+  return value
+}
+
+test(1) // 不会打印，返回 1
+test() // 打印 '计算默认值'，返回 100
+```
+
+实际应用：
+
+```javascript
+// 必填参数检查
+function required(name) {
+  throw new Error(`参数 ${name} 是必填的`)
+}
+
+function createUser(name = required('name'), age = 18) {
+  return { name, age }
+}
+
+createUser('张三') // { name: '张三', age: 18 }
+// createUser(); // Error: 参数 name 是必填的
+
+// 生成唯一 ID
+let id = 0
+function createItem(name, itemId = ++id) {
+  return { id: itemId, name }
+}
+
+createItem('A') // { id: 1, name: 'A' }
+createItem('B') // { id: 2, name: 'B' }
+createItem('C', 100) // { id: 100, name: 'C' }
+```
+
+## 与解构结合
+
+### 参数解构的默认值
+
+```javascript
+// 解构参数 + 默认值
+function createUser({ name = '匿名', age = 18 } = {}) {
+  return { name, age }
+}
+
+createUser() // { name: '匿名', age: 18 }
+createUser({}) // { name: '匿名', age: 18 }
+createUser({ name: '张三' }) // { name: '张三', age: 18 }
+createUser({ name: '张三', age: 25 }) // { name: '张三', age: 25 }
+```
+
+🔶 注意两层默认值的区别：
+
+```javascript
+// 方式 1：只有解构默认值
+function foo({ a = 1, b = 2 }) {
+  console.log(a, b)
+}
+// foo(); // TypeError: 无法解构 undefined
+
+// 方式 2：整体默认值
+function bar({ a, b } = { a: 1, b: 2 }) {
+  console.log(a, b)
+}
+bar() // 1 2
+bar({}) // undefined undefined（整体参数不是 undefined，不触发默认值）
+
+// 方式 3：两层默认值（推荐）
+function baz({ a = 1, b = 2 } = {}) {
+  console.log(a, b)
+}
+baz() // 1 2
+baz({}) // 1 2
+baz({ a: 10 }) // 10 2
+```
+
+### 数组解构默认值
+
+```javascript
+function sum([a = 0, b = 0] = []) {
+  return a + b
+}
+
+sum() // 0
+sum([]) // 0
+sum([1]) // 1
+sum([1, 2]) // 3
+```
+
+## 参数作用域
+
+默认参数形成一个独立的作用域：
+
+```javascript
+const x = 1
+
+function foo(x, y = x) {
+  console.log(y)
+}
+
+foo(2) // 2（y 的默认值是参数 x，不是全局 x）
+```
+
+更复杂的例子：
+
+```javascript
+let x = 1
+
+function foo(
+  x,
+  y = function () {
+    x = 2
+  }
+) {
+  var x = 3
+  y()
+  console.log(x)
+}
+
+foo() // 3
+console.log(x) // 1
+
+// 解释：
+// 1. 参数 (x, y = ...) 形成独立作用域
+// 2. y 函数中的 x 是参数作用域的 x
+// 3. 函数体内 var x = 3 是另一个 x
+// 4. y() 修改的是参数作用域的 x
+// 5. console.log(x) 打印的是函数体的 x
+```
+
+## 参数位置
+
+### 带默认值的参数应放在后面
+
+```javascript
+// 不推荐：默认参数在前
+function greet(greeting = '你好', name) {
+  console.log(`${greeting}，${name}`)
+}
+
+greet('张三') // '张三，undefined'（没达到预期）
+greet(undefined, '张三') // '你好，张三'（必须显式传 undefined）
+
+// 推荐：默认参数在后
+function greet2(name, greeting = '你好') {
+  console.log(`${greeting}，${name}`)
+}
+
+greet2('张三') // '你好，张三'
+```
+
+### 中间的默认参数
+
+```javascript
+function range(start = 0, end, step = 1) {
+  // 处理省略中间参数的情况
+  if (end === undefined) {
+    end = start
+    start = 0
+  }
+
+  const result = []
+  for (let i = start; i < end; i += step) {
+    result.push(i)
+  }
+  return result
+}
+
+range(5) // [0, 1, 2, 3, 4]
+range(1, 5) // [1, 2, 3, 4]
+range(0, 10, 2) // [0, 2, 4, 6, 8]
+```
+
+## length 属性
+
+有默认值的参数不计入 `length`：
+
+```javascript
+;(function (a) {}).length // 1
+;(function (a = 1) {}).length // 0
+;(function (a, b = 1) {}).length // 1
+;(function (a, b, c = 1) {}).length // 2
+
+// rest 参数也不计入
+;(function (a, ...rest) {}).length // 1
+```
+
+## 实战应用
+
+### 配置对象模式
+
+```javascript
+function createServer({
+  port = 3000,
+  host = 'localhost',
+  https = false,
+  cors = true,
+  timeout = 30000,
+} = {}) {
+  console.log(`Server: ${https ? 'https' : 'http'}://${host}:${port}`)
+  console.log(`CORS: ${cors}, Timeout: ${timeout}ms`)
+}
+
+createServer() // 使用全部默认值
+createServer({ port: 8080 }) // 只改端口
+createServer({ https: true, port: 443 }) // HTTPS
+```
+
+### 工厂函数
+
+```javascript
+function createPerson(
+  name,
+  { age = 0, gender = '未知', email = '', address = {} } = {}
+) {
+  return {
+    name,
+    age,
+    gender,
+    email,
+    address: {
+      city: address.city || '未知',
+      country: address.country || '中国',
+    },
+  }
+}
+
+createPerson('张三')
+// {
+//   name: '张三',
+//   age: 0,
+//   gender: '未知',
+//   email: '',
+//   address: { city: '未知', country: '中国' }
+// }
+```
+
+### 函数重载模拟
+
+```javascript
+function createElement(tag, options = {}) {
+  const { id, className, text, children = [], attrs = {} } = options
+
+  const element = document.createElement(tag)
+
+  if (id) element.id = id
+  if (className) element.className = className
+  if (text) element.textContent = text
+
+  Object.entries(attrs).forEach(([key, value]) => {
+    element.setAttribute(key, value)
+  })
+
+  children.forEach((child) => {
+    if (typeof child === 'string') {
+      element.appendChild(document.createTextNode(child))
+    } else {
+      element.appendChild(child)
+    }
+  })
+
+  return element
+}
+
+// 简单用法
+createElement('div')
+
+// 完整用法
+createElement('div', {
+  id: 'container',
+  className: 'wrapper',
+  attrs: { 'data-id': '123' },
+  children: [createElement('p', { text: 'Hello' })],
+})
+```
+
+### 日期格式化
+
+```javascript
+function formatDate(
+  date = new Date(),
+  {
+    year = true,
+    month = true,
+    day = true,
+    hour = false,
+    minute = false,
+    second = false,
+    separator = '-',
+    timeSeparator = ':',
+  } = {}
+) {
+  const parts = []
+
+  if (year) parts.push(date.getFullYear())
+  if (month) parts.push(String(date.getMonth() + 1).padStart(2, '0'))
+  if (day) parts.push(String(date.getDate()).padStart(2, '0'))
+
+  let result = parts.join(separator)
+
+  const timeParts = []
+  if (hour) timeParts.push(String(date.getHours()).padStart(2, '0'))
+  if (minute) timeParts.push(String(date.getMinutes()).padStart(2, '0'))
+  if (second) timeParts.push(String(date.getSeconds()).padStart(2, '0'))
+
+  if (timeParts.length) {
+    result += ' ' + timeParts.join(timeSeparator)
+  }
+
+  return result
+}
+
+formatDate() // '2024-01-09'
+formatDate(new Date(), { hour: true, minute: true }) // '2024-01-09 10:30'
+formatDate(new Date(), { separator: '/' }) // '2024/01/09'
+```
+
+## 小结
+
+| 特性     | 说明                         |
+| -------- | ---------------------------- |
+| 触发条件 | 只有 `undefined` 触发默认值  |
+| 表达式   | 默认值可以是表达式，惰性求值 |
+| 作用域   | 参数形成独立作用域           |
+| 位置     | 默认参数应放在参数列表末尾   |
+| length   | 默认参数不计入函数 length    |
+
+默认参数让函数签名更清晰，配合解构使用可以实现灵活的配置对象模式。

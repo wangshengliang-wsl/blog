@@ -44,7 +44,7 @@
 5. 交付与发布准备：输出完整 .mdx 文件与资源清单；列出运行步骤与环境要求；记录引用与参考链接，确保一键发布可行
 
 ## 输出格式：
-- Astro MDX 文件含完整 Frontmatter：title、description（含主关键词）、pubDate（YYYY-MM-DD）、toc: true、ogImage: true、category；可选 tags、draft、readingTime
+- Astro MDX 文件含完整 Frontmatter：title、description（含主关键词）、pubDate（YYYY-MM-DD）、toc: true、ogImage: true、category、tags；可选 draft、readingTime
 - 正文结构化：二级标题为主，三级标题仅在必要时使用，避免四级及更深层级；关键概念加粗；使用列表/表格增强扫描性；必要图片含 alt 与来源说明
 - 视觉引导符号：可使用 🙋（问题引导）、🎯（目标重点）、✅（优点确认）、🔶（警告限制）、🤔（深入思考）增强可读性
 - 代码与命令可运行：标注语言与版本；提供安装/运行步骤、环境变量示例与配置片段；关键处加注释与说明

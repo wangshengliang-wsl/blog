@@ -1,0 +1,413 @@
+---
+title: 'Symbol 进阶应用'
+description: '深入理解内置 Symbol、Symbol.for/keyFor 以及 Symbol 在元编程中的应用'
+pubDate: 2024-01-19
+toc: true
+ogImage: true
+category: 'ES6+'
+tags: ['ES6', 'Symbol', '元编程', '内置Symbol']
+---
+
+除了基本用法，Symbol 还有更强大的能力：内置 Symbol 可以改变对象的默认行为。
+
+## Symbol.for() 和 Symbol.keyFor()
+
+### 全局 Symbol 注册表
+
+`Symbol.for()` 会在全局注册表中查找或创建 Symbol：
+
+```javascript
+// Symbol() 每次创建新的
+const s1 = Symbol('foo')
+const s2 = Symbol('foo')
+console.log(s1 === s2) // false
+
+// Symbol.for() 从全局注册表查找
+const s3 = Symbol.for('foo')
+const s4 = Symbol.for('foo')
+console.log(s3 === s4) // true（同一个 Symbol）
+```
+
+### Symbol.keyFor()
+
+获取全局 Symbol 的描述符：
+
+```javascript
+const globalSym = Symbol.for('foo')
+const localSym = Symbol('foo')
+
+Symbol.keyFor(globalSym) // 'foo'
+Symbol.keyFor(localSym) // undefined（不是全局 Symbol）
+```
+
+### 跨 iframe/realm 共享
+
+```javascript
+// 在主窗口
+const sym = Symbol.for('shared')
+
+// 在 iframe 中
+const iframeWindow = iframe.contentWindow
+const iframeSym = iframeWindow.Symbol.for('shared')
+
+console.log(sym === iframeSym) // true（全局注册表是跨 realm 的）
+```
+
+### 实际应用
+
+```javascript
+// 跨模块共享 Symbol
+// moduleA.js
+export const INTERNAL = Symbol.for('mylib.internal')
+
+// moduleB.js（即使是不同打包块）
+const sym = Symbol.for('mylib.internal')
+// 可以访问同一个 Symbol
+```
+
+## 内置 Symbol
+
+JavaScript 定义了多个内置 Symbol，用于自定义对象的行为。
+
+### Symbol.iterator
+
+定义对象的默认迭代器：
+
+```javascript
+const range = {
+  start: 1,
+  end: 5,
+
+  [Symbol.iterator]() {
+    let current = this.start
+    const end = this.end
+
+    return {
+      next() {
+        if (current <= end) {
+          return { value: current++, done: false }
+        }
+        return { done: true }
+      },
+    }
+  },
+}
+
+for (const num of range) {
+  console.log(num) // 1, 2, 3, 4, 5
+}
+
+;[...range] // [1, 2, 3, 4, 5]
+```
+
+### Symbol.asyncIterator
+
+定义异步迭代器：
+
+```javascript
+const asyncRange = {
+  start: 1,
+  end: 3,
+
+  async *[Symbol.asyncIterator]() {
+    for (let i = this.start; i <= this.end; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 100))
+      yield i
+    }
+  },
+}
+
+;(async () => {
+  for await (const num of asyncRange) {
+    console.log(num) // 1, 2, 3（每个间隔 100ms）
+  }
+})()
+```
+
+### Symbol.toStringTag
+
+自定义 Object.prototype.toString() 的返回值：
+
+```javascript
+class MyClass {
+  get [Symbol.toStringTag]() {
+    return 'MyClass'
+  }
+}
+
+const obj = new MyClass()
+Object.prototype.toString.call(obj) // '[object MyClass]'
+
+// 内置对象也使用这个
+Object.prototype.toString.call(new Map()) // '[object Map]'
+Object.prototype.toString.call(Promise.resolve()) // '[object Promise]'
+```
+
+### Symbol.toPrimitive
+
+自定义类型转换：
+
+```javascript
+const obj = {
+  [Symbol.toPrimitive](hint) {
+    switch (hint) {
+      case 'number':
+        return 42
+      case 'string':
+        return 'hello'
+      default: // 'default'
+        return 'default value'
+    }
+  },
+}
+
+;+obj // 42（hint: 'number'）
+;`${obj}` // 'hello'（hint: 'string'）
+obj + '' // 'default value'（hint: 'default'）
+```
+
+实际应用：
+
+```javascript
+class Money {
+  constructor(amount, currency) {
+    this.amount = amount
+    this.currency = currency
+  }
+
+  [Symbol.toPrimitive](hint) {
+    if (hint === 'number') {
+      return this.amount
+    }
+    if (hint === 'string') {
+      return `${this.currency}${this.amount}`
+    }
+    return this.amount
+  }
+}
+
+const price = new Money(99.99, '¥')
+console.log(+price) // 99.99
+console.log(`${price}`) // '¥99.99'
+console.log(price > 50) // true
+```
+
+### Symbol.hasInstance
+
+自定义 instanceof 行为：
+
+```javascript
+class MyArray {
+  static [Symbol.hasInstance](instance) {
+    return Array.isArray(instance);
+  }
+}
+
+[] instanceof MyArray; // true
+{} instanceof MyArray; // false
+
+// 实际应用：检查鸭子类型
+class Thenable {
+  static [Symbol.hasInstance](instance) {
+    return instance && typeof instance.then === 'function';
+  }
+}
+
+Promise.resolve() instanceof Thenable; // true
+{ then: () => {} } instanceof Thenable; // true
+```
+
+### Symbol.species
+
+指定派生对象的构造函数：
+
+```javascript
+class MyArray extends Array {
+  static get [Symbol.species]() {
+    return Array // 派生方法返回普通 Array
+  }
+}
+
+const arr = new MyArray(1, 2, 3)
+const mapped = arr.map((x) => x * 2)
+
+console.log(arr instanceof MyArray) // true
+console.log(mapped instanceof MyArray) // false
+console.log(mapped instanceof Array) // true
+```
+
+### Symbol.isConcatSpreadable
+
+控制 Array.concat() 的展开行为：
+
+```javascript
+// 默认数组会展开
+const arr = [1, 2]
+;[0].concat(arr) // [0, 1, 2]
+
+// 设为 false 不展开
+arr[Symbol.isConcatSpreadable] = false
+;[0].concat(arr) // [0, [1, 2]]
+
+// 类数组对象默认不展开
+const arrayLike = { 0: 'a', 1: 'b', length: 2 }
+;[0].concat(arrayLike) // [0, { 0: 'a', 1: 'b', length: 2 }]
+
+// 设为 true 使其展开
+arrayLike[Symbol.isConcatSpreadable] = true
+;[0].concat(arrayLike) // [0, 'a', 'b']
+```
+
+### Symbol.match/replace/search/split
+
+自定义字符串方法的行为：
+
+```javascript
+// 自定义匹配器
+class StartsWithMatcher {
+  constructor(prefix) {
+    this.prefix = prefix
+  }
+
+  [Symbol.match](string) {
+    return string.startsWith(this.prefix)
+  }
+}
+
+'hello world'.match(new StartsWithMatcher('hello')) // true
+'hello world'.match(new StartsWithMatcher('world')) // false
+
+// 自定义替换器
+class Censorer {
+  [Symbol.replace](string) {
+    return string.replace(/badword/gi, '***')
+  }
+}
+
+'This is a badword'.replace(new Censorer()) // 'This is a ***'
+```
+
+### Symbol.unscopables
+
+控制 with 语句的变量排除：
+
+```javascript
+// Array.prototype 有这个属性
+Array.prototype[Symbol.unscopables]
+// {
+//   at: true,
+//   copyWithin: true,
+//   entries: true,
+//   ...
+// }
+
+// 这些方法在 with 语句中不会被绑定到数组
+```
+
+## 实战应用
+
+### 自定义可迭代集合
+
+```javascript
+class Stack {
+  #items = []
+
+  push(item) {
+    this.#items.push(item)
+  }
+
+  pop() {
+    return this.#items.pop()
+  }
+
+  *[Symbol.iterator]() {
+    for (let i = this.#items.length - 1; i >= 0; i--) {
+      yield this.#items[i]
+    }
+  }
+
+  get [Symbol.toStringTag]() {
+    return 'Stack'
+  }
+}
+
+const stack = new Stack()
+stack.push(1)
+stack.push(2)
+stack.push(3)
+
+;[...stack] // [3, 2, 1]
+Object.prototype.toString.call(stack) // '[object Stack]'
+```
+
+### 类型检查工具
+
+```javascript
+class TypeChecker {
+  constructor(typeFn) {
+    this.typeFn = typeFn
+  }
+
+  static [Symbol.hasInstance](instance) {
+    return false // 不直接使用 instanceof
+  }
+
+  check(value) {
+    return this.typeFn(value)
+  }
+}
+
+const isString = new TypeChecker((v) => typeof v === 'string')
+const isNumber = new TypeChecker((v) => typeof v === 'number')
+
+isString.check('hello') // true
+isNumber.check(42) // true
+```
+
+### 延迟计算
+
+```javascript
+class Lazy {
+  constructor(computation) {
+    this.computation = computation
+    this.computed = false
+    this.value = undefined
+  }
+
+  [Symbol.toPrimitive](hint) {
+    if (!this.computed) {
+      this.value = this.computation()
+      this.computed = true
+    }
+    return this.value
+  }
+}
+
+const expensive = new Lazy(() => {
+  console.log('Computing...')
+  return 42
+})
+
+// 首次使用时才计算
+console.log(+expensive) // 'Computing...' 然后 42
+console.log(+expensive) // 42（使用缓存）
+```
+
+## 内置 Symbol 汇总
+
+| Symbol                    | 用途                             |
+| ------------------------- | -------------------------------- |
+| Symbol.iterator           | 默认迭代器                       |
+| Symbol.asyncIterator      | 异步迭代器                       |
+| Symbol.toStringTag        | Object.prototype.toString 返回值 |
+| Symbol.toPrimitive        | 类型转换                         |
+| Symbol.hasInstance        | instanceof 行为                  |
+| Symbol.species            | 派生对象构造函数                 |
+| Symbol.isConcatSpreadable | concat 是否展开                  |
+| Symbol.match              | String.match 行为                |
+| Symbol.replace            | String.replace 行为              |
+| Symbol.search             | String.search 行为               |
+| Symbol.split              | String.split 行为                |
+| Symbol.unscopables        | with 语句排除属性                |
+
+内置 Symbol 是 JavaScript 元编程的核心，让开发者可以自定义对象的底层行为。

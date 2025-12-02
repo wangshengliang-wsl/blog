@@ -1,268 +1,622 @@
 ---
 title: Astro 内容集合
-description: 深入理解 Astro Content Collections，涵盖集合定义、Schema 验证、内容查询、MDX 集成及博客系统实战
-pubDate: 2025-11-27
+description: 深入理解 Astro 5 的 Content Layer API，学习 Schema 定义、集合查询和内容渲染
+pubDate: 2025-12-02
 toc: true
 ogImage: true
 category: Astro
+tags: ['Astro', 'Content Collections', 'MDX', 'Zod']
 ---
 
-Content Collections 是 Astro 管理内容的核心功能，为 Markdown/MDX 内容提供类型安全、Schema 验证和便捷的查询 API。非常适合构建博客、文档站等内容驱动型网站。
+## 内容集合概述
 
-> 本文基于 Astro v5.x 编写。
+🙋 如果你曾经用纯 Markdown 文件管理博客，一定遇到过这些问题：
 
-## 内容集合基础
+- Frontmatter 字段写错了，构建时才发现
+- 不同文章的 Frontmatter 格式不一致
+- 没有 TypeScript 类型提示，写代码靠猜
 
-### 目录结构
+Astro 的内容集合（Content Collections）就是为解决这些问题而设计的。
 
-内容集合位于 `src/content/` 目录：
+### 什么是内容集合？
 
-```text
-src/content/
-├── config.ts          # 集合配置（Schema 定义）
-├── blog/              # 博客集合
-│   ├── post-1.md
-│   ├── post-2.mdx
-│   └── drafts/
-│       └── draft-1.md
-├── docs/              # 文档集合
-│   ├── getting-started.md
-│   └── guides/
-│       └── routing.md
-└── authors/           # 作者集合（JSON/YAML）
-    ├── alice.json
-    └── bob.json
-```
+内容集合是一种**类型安全的内容管理方式**。你可以：
 
-### 定义集合配置
+- 📝 用 Zod Schema 定义 Frontmatter 结构
+- ✅ 构建时自动验证所有内容文件
+- 🎯 获得完整的 TypeScript 类型提示
+- 🔍 用统一的 API 查询和渲染内容
 
 ```typescript
-// src/content/config.ts
-import { defineCollection, z } from 'astro:content'
+// 定义一个博客集合
+const blog = defineCollection({
+  loader: glob({ base: './src/content/blog', pattern: '**/*.mdx' }),
+  schema: z.object({
+    title: z.string().max(60),
+    pubDate: z.coerce.date(),
+    tags: z.array(z.string()).default([]),
+  }),
+})
+```
 
-// 博客集合
-const blogCollection = defineCollection({
-  type: 'content', // Markdown/MDX 内容
+### Astro 5 Content Layer API vs 旧版 API
+
+Astro 5 引入了全新的 **Content Layer API**，相比旧版有重大改进：
+
+| 特性     | 旧版 (v4.x)             | Content Layer API (v5)  |
+| -------- | ----------------------- | ----------------------- |
+| 配置文件 | `src/content/config.ts` | `src/content.config.ts` |
+| 数据源   | 仅本地文件              | 本地 + 远程（CMS、API） |
+| 性能     | 每次构建全量处理        | 增量构建，缓存优化      |
+| Loader   | 内置固定                | 可自定义                |
+| render() | 条目方法                | 独立函数                |
+
+🔶 **迁移注意**: 如果你从 Astro 4.x 升级，需要调整配置文件位置和 render 方式。
+
+### 集合 vs 普通 Markdown 文件
+
+不使用集合时：
+
+```astro
+---
+// ❌ 手动导入，没有类型检查
+import posts from '../posts/*.md'
+
+// 无法保证每篇文章都有这些字段
+posts.forEach((post) => {
+  console.log(post.frontmatter.title) // 可能是 undefined
+})
+---
+```
+
+使用集合后：
+
+```astro
+---
+// ✅ 类型安全的查询
+import { getCollection } from 'astro:content'
+
+const posts = await getCollection('blog')
+
+posts.forEach((post) => {
+  console.log(post.data.title) // TypeScript 知道这是 string
+})
+---
+```
+
+## 定义集合
+
+### src/content.config.ts 配置文件
+
+这是 Astro 5 内容集合的配置入口：
+
+```typescript
+// src/content.config.ts
+import { defineCollection, z } from 'astro:content'
+import { glob, file } from 'astro/loaders'
+
+// 定义博客集合
+const blog = defineCollection({
+  loader: glob({ base: './src/content/blog', pattern: '**/*.mdx' }),
   schema: z.object({
     title: z.string(),
-    description: z.string(),
-    pubDate: z.date(),
-    updatedDate: z.date().optional(),
-    author: z.string().default('Anonymous'),
-    tags: z.array(z.string()).default([]),
+    pubDate: z.coerce.date(),
     draft: z.boolean().default(false),
-    image: z.string().optional(),
   }),
 })
 
-// 作者集合
-const authorsCollection = defineCollection({
-  type: 'data', // JSON/YAML 数据
+// 定义项目集合（JSON 数据）
+const projects = defineCollection({
+  loader: file('./src/content/projects/data.json'),
   schema: z.object({
+    id: z.string(),
     name: z.string(),
-    email: z.string().email(),
-    avatar: z.string().url(),
-    bio: z.string().optional(),
+    link: z.string().url(),
   }),
 })
 
-export const collections = {
-  blog: blogCollection,
-  authors: authorsCollection,
-}
+// 导出所有集合
+export const collections = { blog, projects }
 ```
 
-### 内容文件示例
+🎯 关键点：
 
-```markdown
----
-title: 我的第一篇文章
-description: 这是文章描述
-pubDate: 2024-01-15
-tags: ['astro', 'tutorial']
-author: alice
----
+- 文件必须命名为 `content.config.ts`（注意不是 `config.ts`）
+- 必须导出 `collections` 对象
+- 每个集合需要 `loader` 和 `schema`
 
-# 文章标题
+### defineCollection() 函数
 
-这是文章内容...
-```
-
-## Schema 验证
-
-### Zod 类型
-
-Astro 使用 Zod 进行 Schema 验证：
+`defineCollection()` 接受一个配置对象：
 
 ```typescript
-import { z } from 'astro:content'
+const myCollection = defineCollection({
+  // 数据加载器（必需）
+  loader: glob({ base: './src/content/my-collection', pattern: '**/*.md' }),
 
-const schema = z.object({
-  // 基础类型
-  title: z.string(),
-  count: z.number(),
-  active: z.boolean(),
+  // Schema 定义（推荐）
+  schema: z.object({
+    title: z.string(),
+    // ...
+  }),
+})
+```
 
-  // 日期
-  pubDate: z.date(),
-  // 也可以接受字符串自动转换
+### Zod Schema 验证
+
+Astro 使用 [Zod](https://zod.dev/) 进行 Schema 验证。Zod 是一个 TypeScript-first 的验证库。
+
+**基本类型**：
+
+```typescript
+z.string() // 字符串
+z.number() // 数字
+z.boolean() // 布尔值
+z.date() // Date 对象
+z.array(z.string()) // 字符串数组
+```
+
+**常用修饰符**：
+
+```typescript
+z.string().optional() // 可选
+z.string().default('默认值') // 默认值
+z.string().max(60) // 最大长度
+z.number().min(0).max(100) // 范围限制
+z.coerce.date() // 自动转换为 Date
+```
+
+**完整示例**：
+
+```typescript
+const postSchema = z.object({
+  // 必需字段
+  title: z.string().max(60),
   pubDate: z.coerce.date(),
 
-  // 可选字段
-  subtitle: z.string().optional(),
-
-  // 默认值
+  // 可选字段（带默认值）
+  description: z.string().default(''),
   draft: z.boolean().default(false),
+  tags: z.array(z.string()).default([]),
 
-  // 枚举
-  status: z.enum(['draft', 'published', 'archived']),
-
-  // 数组
-  tags: z.array(z.string()),
-
-  // 嵌套对象
-  author: z.object({
-    name: z.string(),
-    email: z.string().email(),
-  }),
+  // 可选字段（可能不存在）
+  coverImage: z.string().optional(),
 
   // 联合类型
-  category: z.union([z.string(), z.array(z.string())]),
+  category: z.enum(['tech', 'life', 'other']),
 
-  // 字符串验证
-  slug: z.string().min(3).max(100),
+  // 自定义验证
+  readingTime: z.number().min(1).optional(),
+})
+```
+
+### 内置 Loader：glob / file
+
+**glob loader** - 匹配多个文件：
+
+```typescript
+import { glob } from 'astro/loaders'
+
+// 匹配所有 .md 和 .mdx 文件
+const blog = defineCollection({
+  loader: glob({
+    base: './src/content/blog',
+    pattern: '**/*.{md,mdx}',
+  }),
+  schema: postSchema,
+})
+
+// 排除某些文件
+const docs = defineCollection({
+  loader: glob({
+    base: './src/content/docs',
+    pattern: '**/[^_]*.md', // 排除以 _ 开头的文件
+  }),
+  schema: docSchema,
+})
+```
+
+**file loader** - 加载单个数据文件：
+
+```typescript
+import { file } from 'astro/loaders'
+
+// JSON 文件
+const projects = defineCollection({
+  loader: file('./src/content/projects/data.json'),
+  schema: projectSchema,
+})
+
+// YAML 文件
+const config = defineCollection({
+  loader: file('./src/content/config.yaml'),
+  schema: configSchema,
+})
+```
+
+JSON 数据格式：
+
+```json
+// src/content/projects/data.json
+[
+  {
+    "id": "project-1",
+    "name": "我的项目",
+    "link": "https://example.com"
+  },
+  {
+    "id": "project-2",
+    "name": "另一个项目",
+    "link": "https://example.org"
+  }
+]
+```
+
+## Schema 设计
+
+### 必需与可选字段
+
+```typescript
+const schema = z.object({
+  // 必需：不提供会报错
+  title: z.string(),
+
+  // 可选：可以不提供（值为 undefined）
+  subtitle: z.string().optional(),
+
+  // 可选但有默认值：不提供时使用默认值
+  draft: z.boolean().default(false),
+  tags: z.array(z.string()).default([]),
+})
+```
+
+🔶 **最佳实践**: 必需字段尽量精简，其他用 `default()` 提供默认值。
+
+### 字段类型
+
+**字符串类型**：
+
+```typescript
+z.string() // 任意字符串
+z.string().min(1) // 非空字符串
+z.string().max(60) // 限制长度
+z.string().url() // URL 格式
+z.string().email() // 邮箱格式
+z.string().regex(/^[a-z]+$/) // 正则匹配
+z.enum(['a', 'b', 'c']) // 枚举值
+```
+
+**数字类型**：
+
+```typescript
+z.number() // 任意数字
+z.number().int() // 整数
+z.number().positive() // 正数
+z.number().min(0).max(100) // 范围
+```
+
+**日期类型**：
+
+```typescript
+// 推荐使用 coerce，自动将字符串转为 Date
+z.coerce.date()
+
+// Frontmatter 中可以这样写：
+// pubDate: 2025-12-02
+// pubDate: "2025-12-02"
+// pubDate: "December 2, 2025"
+```
+
+**数组类型**：
+
+```typescript
+z.array(z.string()) // 字符串数组
+z.array(z.string()).min(1) // 至少一个元素
+z.array(z.string()).max(5) // 最多五个元素
+```
+
+**对象类型**：
+
+```typescript
+z.object({
+  name: z.string(),
   url: z.string().url(),
-  email: z.string().email(),
 })
 ```
 
-### 图片 Schema
+**联合类型**：
 
 ```typescript
-import { defineCollection, z } from 'astro:content'
-import { image } from 'astro:assets'
+// 字符串或布尔值
+z.union([z.string(), z.boolean()])
 
-const blogCollection = defineCollection({
-  schema: ({ image }) =>
-    z.object({
-      title: z.string(),
-      // 引用 src/assets 中的图片
-      cover: image(),
-      // 可选图片
-      thumbnail: image().optional(),
-    }),
-})
+// 简写（两种类型）
+z.string().or(z.boolean())
 ```
 
-Frontmatter 中引用图片：
+### 自定义验证逻辑
 
-```markdown
----
-title: 文章标题
-cover: ./images/cover.jpg
----
-```
-
-### 集合引用
-
-在一个集合中引用另一个集合：
+使用 `.refine()` 添加自定义验证：
 
 ```typescript
+const schema = z
+  .object({
+    title: z.string(),
+    pubDate: z.coerce.date(),
+    lastModDate: z.coerce.date().optional(),
+  })
+  .refine(
+    (data) => {
+      // 如果有 lastModDate，必须晚于 pubDate
+      if (data.lastModDate) {
+        return data.lastModDate >= data.pubDate
+      }
+      return true
+    },
+    {
+      message: '最后修改日期必须晚于发布日期',
+    }
+  )
+```
+
+### reference() 集合引用
+
+内容集合之间可以相互引用：
+
+```typescript
+// src/content.config.ts
 import { defineCollection, z, reference } from 'astro:content'
 
-const blogCollection = defineCollection({
+const authors = defineCollection({
+  loader: file('./src/content/authors/data.json'),
+  schema: z.object({
+    id: z.string(),
+    name: z.string(),
+    avatar: z.string().url(),
+  }),
+})
+
+const blog = defineCollection({
+  loader: glob({ base: './src/content/blog', pattern: '**/*.mdx' }),
   schema: z.object({
     title: z.string(),
     // 引用 authors 集合
     author: reference('authors'),
-    // 引用多个
-    relatedPosts: z.array(reference('blog')).optional(),
+    // 引用多篇相关文章
+    relatedPosts: z.array(reference('blog')).default([]),
   }),
 })
 ```
 
-```markdown
+在 Frontmatter 中使用：
+
+```yaml
 ---
-title: 我的文章
-author: alice # 引用 authors/alice.json
+title: '我的文章'
+author: john-doe # 对应 authors 集合中的 id
 relatedPosts:
-  - post-1
-  - post-2
+  - another-post-id
+  - yet-another-post
 ---
 ```
 
-## 查询内容
-
-### 获取集合
+查询时解析引用：
 
 ```astro
 ---
-import { getCollection, getEntry } from 'astro:content'
+import { getEntry, getEntries } from 'astro:content'
 
-// 获取所有文章
+const post = await getEntry('blog', 'my-post')
+
+// 解析单个引用
+const author = await getEntry(post.data.author)
+
+// 解析多个引用
+const relatedPosts = await getEntries(post.data.relatedPosts)
+---
+
+<p>作者: {author.data.name}</p>
+```
+
+## 查询集合
+
+### getCollection() 获取所有条目
+
+```astro
+---
+import { getCollection } from 'astro:content'
+
+// 获取所有博客文章
 const allPosts = await getCollection('blog')
 
-// 过滤条件
+// 带过滤器
 const publishedPosts = await getCollection('blog', ({ data }) => {
   return data.draft !== true
 })
 
-// 按日期排序
-const sortedPosts = publishedPosts.sort(
-  (a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf()
-)
+// 复杂过滤
+const recentTechPosts = await getCollection('blog', ({ data }) => {
+  const oneMonthAgo = new Date()
+  oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1)
 
-// 获取单个条目
-const post = await getEntry('blog', 'post-1')
-
-// 通过引用获取
-const author = await getEntry(post.data.author)
+  return (
+    data.draft !== true &&
+    data.category === 'tech' &&
+    data.pubDate > oneMonthAgo
+  )
+})
 ---
 ```
 
-### 条目属性
-
-```typescript
-interface CollectionEntry {
-  id: string // 文件路径（相对于集合目录）
-  slug: string // URL slug
-  body: string // 原始内容
-  collection: string // 集合名称
-  data: {
-    // Frontmatter 数据（类型安全）
-    title: string
-    pubDate: Date
-    // ...
-  }
-  render(): Promise<{ Content: AstroComponent }> // 渲染方法
-}
-```
-
-### 渲染内容
+### getEntry() 获取单个条目
 
 ```astro
 ---
 import { getEntry } from 'astro:content'
 
-const post = await getEntry('blog', 'post-1')
-const { Content, headings, remarkPluginFrontmatter } = await post.render()
+// 通过集合名和 ID 获取
+const post = await getEntry('blog', 'hello-world')
+
+if (post) {
+  console.log(post.data.title)
+}
+
+// 也可以传入引用对象
+const authorRef = post.data.author
+const author = await getEntry(authorRef)
+---
+```
+
+### getEntries() 批量获取
+
+```astro
+---
+import { getEntries } from 'astro:content'
+
+// 批量获取多个条目
+const featuredPosts = await getEntries([
+  { collection: 'blog', id: 'post-1' },
+  { collection: 'blog', id: 'post-2' },
+  { collection: 'blog', id: 'post-3' },
+])
+
+// 解析引用数组
+const relatedPosts = await getEntries(post.data.relatedPosts)
+---
+```
+
+### 过滤与排序
+
+```astro
+---
+import { getCollection } from 'astro:content'
+
+// 获取所有文章
+const posts = await getCollection('blog')
+
+// 按发布日期排序（最新在前）
+const sortedPosts = posts.sort(
+  (a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf()
+)
+
+// 过滤草稿（生产环境）
+const publishedPosts = import.meta.env.PROD
+  ? posts.filter((post) => !post.data.draft)
+  : posts
+
+// 按分类分组
+const postsByCategory = posts.reduce(
+  (acc, post) => {
+    const category = post.data.category
+    if (!acc[category]) acc[category] = []
+    acc[category].push(post)
+    return acc
+  },
+  {} as Record<string, typeof posts>
+)
+
+// 获取所有标签
+const allTags = [...new Set(posts.flatMap((post) => post.data.tags))]
+---
+```
+
+### CollectionEntry 类型
+
+每个集合条目的类型结构：
+
+```typescript
+import type { CollectionEntry } from 'astro:content'
+
+type BlogPost = CollectionEntry<'blog'>
+
+// BlogPost 包含：
+// - id: string (文件路径/唯一标识)
+// - collection: 'blog'
+// - data: { title: string, pubDate: Date, ... }  (Schema 定义的字段)
+// - body: string (原始内容)
+```
+
+在组件中使用类型：
+
+```astro
+---
+import type { CollectionEntry } from 'astro:content'
+
+interface Props {
+  post: CollectionEntry<'blog'>
+}
+
+const { post } = Astro.props
 ---
 
 <article>
   <h1>{post.data.title}</h1>
   <time>{post.data.pubDate.toLocaleDateString()}</time>
+</article>
+```
 
-  <!-- 渲染 Markdown 内容 -->
+## 渲染内容
+
+### render() 函数（Astro 5 新方式）
+
+Astro 5 中，`render()` 是一个独立函数，而不是条目的方法：
+
+```astro
+---
+import { getEntry, render } from 'astro:content'
+
+const post = await getEntry('blog', 'hello-world')
+const { Content, headings } = await render(post)
+---
+
+<article>
+  <h1>{post.data.title}</h1>
   <Content />
 </article>
 ```
 
-### 获取目录标题
+🔶 **与旧版的区别**：
+
+```typescript
+// Astro 4.x (旧版)
+const { Content } = await post.render()
+
+// Astro 5.x (新版)
+import { render } from 'astro:content'
+const { Content } = await render(post)
+```
+
+### `<Content />` 组件
+
+`Content` 是一个 Astro 组件，渲染 Markdown/MDX 内容：
 
 ```astro
 ---
-const { Content, headings } = await post.render()
-// headings: [{ depth: 2, slug: 'intro', text: 'Introduction' }, ...]
+import { getEntry, render } from 'astro:content'
+
+const post = await getEntry('blog', 'my-post')
+const { Content } = await render(post)
+---
+
+<article class="prose">
+  <Content />
+</article>
+```
+
+### 获取 headings 生成目录
+
+`render()` 返回的 `headings` 包含所有标题信息：
+
+```astro
+---
+const { Content, headings } = await render(post)
+
+// headings 结构:
+// [
+//   { depth: 2, slug: 'introduction', text: '介绍' },
+//   { depth: 3, slug: 'getting-started', text: '快速开始' },
+//   { depth: 2, slug: 'examples', text: '示例' },
+// ]
 ---
 
 <nav class="toc">
@@ -270,7 +624,7 @@ const { Content, headings } = await post.render()
   <ul>
     {
       headings
-        .filter((h) => h.depth <= 3)
+        .filter((h) => h.depth <= 3) // 只显示 h2 和 h3
         .map((h) => (
           <li style={`margin-left: ${(h.depth - 2) * 1}rem`}>
             <a href={`#${h.slug}`}>{h.text}</a>
@@ -279,340 +633,342 @@ const { Content, headings } = await post.render()
     }
   </ul>
 </nav>
+
+<article>
+  <Content />
+</article>
 ```
 
-## MDX 支持
+### 自定义组件传递
 
-### 安装 MDX 集成
-
-```bash
-npx astro add mdx
-```
-
-### 在 MDX 中使用组件
-
-```mdx
----
-title: MDX 文章
----
-
-import Callout from '../../components/Callout.astro'
-import Counter from '../../components/Counter'
-
-# 使用组件
-
-<Callout type="info">这是一个提示框</Callout>
-
-<Counter client:load />
-
-## 普通 Markdown
-
-这是普通的 Markdown 内容...
-```
-
-### 自定义 MDX 组件
-
-```javascript
-// astro.config.mjs
-import { defineConfig } from 'astro/config'
-import mdx from '@astrojs/mdx'
-
-export default defineConfig({
-  integrations: [mdx()],
-  markdown: {
-    // 自定义组件映射
-    // 替换默认 HTML 元素
-  },
-})
-```
-
-## Remark/Rehype 插件
-
-### 配置插件
-
-```javascript
-// astro.config.mjs
-import { defineConfig } from 'astro/config'
-import remarkToc from 'remark-toc'
-import rehypeSlug from 'rehype-slug'
-import rehypeAutolinkHeadings from 'rehype-autolink-headings'
-
-export default defineConfig({
-  markdown: {
-    remarkPlugins: [
-      remarkToc,
-      // 带配置的插件
-      [remarkPlugin, { option: 'value' }],
-    ],
-    rehypePlugins: [rehypeSlug, [rehypeAutolinkHeadings, { behavior: 'wrap' }]],
-    // 语法高亮
-    syntaxHighlight: 'shiki',
-    shikiConfig: {
-      theme: 'github-dark',
-      wrap: true,
-    },
-  },
-})
-```
-
-### 常用插件
-
-| 插件                       | 功能                 |
-| -------------------------- | -------------------- |
-| `remark-toc`               | 自动生成目录         |
-| `remark-reading-time`      | 计算阅读时间         |
-| `remark-gfm`               | GitHub 风格 Markdown |
-| `rehype-slug`              | 标题添加 ID          |
-| `rehype-autolink-headings` | 标题添加锚点链接     |
-| `rehype-pretty-code`       | 代码高亮             |
-
-### 自定义 Remark 插件
-
-```javascript
-// plugins/remark-reading-time.mjs
-import getReadingTime from 'reading-time'
-import { toString } from 'mdast-util-to-string'
-
-export function remarkReadingTime() {
-  return function (tree, { data }) {
-    const textOnPage = toString(tree)
-    const readingTime = getReadingTime(textOnPage)
-    data.astro.frontmatter.readingTime = readingTime.text
-  }
-}
-```
+可以覆盖 Markdown 渲染的默认组件：
 
 ```astro
 ---
-const { remarkPluginFrontmatter } = await post.render()
-const readingTime = remarkPluginFrontmatter.readingTime
+const { Content } = await render(post)
+import CustomImage from '~/components/CustomImage.astro'
+import CustomLink from '~/components/CustomLink.astro'
 ---
 
-<span>阅读时间：{readingTime}</span>
+<Content
+  components={{
+    img: CustomImage,
+    a: CustomLink,
+    // 覆盖更多元素...
+    h1: (props) => <h1 class="custom-h1" {...props} />,
+  }}
+/>
 ```
 
-## 实战：博客系统
+自定义图片组件示例：
 
-### 集合配置
+```astro
+---
+// src/components/CustomImage.astro
+interface Props {
+  src: string
+  alt: string
+}
+const { src, alt } = Astro.props
+---
+
+<figure class="image-wrapper">
+  <img src={src} alt={alt} loading="lazy" />
+  {alt && <figcaption>{alt}</figcaption>}
+</figure>
+```
+
+## 实战：当前博客的内容架构
+
+让我们深入分析当前博客项目的内容集合实现。
+
+### 分析 src/content.config.ts
 
 ```typescript
-// src/content/config.ts
-import { defineCollection, z, reference } from 'astro:content'
+// src/content.config.ts
+import { glob, file } from 'astro/loaders'
+import { defineCollection } from 'astro:content'
 
+import {
+  pageSchema,
+  postSchema,
+  projectSchema,
+  streamSchema,
+  photoSchema,
+} from '~/content/schema'
+
+// 页面集合（MDX 页面的 Frontmatter）
+const pages = defineCollection({
+  loader: glob({ base: './src/pages', pattern: '**/*.mdx' }),
+  schema: pageSchema,
+})
+
+// 博客文章集合
 const blog = defineCollection({
-  type: 'content',
-  schema: ({ image }) =>
-    z.object({
-      title: z.string(),
-      description: z.string(),
-      pubDate: z.coerce.date(),
-      updatedDate: z.coerce.date().optional(),
-      author: reference('authors'),
-      cover: image().optional(),
-      tags: z.array(z.string()).default([]),
-      category: z.string(),
-      draft: z.boolean().default(false),
-    }),
+  loader: glob({ base: './src/content/blog', pattern: '**/[^_]*.{md,mdx}' }),
+  schema: postSchema,
 })
 
-const authors = defineCollection({
-  type: 'data',
-  schema: z.object({
-    name: z.string(),
-    avatar: z.string(),
-    bio: z.string(),
-    social: z
-      .object({
-        twitter: z.string().optional(),
-        github: z.string().optional(),
-      })
-      .optional(),
+// 项目数据集合
+const projects = defineCollection({
+  loader: file('./src/content/projects/data.json'),
+  schema: projectSchema,
+})
+
+// 照片集合
+const photos = defineCollection({
+  loader: file('src/content/photos/data.json'),
+  schema: photoSchema,
+})
+
+// 更新日志集合
+const changelog = defineCollection({
+  loader: glob({
+    base: './src/content/changelog',
+    pattern: '**/[^_]*.{md,mdx}',
   }),
+  schema: postSchema,
 })
 
-export const collections = { blog, authors }
+// 外部链接流集合
+const streams = defineCollection({
+  loader: file('./src/content/streams/data.json'),
+  schema: streamSchema,
+})
+
+export const collections = {
+  pages,
+  blog,
+  projects,
+  photos,
+  changelog,
+  streams,
+}
 ```
 
-### 文章列表页
+🎯 设计要点：
 
-```astro
----
-// src/pages/blog/index.astro
+1. **多种内容类型**: blog、changelog 用 Markdown，projects、streams 用 JSON
+2. **排除下划线文件**: `**/[^_]*.{md,mdx}` 排除以 `_` 开头的草稿
+3. **复用 Schema**: blog 和 changelog 共用 `postSchema`
+
+### postSchema 字段详解
+
+```typescript
+// src/content/schema.ts
+import { z } from 'astro:content'
+
+export const postSchema = z.object({
+  // 必需字段
+  title: z.string().max(60),
+  pubDate: z.coerce.date(),
+
+  // 分类（默认"杂谈"）
+  category: z.string().default('杂谈'),
+
+  // 可选元数据
+  description: z.string().default(''),
+  subtitle: z.string().default(''),
+  lastModDate: z.union([z.coerce.date(), z.literal('')]).optional(),
+  tags: z.array(z.string()).default([]),
+
+  // 内容类型标记
+  radio: z.boolean().default(false),
+  video: z.boolean().default(false),
+  platform: z.string().default(''),
+
+  // 显示控制
+  toc: z.boolean().default(true),
+  draft: z.boolean().default(false),
+  ogImage: z.union([z.string(), z.boolean()]).default(true),
+
+  // 功能开关
+  share: z.boolean().default(true),
+  giscus: z.boolean().default(true),
+  search: z.boolean().default(true),
+
+  // 重定向
+  redirect: z.string().url().optional(),
+
+  // 阅读时间
+  minutesRead: z.number().optional(),
+})
+```
+
+### 文章查询与渲染流程
+
+**查询文章** (`src/utils/data.ts`):
+
+```typescript
 import { getCollection } from 'astro:content'
-import Layout from '../../layouts/Layout.astro'
-import PostCard from '../../components/PostCard.astro'
+import type { CollectionEntry } from 'astro:content'
 
-const posts = await getCollection('blog', ({ data }) => !data.draft)
-const sortedPosts = posts.sort(
-  (a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf()
-)
----
+export async function getFilteredPosts(
+  collection: 'blog' | 'changelog'
+): Promise<CollectionEntry<typeof collection>[]> {
+  const posts = await getCollection(collection)
 
-<Layout title="博客">
-  <h1>所有文章</h1>
-  <div class="posts-grid">
-    {sortedPosts.map((post) => <PostCard post={post} />)}
-  </div>
-</Layout>
-```
+  // 生产环境过滤草稿
+  const filtered = import.meta.env.PROD
+    ? posts.filter((post) => !post.data.draft)
+    : posts
 
-### 文章详情页
-
-```astro
----
-// src/pages/blog/[slug].astro
-import { getCollection, getEntry } from 'astro:content'
-import Layout from '../../layouts/Layout.astro'
-
-export async function getStaticPaths() {
-  const posts = await getCollection('blog')
-  return posts.map((post) => ({
-    params: { slug: post.slug },
-    props: { post },
-  }))
+  // 按日期排序
+  return filtered.sort(
+    (a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf()
+  )
 }
 
-const { post } = Astro.props
-const { Content, headings } = await post.render()
-const author = await getEntry(post.data.author)
+// 按分类获取
+export async function getPostsByCategory(category: string) {
+  const posts = await getFilteredPosts('blog')
+  return posts.filter((post) => post.data.category === category)
+}
+
+// 获取所有分类
+export async function getAllCategories() {
+  const posts = await getFilteredPosts('blog')
+  return [...new Set(posts.map((post) => post.data.category))]
+}
+```
+
+**渲染文章** (`src/components/views/RenderPost.astro`):
+
+```astro
+---
+import { render } from 'astro:content'
+import type { CollectionEntry } from 'astro:content'
+
+import BaseLayout from '~/layouts/BaseLayout.astro'
+import PostMeta from '~/components/PostMeta.astro'
+import TableOfContents from '~/components/TableOfContents.astro'
+import Giscus from '~/components/Giscus.astro'
+
+interface Props {
+  post: CollectionEntry<'blog'>
+  isCommentable?: boolean
+}
+
+const { post, isCommentable = false } = Astro.props
+const { Content, headings } = await render(post)
+const { title, description, pubDate, toc, giscus } = post.data
 ---
 
-<Layout title={post.data.title} description={post.data.description}>
-  <article>
-    <header>
-      <h1>{post.data.title}</h1>
-      <div class="meta">
-        <img src={author.data.avatar} alt={author.data.name} />
-        <span>{author.data.name}</span>
-        <time>{post.data.pubDate.toLocaleDateString('zh-CN')}</time>
-      </div>
-      {
-        post.data.tags.length > 0 && (
-          <div class="tags">
-            {post.data.tags.map((tag) => (
-              <a href={`/tags/${tag}`}>{tag}</a>
-            ))}
-          </div>
-        )
-      }
-    </header>
+<BaseLayout title={title} description={description}>
+  <article class="prose mx-auto">
+    <h1>{title}</h1>
+    <PostMeta date={pubDate} />
+
+    {toc && headings.length > 0 && <TableOfContents {headings} />}
 
     <Content />
   </article>
-</Layout>
+
+  {isCommentable && giscus && <Giscus slot="giscus" />}
+</BaseLayout>
 ```
 
-### 标签页
+### 内容文件组织
 
-```astro
----
-// src/pages/tags/[tag].astro
-import { getCollection } from 'astro:content'
-import Layout from '../../layouts/Layout.astro'
-
-export async function getStaticPaths() {
-  const posts = await getCollection('blog')
-
-  // 获取所有唯一标签
-  const tags = [...new Set(posts.flatMap((post) => post.data.tags))]
-
-  return tags.map((tag) => ({
-    params: { tag },
-    props: {
-      posts: posts.filter((post) => post.data.tags.includes(tag)),
-    },
-  }))
-}
-
-const { tag } = Astro.params
-const { posts } = Astro.props
----
-
-<Layout title={`标签: ${tag}`}>
-  <h1>#{tag}</h1>
-  <p>共 {posts.length} 篇文章</p>
-  <ul>
-    {
-      posts.map((post) => (
-        <li>
-          <a href={`/blog/${post.slug}`}>{post.data.title}</a>
-        </li>
-      ))
-    }
-  </ul>
-</Layout>
+```
+src/content/
+├── blog/                    # 博客文章
+│   ├── Astro/              # 分类文件夹
+│   │   ├── 1-入门指南.mdx
+│   │   └── 2-路由与页面.mdx
+│   ├── TypeScript/
+│   │   └── 泛型详解.mdx
+│   └── _drafts/            # 草稿（被排除）
+│       └── work-in-progress.mdx
+├── changelog/               # 更新日志
+│   └── 2025-01.mdx
+├── projects/                # 项目数据
+│   └── data.json
+├── photos/                  # 照片数据
+│   └── data.json
+├── streams/                 # 外部链接
+│   └── data.json
+└── schema.ts               # Schema 定义
 ```
 
-### RSS 订阅
+## 内容集合最佳实践
+
+### Schema 设计原则
 
 ```typescript
-// src/pages/rss.xml.ts
-import rss from '@astrojs/rss'
-import { getCollection } from 'astro:content'
+// ✅ 好的 Schema 设计
+const schema = z.object({
+  // 1. 必需字段精简
+  title: z.string().max(60),
+  pubDate: z.coerce.date(),
 
-export async function GET(context) {
-  const posts = await getCollection('blog')
+  // 2. 可选字段有合理默认值
+  description: z.string().default(''),
+  draft: z.boolean().default(false),
+  tags: z.array(z.string()).default([]),
 
-  return rss({
-    title: '我的博客',
-    description: '博客描述',
-    site: context.site,
-    items: posts.map((post) => ({
-      title: post.data.title,
-      pubDate: post.data.pubDate,
-      description: post.data.description,
-      link: `/blog/${post.slug}/`,
-    })),
-  })
-}
-```
+  // 3. 使用 coerce 自动转换
+  pubDate: z.coerce.date(), // 接受字符串自动转 Date
 
-## 最佳实践
+  // 4. 提供清晰的类型约束
+  category: z.enum(['tech', 'life', 'other']),
 
-### 1. 类型安全
-
-始终定义完整的 Schema，享受 TypeScript 类型推断：
-
-```typescript
-const post = await getEntry('blog', 'my-post')
-// post.data.title 自动获得 string 类型
-```
-
-### 2. 内容验证
-
-Schema 验证会在构建时捕获错误：
-
-```bash
-# 构建时会报告 Frontmatter 错误
-npm run build
-```
-
-### 3. 草稿过滤
-
-```typescript
-const publishedPosts = await getCollection('blog', ({ data }) => {
-  // 开发环境显示草稿，生产环境隐藏
-  return import.meta.env.PROD ? !data.draft : true
+  // 5. 复杂类型用联合
+  ogImage: z.union([z.string(), z.boolean()]).default(true),
 })
 ```
 
-### 4. 合理组织内容
+### 查询优化
 
-```text
-src/content/
-├── blog/
-│   ├── 2024/           # 按年份组织
-│   │   ├── 01/
-│   │   └── 02/
-│   └── images/         # 文章图片
-└── docs/
-    ├── en/             # 多语言
-    └── zh/
+```typescript
+// ✅ 在 getStaticPaths 中复用查询结果
+export async function getStaticPaths() {
+  const posts = await getFilteredPosts('blog')
+
+  return posts.map((post) => ({
+    params: { slug: post.id },
+    props: { post }, // 传递整个 post，避免重复查询
+  }))
+}
+
+// ❌ 避免在页面中重复查询
+const posts = await getCollection('blog')
+const post = posts.find((p) => p.id === slug) // 重复查询
 ```
+
+### 类型安全
+
+```typescript
+// 导出 Schema 的类型
+export type PostSchema = z.infer<typeof postSchema>
+
+// 组件中使用
+import type { CollectionEntry } from 'astro:content'
+
+interface Props {
+  post: CollectionEntry<'blog'>
+}
+```
+
+## 下一步
+
+🎯 现在你已经掌握了 Astro 的内容集合系统：
+
+- Content Layer API 的使用
+- Schema 定义和 Zod 验证
+- 集合查询方法
+- 内容渲染流程
+
+下一篇文章，我们将学习 Astro 的**集成与部署**，包括：
+
+- 官方集成的安装和配置
+- 构建优化策略
+- 多种部署平台的实践
+- 当前博客的完整技术栈分析
 
 ## 参考资料
 
-- [Content Collections 文档](https://docs.astro.build/zh-cn/guides/content-collections/)
+- [Astro 内容集合文档](https://docs.astro.build/en/guides/content-collections/)
+- [Astro 5 Content Layer API](https://docs.astro.build/en/guides/upgrade-to/v5/)
 - [Zod 文档](https://zod.dev/)
-- [MDX 集成](https://docs.astro.build/zh-cn/guides/integrations-guide/mdx/)
-- [Markdown 配置](https://docs.astro.build/zh-cn/guides/markdown-content/)
+- [MDX 官方文档](https://mdxjs.com/)

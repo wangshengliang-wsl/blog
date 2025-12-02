@@ -1,0 +1,396 @@
+---
+title: '字符串新增方法'
+description: '详解 ES6+ 字符串新方法：includes、startsWith、padStart、replaceAll 等实用 API'
+pubDate: 2024-01-05
+toc: true
+ogImage: true
+category: 'ES6+'
+tags: ['ES6', '字符串', 'includes', 'startsWith', 'padStart']
+---
+
+ES6 及后续版本为字符串新增了许多实用方法，让字符串操作更加便捷。
+
+## 查找方法
+
+### includes()
+
+判断字符串是否包含指定子串：
+
+```javascript
+const str = 'Hello World'
+
+// ES5 写法
+str.indexOf('World') !== -1 // true
+
+// ES6
+str.includes('World') // true
+str.includes('world') // false（大小写敏感）
+str.includes('World', 7) // false（从位置7开始查找）
+```
+
+### startsWith() 和 endsWith()
+
+```javascript
+const filename = 'image.png'
+
+// 判断前缀
+filename.startsWith('image') // true
+filename.startsWith('img') // false
+
+// 判断后缀
+filename.endsWith('.png') // true
+filename.endsWith('.jpg') // false
+
+// 指定起始位置
+const url = 'https://example.com'
+url.startsWith('example', 8) // true（从位置8开始）
+
+// 指定结束位置
+const text = 'Hello World'
+text.endsWith('Hello', 5) // true（只看前5个字符）
+```
+
+实际应用：
+
+```javascript
+// 文件类型判断
+function isImage(filename) {
+  return ['.png', '.jpg', '.jpeg', '.gif', '.webp'].some((ext) =>
+    filename.toLowerCase().endsWith(ext)
+  )
+}
+
+// URL 协议判断
+function isSecure(url) {
+  return url.startsWith('https://')
+}
+
+// 手机号脱敏
+function maskPhone(phone) {
+  if (phone.startsWith('+86')) {
+    phone = phone.slice(3)
+  }
+  return phone.slice(0, 3) + '****' + phone.slice(-4)
+}
+```
+
+## 填充方法
+
+### padStart() 和 padEnd()
+
+用指定字符填充到目标长度：
+
+```javascript
+// 左填充
+'5'.padStart(2, '0') // '05'
+'12'.padStart(2, '0') // '12'
+'123'.padStart(2, '0') // '123'（已超过目标长度，不变）
+
+// 右填充
+'abc'.padEnd(6, '.') // 'abc...'
+'abc'.padEnd(6) // 'abc   '（默认用空格填充）
+
+// 填充字符串会被截断
+'1'.padStart(5, 'ab') // 'abab1'
+```
+
+实际应用：
+
+```javascript
+// 格式化数字
+function formatNumber(num, digits = 2) {
+  return String(num).padStart(digits, '0')
+}
+formatNumber(5) // '05'
+formatNumber(123, 5) // '00123'
+
+// 格式化日期
+function formatDate(date) {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+// 格式化时间
+function formatTime(seconds) {
+  const h = Math.floor(seconds / 3600)
+  const m = Math.floor((seconds % 3600) / 60)
+  const s = seconds % 60
+  return [h, m, s].map((n) => String(n).padStart(2, '0')).join(':')
+}
+formatTime(3661) // '01:01:01'
+
+// 银行卡号格式化
+function formatBankCard(card) {
+  return card
+    .replace(/\s/g, '')
+    .replace(/(\d{4})/g, '$1 ')
+    .trim()
+}
+
+// 金额格式化（右对齐）
+function formatMoney(amount) {
+  return amount.toFixed(2).padStart(10)
+}
+```
+
+## 去除空白
+
+### trim()、trimStart()、trimEnd()
+
+```javascript
+const str = '  hello world  '
+
+str.trim() // 'hello world'
+str.trimStart() // 'hello world  '（别名：trimLeft）
+str.trimEnd() // '  hello world'（别名：trimRight）
+```
+
+实际应用：
+
+```javascript
+// 表单输入清理
+function cleanInput(value) {
+  return value.trim()
+}
+
+// 去除行首空格但保留行尾
+function preserveTrailing(text) {
+  return text
+    .split('\n')
+    .map((line) => line.trimStart())
+    .join('\n')
+}
+```
+
+## 替换方法
+
+### replaceAll()
+
+ES2021 新增，替换所有匹配项：
+
+```javascript
+const str = 'aabbcc'
+
+// replace 只替换第一个
+str.replace('b', 'x') // 'aaxbcc'
+
+// ES5 替换所有需要正则
+str.replace(/b/g, 'x') // 'aaxxcc'
+
+// replaceAll 直接替换所有
+str.replaceAll('b', 'x') // 'aaxxcc'
+```
+
+🔶 注意：replaceAll 的第一个参数如果是正则，必须带 `g` 标志：
+
+```javascript
+'aabb'.replaceAll(/b/, 'x') // TypeError
+'aabb'.replaceAll(/b/g, 'x') // 'aaxx' ✅
+```
+
+实际应用：
+
+```javascript
+// 转义 HTML
+function escapeHTML(str) {
+  return str
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+}
+
+// 路径标准化
+function normalizePath(path) {
+  return path.replaceAll('\\', '/')
+}
+
+// 移除所有空格
+function removeSpaces(str) {
+  return str.replaceAll(' ', '')
+}
+```
+
+## 重复方法
+
+### repeat()
+
+```javascript
+'ab'.repeat(3) // 'ababab'
+'*'.repeat(10) // '**********'
+'x'.repeat(0) // ''
+
+// 小数会向下取整
+'ab'.repeat(2.9) // 'abab'
+
+// 负数或 Infinity 报错
+// 'ab'.repeat(-1); // RangeError
+```
+
+实际应用：
+
+```javascript
+// 生成分隔线
+const line = '-'.repeat(50)
+
+// 缩进
+function indent(str, level = 1) {
+  const spaces = '  '.repeat(level)
+  return str
+    .split('\n')
+    .map((line) => spaces + line)
+    .join('\n')
+}
+
+// 简单进度条
+function progress(percent, width = 20) {
+  const filled = Math.round((width * percent) / 100)
+  const empty = width - filled
+  return '[' + '█'.repeat(filled) + '░'.repeat(empty) + '] ' + percent + '%'
+}
+progress(75) // '[███████████████░░░░░] 75%'
+
+// 生成占位符
+function placeholder(length) {
+  return '█'.repeat(length)
+}
+```
+
+## 访问方法
+
+### at()
+
+ES2022 新增，支持负索引：
+
+```javascript
+const str = 'Hello'
+
+// 传统方式
+str[0] // 'H'
+str[str.length - 1] // 'o'
+str.charAt(0) // 'H'
+
+// at() 支持负索引
+str.at(0) // 'H'
+str.at(-1) // 'o'
+str.at(-2) // 'l'
+str.at(100) // undefined
+```
+
+实际应用：
+
+```javascript
+// 获取文件扩展名
+function getExt(filename) {
+  const parts = filename.split('.')
+  return parts.at(-1)
+}
+getExt('image.png') // 'png'
+getExt('archive.tar.gz') // 'gz'
+
+// 获取路径最后一部分
+function basename(path) {
+  return path.split('/').at(-1)
+}
+```
+
+## 分割和拼接
+
+### split() 的增强
+
+```javascript
+// 限制分割数量
+'a,b,c,d'.split(',', 2) // ['a', 'b']
+
+// 用正则分割
+'a1b2c3'.split(/\d/) // ['a', 'b', 'c', '']
+
+// 保留分隔符（使用捕获组）
+'a1b2c3'.split(/(\d)/) // ['a', '1', 'b', '2', 'c', '3', '']
+```
+
+## 大小写转换增强
+
+### toLocaleLowerCase() 和 toLocaleUpperCase()
+
+考虑特定语言的大小写规则：
+
+```javascript
+// 土耳其语的 I 大小写特殊
+const str = 'I'
+str.toLowerCase() // 'i'
+str.toLocaleLowerCase('tr-TR') // 'ı'（土耳其语小写 i）
+
+// 德语 ß 转大写
+const german = 'straße'
+german.toUpperCase() // 'STRASSE'
+german.toLocaleUpperCase('de-DE') // 'STRASSE'
+```
+
+## 实战技巧
+
+### 模板解析
+
+```javascript
+function parseTemplate(template, data) {
+  return template.replace(/\{\{(\w+)\}\}/g, (_, key) => {
+    return data[key] ?? ''
+  })
+}
+
+const tpl = '你好，{{name}}！今天是{{date}}。'
+parseTemplate(tpl, { name: '张三', date: '2024-01-01' })
+// '你好，张三！今天是2024-01-01。'
+```
+
+### 驼峰命名转换
+
+```javascript
+// kebab-case 转 camelCase
+function toCamelCase(str) {
+  return str.replace(/-([a-z])/g, (_, char) => char.toUpperCase())
+}
+toCamelCase('background-color') // 'backgroundColor'
+
+// camelCase 转 kebab-case
+function toKebabCase(str) {
+  return str.replace(/([A-Z])/g, '-$1').toLowerCase()
+}
+toKebabCase('backgroundColor') // 'background-color'
+
+// snake_case 转 camelCase
+function snakeToCamel(str) {
+  return str.replace(/_([a-z])/g, (_, char) => char.toUpperCase())
+}
+snakeToCamel('user_name') // 'userName'
+```
+
+### 字符串截断
+
+```javascript
+function truncate(str, maxLength, suffix = '...') {
+  if (str.length <= maxLength) return str
+  return str.slice(0, maxLength - suffix.length) + suffix
+}
+
+truncate('这是一段很长的文本', 10) // '这是一段很长的...'
+```
+
+## 方法汇总
+
+| 方法         | 作用                   | 版本   |
+| ------------ | ---------------------- | ------ |
+| includes()   | 是否包含子串           | ES6    |
+| startsWith() | 是否以指定字符串开头   | ES6    |
+| endsWith()   | 是否以指定字符串结尾   | ES6    |
+| padStart()   | 左填充至指定长度       | ES2017 |
+| padEnd()     | 右填充至指定长度       | ES2017 |
+| trimStart()  | 去除开头空白           | ES2019 |
+| trimEnd()    | 去除结尾空白           | ES2019 |
+| repeat()     | 重复字符串             | ES6    |
+| replaceAll() | 替换所有匹配           | ES2021 |
+| at()         | 按索引访问（支持负数） | ES2022 |
+
+这些方法让字符串操作变得更加直观和便捷，善用它们可以写出更简洁的代码。

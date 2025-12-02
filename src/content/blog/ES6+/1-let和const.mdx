@@ -1,81 +1,46 @@
 ---
-title: let 和 const 命令
-description: 深入理解 ES6 中 let 和 const 的块级作用域、暂时性死区、变量提升差异，以及在实际开发中的最佳实践
-pubDate: 2025-11-27
+title: 'let 和 const 命令'
+description: '深入理解 ES6 中 let 和 const 的块级作用域、暂时性死区与最佳实践'
+pubDate: 2024-01-01
 toc: true
 ogImage: true
-category: ES6+
+category: 'ES6+'
+tags: ['ES6', '变量声明', '作用域', 'let', 'const']
 ---
 
-ES6 之前，JavaScript 只有 `var` 一种声明变量的方式。`var` 的函数作用域和变量提升机制给开发者带来了不少困扰——循环中的闭包问题、意外的全局变量污染、难以追踪的变量覆盖。ES6 引入的 `let` 和 `const` 从根本上解决了这些问题。
+ES6 引入了 `let` 和 `const` 两个新的变量声明关键字，彻底改变了 JavaScript 的变量作用域规则。
 
-## var 的历史包袱
+## 🎯 var 的问题
 
-在理解 `let` 和 `const` 之前，有必要回顾 `var` 存在的问题。
-
-### 变量提升（Hoisting）
-
-`var` 声明的变量会被提升到函数作用域顶部，但赋值不会提升：
+先看 `var` 存在的问题：
 
 ```javascript
-console.log(name) // undefined，而非报错
+// 问题1：变量提升
+console.log(name) // undefined，而不是报错
 var name = '张三'
 
-// 等价于
-var name
-console.log(name) // undefined
-name = '张三'
+// 问题2：没有块级作用域
+for (var i = 0; i < 3; i++) {
+  setTimeout(() => console.log(i), 100)
+}
+// 输出：3, 3, 3（而不是 0, 1, 2）
+
+// 问题3：可以重复声明
+var count = 1
+var count = 2 // 不报错，容易造成 bug
 ```
 
-这种行为让代码的执行顺序变得不直观，容易产生难以排查的 bug。
+## let 声明
 
-### 没有块级作用域
-
-`var` 只有函数作用域，没有块级作用域：
+### 基本用法
 
 ```javascript
-function example() {
-  if (true) {
-    var x = 10
-  }
-  console.log(x) // 10，x 泄漏到了 if 块外部
-}
+let age = 25
+age = 26 // 可以重新赋值
 
-for (var i = 0; i < 3; i++) {
-  // ...
-}
-console.log(i) // 3，循环变量泄漏
+let username = '李四'
+// let username = '王五'; // SyntaxError: 不能重复声明
 ```
-
-### 经典的循环闭包问题
-
-```javascript
-var funcs = []
-for (var i = 0; i < 3; i++) {
-  funcs.push(function () {
-    console.log(i)
-  })
-}
-funcs[0]() // 3
-funcs[1]() // 3
-funcs[2]() // 3
-```
-
-由于 `var` 没有块级作用域，三个函数共享同一个 `i`，循环结束后 `i` 的值是 3。ES5 时代需要用 IIFE（立即执行函数表达式）来解决：
-
-```javascript
-for (var i = 0; i < 3; i++) {
-  ;(function (j) {
-    funcs.push(function () {
-      console.log(j)
-    })
-  })(i)
-}
-```
-
-## let：块级作用域的变量
-
-`let` 是 `var` 的升级版，拥有块级作用域。
 
 ### 块级作用域
 
@@ -86,154 +51,84 @@ for (var i = 0; i < 3; i++) {
   let a = 10
   var b = 20
 }
+// console.log(a); // ReferenceError: a is not defined
 console.log(b) // 20
-console.log(a) // ReferenceError: a is not defined
 ```
 
-这让 `if`、`for`、`while` 等语句块内的变量不会泄漏：
+经典的循环问题用 `let` 轻松解决：
 
 ```javascript
 for (let i = 0; i < 3; i++) {
-  // i 只在循环体内有效
+  setTimeout(() => console.log(i), 100)
 }
-console.log(i) // ReferenceError: i is not defined
+// 输出：0, 1, 2 ✅
 ```
 
-### 解决循环闭包问题
+### 暂时性死区（TDZ）
 
-`let` 天然解决了循环闭包问题：
-
-```javascript
-const funcs = []
-for (let i = 0; i < 3; i++) {
-  funcs.push(function () {
-    console.log(i)
-  })
-}
-funcs[0]() // 0
-funcs[1]() // 1
-funcs[2]() // 2
-```
-
-每次循环迭代，JavaScript 引擎都会创建一个新的 `i` 绑定，每个闭包捕获的是不同的 `i`。
-
-### 暂时性死区（Temporal Dead Zone, TDZ）
-
-`let` 声明的变量不会被提升到块顶部。在声明之前访问变量会抛出 `ReferenceError`：
+从块的开始到 `let` 声明之间的区域叫做"暂时性死区"（Temporal Dead Zone）：
 
 ```javascript
+// TDZ 开始
 console.log(x) // ReferenceError: Cannot access 'x' before initialization
-let x = 10
+let x = 10 // TDZ 结束
 ```
 
-从块的开始到 `let` 声明语句之间的区域被称为"暂时性死区"。在 TDZ 内访问变量会报错，这让代码行为更加可预测。
+🔶 TDZ 的存在让代码更加可预测，强制你先声明后使用。
 
-TDZ 的存在有几个重要影响：
+一个隐蔽的 TDZ 场景：
 
 ```javascript
-// typeof 不再安全
-console.log(typeof undeclaredVar) // undefined
-console.log(typeof x) // ReferenceError
-let x
-
-// 函数参数默认值中的 TDZ
 function foo(x = y, y = 2) {
   return [x, y]
 }
-foo() // ReferenceError: Cannot access 'y' before initialization
+foo() // ReferenceError: y 在 TDZ 中
 ```
 
-### 不允许重复声明
+## const 声明
 
-同一作用域内，`let` 不允许重复声明同一变量：
+### 基本用法
 
-```javascript
-let x = 10
-let x = 20 // SyntaxError: Identifier 'x' has already been declared
-
-// var 可以重复声明
-var y = 10
-var y = 20 // 正常
-```
-
-这能在编码阶段就发现变量命名冲突。
-
-### 不会成为全局对象的属性
-
-在全局作用域中，`var` 声明的变量会成为 `window`（浏览器）或 `global`（Node.js）的属性，`let` 不会：
+`const` 声明一个只读常量，必须在声明时初始化：
 
 ```javascript
-var a = 1
-let b = 2
-
-console.log(window.a) // 1
-console.log(window.b) // undefined
-```
-
-这避免了意外污染全局对象。
-
-## const：不可重新赋值的常量
-
-`const` 声明一个只读的常量，声明后不能重新赋值。
-
-### 必须初始化
-
-`const` 声明时必须赋值，不能先声明后赋值：
-
-```javascript
-const PI // SyntaxError: Missing initializer in const declaration
-PI = 3.14
-
-// 正确用法
 const PI = 3.14159
+// PI = 3.14; // TypeError: Assignment to constant variable
+
+// const MAX; // SyntaxError: Missing initializer
 ```
 
-### 不可重新赋值
+### 对象和数组
+
+🤔 `const` 保证的是变量指向的内存地址不变，而不是值不变：
 
 ```javascript
-const MAX_SIZE = 100
-MAX_SIZE = 200 // TypeError: Assignment to constant variable
+const user = { name: '张三' }
+user.name = '李四' // ✅ 可以修改属性
+user.age = 25 // ✅ 可以添加属性
+// user = {}; // ❌ TypeError: 不能重新赋值
+
+const list = [1, 2, 3]
+list.push(4) // ✅ 可以修改数组内容
+// list = []; // ❌ TypeError
 ```
 
-### 本质是绑定不可变，而非值不可变
-
-`const` 保证的是变量指向的内存地址不变。对于基本类型（number、string、boolean），值就保存在变量指向的内存地址，所以等同于值不可变。对于引用类型（对象、数组），变量存储的是指向实际数据的指针，`const` 只能保证指针不变，数据本身可以修改：
-
-```javascript
-const obj = { name: '张三' }
-obj.name = '李四' // 允许，修改对象属性
-obj.age = 25 // 允许，添加新属性
-console.log(obj) // { name: '李四', age: 25 }
-
-obj = {} // TypeError: Assignment to constant variable
-
-const arr = [1, 2, 3]
-arr.push(4) // 允许
-arr[0] = 100 // 允许
-console.log(arr) // [100, 2, 3, 4]
-
-arr = [5, 6, 7] // TypeError
-```
-
-如果需要冻结对象，使用 `Object.freeze()`：
+如果需要真正不可变的对象，使用 `Object.freeze()`：
 
 ```javascript
 const frozen = Object.freeze({ name: '张三' })
-frozen.name = '李四' // 静默失败（严格模式下报错）
+frozen.name = '李四' // 静默失败，严格模式下报错
 console.log(frozen.name) // '张三'
-```
 
-注意 `Object.freeze()` 是浅冻结，嵌套对象不会被冻结：
-
-```javascript
+// 注意：freeze 是浅冻结
 const nested = Object.freeze({
-  outer: { inner: 1 },
+  info: { age: 25 },
 })
-nested.outer.inner = 2 // 可以修改
-console.log(nested.outer.inner) // 2
+nested.info.age = 30 // 仍然可以修改
+console.log(nested.info.age) // 30
 ```
 
-深冻结需要递归处理：
+深度冻结需要递归处理：
 
 ```javascript
 function deepFreeze(obj) {
@@ -244,255 +139,203 @@ function deepFreeze(obj) {
   })
   return Object.freeze(obj)
 }
+
+const config = deepFreeze({
+  api: { url: 'https://api.example.com' },
+})
+config.api.url = 'xxx' // 无效
 ```
 
-### 块级作用域和 TDZ
-
-`const` 同样具有块级作用域和暂时性死区，行为与 `let` 一致：
-
-```javascript
-{
-  console.log(MAX) // ReferenceError
-  const MAX = 100
-}
-console.log(MAX) // ReferenceError: MAX is not defined
-```
-
-## 块级作用域的应用场景
+## 块级作用域的应用
 
 ### 替代 IIFE
 
-ES5 时代经常用 IIFE 创建局部作用域来避免变量污染：
+ES5 时代用 IIFE 创建私有作用域：
 
 ```javascript
 // ES5
 ;(function () {
-  var tmp = '临时变量'
-  // ...
+  var private = '私有变量'
 })()
 ```
 
-有了块级作用域，直接用代码块即可：
+ES6 直接用块：
 
 ```javascript
 // ES6
 {
-  let tmp = '临时变量'
-  // ...
+  let private = '私有变量'
 }
 ```
 
-### switch 语句中的变量声明
+### 条件声明
 
 ```javascript
+function process(condition) {
+  if (condition) {
+    let result = '处理结果'
+    return result
+  }
+  // result 在这里不可访问，避免意外使用
+  return null
+}
+```
+
+### switch 语句
+
+```javascript
+// 🔶 没有块作用域会报错
+switch (type) {
+  case 'A':
+    let msg = 'Type A' // 报错：重复声明
+    break
+  case 'B':
+    let msg = 'Type B'
+    break
+}
+
+// ✅ 正确写法：用块包裹
 switch (type) {
   case 'A': {
-    let result = processA()
-    return result
+    let msg = 'Type A'
+    console.log(msg)
+    break
   }
   case 'B': {
-    let result = processB() // 不会与上面的 result 冲突
-    return result
+    let msg = 'Type B'
+    console.log(msg)
+    break
   }
 }
 ```
 
-每个 `case` 用代码块包裹，避免变量声明冲突。
+## 全局变量
 
-### 条件语句中安全声明函数
-
-ES5 规范不允许在块级作用域中声明函数，但浏览器为了兼容旧代码没有遵守。ES6 明确允许块级作用域中声明函数，但行为类似 `let`：
+`var` 和 `function` 声明的全局变量会成为 `window` 的属性，`let` 和 `const` 不会：
 
 ```javascript
-// 推荐用函数表达式
-if (condition) {
-  let fn = function () {
-    /* ... */
-  }
-}
+var globalVar = 'var'
+let globalLet = 'let'
+const globalConst = 'const'
+
+console.log(window.globalVar) // 'var'
+console.log(window.globalLet) // undefined
+console.log(window.globalConst) // undefined
 ```
 
-## 循环中的特殊行为
+## 最佳实践
 
-### for 循环的双层作用域
-
-`for` 循环使用 `let` 声明循环变量时，存在一个微妙的机制：设置循环变量的部分是一个父作用域，循环体内部是单独的子作用域：
+### 1. 默认使用 const
 
 ```javascript
-for (let i = 0; i < 3; i++) {
-  let i = 'abc'
-  console.log(i) // 输出三次 'abc'
-}
-```
+// ✅ 推荐
+const config = { debug: true }
+const API_URL = 'https://api.example.com'
+const numbers = [1, 2, 3]
 
-循环体内的 `i` 和循环条件中的 `i` 不在同一个作用域，不会冲突。
-
-### for...in 和 for...of
-
-同样的机制适用于 `for...in` 和 `for...of`：
-
-```javascript
-const obj = { a: 1, b: 2, c: 3 }
-for (let key in obj) {
-  setTimeout(() => console.log(key), 100)
-}
-// 依次输出 'a', 'b', 'c'
-
-const arr = [10, 20, 30]
-for (let value of arr) {
-  setTimeout(() => console.log(value), 100)
-}
-// 依次输出 10, 20, 30
-```
-
-## 实战中的最佳实践
-
-### 默认使用 const
-
-很多团队推崇"const 优先"原则：默认使用 `const`，只有在确定需要重新赋值时才用 `let`，完全不用 `var`。
-
-```javascript
-// 推荐
-const config = loadConfig()
-const users = await fetchUsers()
-
+// 只有需要重新赋值时才用 let
 let count = 0
-for (const user of users) {
-  if (user.active) {
-    count++ // count 需要修改，所以用 let
+count++
+```
+
+### 2. 不再使用 var
+
+```javascript
+// ❌ 避免
+var name = '张三'
+
+// ✅ 推荐
+const name = '张三'
+```
+
+### 3. 在块的顶部声明
+
+```javascript
+function process(items) {
+  // 变量声明放在块的顶部
+  const result = []
+  let total = 0
+
+  for (const item of items) {
+    result.push(item.value)
+    total += item.value
   }
+
+  return { result, total }
 }
 ```
 
-这种风格的好处：
-
-1. 代码意图更清晰：看到 `const` 就知道这个变量不会被重新赋值
-2. 减少意外修改：防止不小心覆盖重要变量
-3. 便于代码审查：`let` 出现时会特别关注变量的修改逻辑
-
-### 解构赋值搭配 const
-
-从对象或数组中提取值时，用 `const` 解构：
+### 4. 循环中的选择
 
 ```javascript
-const { name, age } = user
-const [first, second] = items
-```
-
-### 循环中的选择
-
-遍历时如果不需要修改循环变量，用 `const`：
-
-```javascript
-// 推荐：const for...of
+// for...of 和 for...in 使用 const
 for (const item of items) {
-  process(item)
+  console.log(item)
 }
 
-// 推荐：const for...in
 for (const key in obj) {
-  console.log(obj[key])
+  console.log(key)
 }
 
-// 需要修改索引时用 let
-for (let i = 0; i < arr.length; i++) {
-  // ...
-}
-```
-
-### 命名常量
-
-项目中的配置值、魔法数字用 `const` 命名，提高可读性：
-
-```javascript
-// 不推荐
-if (status === 1) {
-  /* ... */
-}
-setTimeout(fn, 86400000)
-
-// 推荐
-const STATUS_ACTIVE = 1
-const ONE_DAY_MS = 24 * 60 * 60 * 1000
-
-if (status === STATUS_ACTIVE) {
-  /* ... */
-}
-setTimeout(fn, ONE_DAY_MS)
-```
-
-## 常见错误和边界情况
-
-### TDZ 中的 typeof
-
-```javascript
-// 对未声明的变量使用 typeof 返回 'undefined'
-console.log(typeof notDefined) // 'undefined'
-
-// 但在 TDZ 中会报错
-console.log(typeof x) // ReferenceError
-let x = 1
-```
-
-### 循环中的 const
-
-```javascript
-// for...of 和 for...in 中可以用 const
-for (const item of [1, 2, 3]) {
-  console.log(item) // 正常，每次迭代都是新绑定
-}
-
-// 传统 for 循环中 const 会报错
-for (const i = 0; i < 3; i++) {
-  // TypeError: Assignment to constant variable
+// 传统 for 循环使用 let
+for (let i = 0; i < 10; i++) {
   console.log(i)
 }
 ```
 
-### 全局作用域的差异
+## 常见问题
+
+### 🙋 let 和 const 有变量提升吗？
+
+有，但行为不同。它们会被提升到块的顶部，但在声明之前处于 TDZ，访问会报错：
 
 ```javascript
-// 浏览器环境
-var globalVar = 1
-let globalLet = 2
-const globalConst = 3
-
-console.log(window.globalVar) // 1
-console.log(window.globalLet) // undefined
-console.log(window.globalConst) // undefined
-
-// 但都可以直接访问
-console.log(globalVar) // 1
-console.log(globalLet) // 2
-console.log(globalConst) // 3
+// JavaScript 引擎知道 x 存在，但不让你访问
+console.log(x) // ReferenceError
+let x = 1
 ```
 
-## ES6 声明变量的六种方式
+### 🙋 什么时候用 let？
 
-ES6 之后，JavaScript 有六种声明变量的方式：
-
-1. `var` - 函数作用域，有变量提升
-2. `let` - 块级作用域，有 TDZ
-3. `const` - 块级作用域，不可重新赋值
-4. `function` - 函数声明，有提升
-5. `class` - 类声明，有 TDZ
-6. `import` - 模块导入，有 TDZ
+只有在需要重新赋值时才用 let：
 
 ```javascript
-var a = 1
-let b = 2
-const c = 3
-function d() {}
-class E {}
-import { f } from './module.js'
+// 计数器
+let count = 0
+items.forEach(() => count++)
+
+// 累加器
+let sum = 0
+for (const num of numbers) {
+  sum += num
+}
+
+// 状态标记
+let isReady = false
+// ... 某些操作后
+isReady = true
 ```
 
-## 性能考量
+### 🙋 const 声明的对象如何实现不可变？
 
-从性能角度，`let` 和 `const` 与 `var` 在现代 JavaScript 引擎中几乎没有差异。引擎会对这些声明进行优化，选择使用哪种应基于代码清晰度和正确性，而非性能。
+```javascript
+// 方案1：Object.freeze()（浅冻结）
+const obj = Object.freeze({ a: 1 })
 
-有观点认为 `const` 可能带来微小的优化空间，因为引擎知道变量不会被重新赋值，可以做更激进的优化。但这种优化在实际场景中几乎不可测量。
+// 方案2：深冻结函数
+// 方案3：使用 Immutable.js 等库
+// 方案4：TypeScript 的 Readonly 类型（编译时检查）
+```
 
----
+## 总结对比
 
-`let` 和 `const` 是 ES6 带来的基础性改进。块级作用域让代码行为更可预测，TDZ 帮助在开发阶段就发现错误，`const` 的不可变绑定让代码意图更清晰。在现代 JavaScript 开发中，应该完全用 `let` 和 `const` 替代 `var`。
+| 特性       | var                      | let            | const          |
+| ---------- | ------------------------ | -------------- | -------------- |
+| 作用域     | 函数作用域               | 块级作用域     | 块级作用域     |
+| 变量提升   | 是（初始化为 undefined） | 是（但有 TDZ） | 是（但有 TDZ） |
+| 重复声明   | 允许                     | 不允许         | 不允许         |
+| 重新赋值   | 允许                     | 允许           | 不允许         |
+| 全局属性   | 是（挂载到 window）      | 否             | 否             |
+| 必须初始化 | 否                       | 否             | 是             |
+
+**结论**：默认使用 `const`，需要重新赋值时使用 `let`，不再使用 `var`。

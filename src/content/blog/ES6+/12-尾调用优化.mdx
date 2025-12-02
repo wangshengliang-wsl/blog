@@ -1,0 +1,388 @@
+---
+title: '尾调用优化'
+description: '理解 ES6 尾调用与尾递归优化的原理、条件和实际应用'
+pubDate: 2024-01-12
+toc: true
+ogImage: true
+category: 'ES6+'
+tags: ['ES6', '尾调用', '递归', '性能优化']
+---
+
+尾调用优化（Tail Call Optimization，TCO）是 ES6 引入的一项重要优化，可以避免递归调用导致的栈溢出。
+
+## 什么是尾调用
+
+尾调用是指函数的最后一步是调用另一个函数：
+
+```javascript
+// ✅ 尾调用
+function f(x) {
+  return g(x)
+}
+
+// ❌ 不是尾调用：调用后还有操作
+function f(x) {
+  return g(x) + 1
+}
+
+// ❌ 不是尾调用：调用后还要赋值
+function f(x) {
+  const result = g(x)
+  return result
+}
+
+// ❌ 不是尾调用：没有 return
+function f(x) {
+  g(x)
+}
+```
+
+🤔 **关键**：尾调用的判断是看"最后一步是否只是调用函数"，而不是看位置：
+
+```javascript
+// ✅ 尾调用（最后一步是 g(x)）
+function f(x) {
+  if (x > 0) {
+    return m(x)
+  }
+  return g(x)
+}
+```
+
+## 尾调用优化原理
+
+### 调用栈
+
+每次函数调用都会在调用栈中创建一个栈帧，保存局部变量、返回地址等信息：
+
+```javascript
+function a() {
+  return b() // 需要保存 a 的栈帧，等 b 返回后继续
+}
+
+function b() {
+  return c() // 需要保存 b 的栈帧
+}
+
+function c() {
+  return 1
+}
+
+// 调用栈：a -> b -> c
+// 每一层都占用内存
+```
+
+### 优化机制
+
+如果是尾调用，因为外层函数不再需要任何信息，可以直接替换栈帧而不是新增：
+
+```javascript
+// 没有优化时
+function factorial(n) {
+  if (n === 1) return 1
+  return n * factorial(n - 1) // 不是尾调用，需要等递归返回后乘以 n
+}
+
+factorial(5)
+// 调用栈：
+// factorial(5)
+// factorial(5) -> factorial(4)
+// factorial(5) -> factorial(4) -> factorial(3)
+// factorial(5) -> factorial(4) -> factorial(3) -> factorial(2)
+// factorial(5) -> factorial(4) -> factorial(3) -> factorial(2) -> factorial(1)
+
+// 有优化时（尾调用版本）
+function factorial(n, acc = 1) {
+  if (n === 1) return acc
+  return factorial(n - 1, n * acc) // 尾调用
+}
+
+factorial(5)
+// 调用栈始终只有一层
+```
+
+## 尾递归
+
+递归函数的尾调用就是尾递归。将普通递归改为尾递归是常见的优化手段。
+
+### 阶乘
+
+```javascript
+// 普通递归（会栈溢出）
+function factorial(n) {
+  if (n === 1) return 1
+  return n * factorial(n - 1)
+}
+
+// 尾递归（不会栈溢出）
+function factorialTail(n, acc = 1) {
+  if (n === 1) return acc
+  return factorialTail(n - 1, n * acc)
+}
+
+// 对比
+// factorial(100000); // RangeError: Maximum call stack size exceeded
+// factorialTail(100000); // 正常计算（如果引擎支持 TCO）
+```
+
+### 斐波那契数列
+
+```javascript
+// 普通递归（极慢且会栈溢出）
+function fibonacci(n) {
+  if (n <= 1) return n
+  return fibonacci(n - 1) + fibonacci(n - 2)
+}
+
+// 尾递归
+function fibonacciTail(n, prev = 0, curr = 1) {
+  if (n === 0) return prev
+  if (n === 1) return curr
+  return fibonacciTail(n - 1, curr, prev + curr)
+}
+
+fibonacci(40) // 很慢
+fibonacciTail(40) // 很快
+fibonacciTail(10000) // 正常计算（如果引擎支持 TCO）
+```
+
+### 数组求和
+
+```javascript
+// 普通递归
+function sum(arr) {
+  if (arr.length === 0) return 0
+  return arr[0] + sum(arr.slice(1))
+}
+
+// 尾递归
+function sumTail(arr, acc = 0) {
+  if (arr.length === 0) return acc
+  return sumTail(arr.slice(1), acc + arr[0])
+}
+```
+
+### 数组展平
+
+```javascript
+// 普通递归
+function flatten(arr) {
+  return arr.reduce((flat, item) => {
+    return flat.concat(Array.isArray(item) ? flatten(item) : item)
+  }, [])
+}
+
+// 尾递归
+function flattenTail(arr, result = []) {
+  if (arr.length === 0) return result
+  const [first, ...rest] = arr
+  if (Array.isArray(first)) {
+    return flattenTail([...first, ...rest], result)
+  }
+  return flattenTail(rest, [...result, first])
+}
+
+flatten([1, [2, [3, 4]], 5]) // [1, 2, 3, 4, 5]
+```
+
+## 🔶 浏览器支持现状
+
+重要的是：**目前只有 Safari 实现了尾调用优化**。V8（Chrome、Node.js）和 SpiderMonkey（Firefox）出于各种原因没有实现。
+
+```javascript
+// 在 Chrome/Node.js 中仍然会栈溢出
+function factorial(n, acc = 1) {
+  if (n === 1) return acc
+  return factorial(n - 1, n * acc)
+}
+
+factorial(100000) // 仍然会 RangeError
+```
+
+## 替代方案
+
+### 蹦床函数（Trampoline）
+
+蹦床函数可以在不支持 TCO 的环境中模拟尾调用优化：
+
+```javascript
+// 蹦床函数
+function trampoline(fn) {
+  return function (...args) {
+    let result = fn(...args)
+    while (typeof result === 'function') {
+      result = result()
+    }
+    return result
+  }
+}
+
+// 改写递归函数，返回函数而不是调用
+function factorialTrampoline(n, acc = 1) {
+  if (n === 1) return acc
+  return () => factorialTrampoline(n - 1, n * acc) // 返回函数
+}
+
+const factorial = trampoline(factorialTrampoline)
+factorial(100000) // 正常计算，不会栈溢出
+```
+
+### 循环替代
+
+将递归改写为循环是最直接的方案：
+
+```javascript
+// 递归版本
+function factorial(n) {
+  if (n === 1) return 1
+  return n * factorial(n - 1)
+}
+
+// 循环版本
+function factorialLoop(n) {
+  let result = 1
+  for (let i = 2; i <= n; i++) {
+    result *= i
+  }
+  return result
+}
+
+// 递归版本（斐波那契）
+function fibonacci(n) {
+  if (n <= 1) return n
+  return fibonacci(n - 1) + fibonacci(n - 2)
+}
+
+// 循环版本
+function fibonacciLoop(n) {
+  if (n <= 1) return n
+  let prev = 0
+  let curr = 1
+  for (let i = 2; i <= n; i++) {
+    ;[prev, curr] = [curr, prev + curr]
+  }
+  return curr
+}
+```
+
+### Generator + 循环
+
+```javascript
+function* factorialGen(n, acc = 1) {
+  while (n > 1) {
+    yield
+    acc *= n
+    n--
+  }
+  return acc
+}
+
+function runGenerator(gen) {
+  let result = gen.next()
+  while (!result.done) {
+    result = gen.next()
+  }
+  return result.value
+}
+
+runGenerator(factorialGen(100000)) // 正常计算
+```
+
+## 尾调用优化的条件
+
+ES6 规范要求满足以下条件才能进行尾调用优化：
+
+1. **严格模式**：必须在严格模式下
+2. **尾位置**：调用必须在尾位置
+3. **纯函数调用**：不能是方法调用或间接调用
+
+```javascript
+'use strict'
+
+// ✅ 可以优化
+function f(x) {
+  return g(x)
+}
+
+// ❌ 不能优化：不是严格模式
+// function f(x) {
+//   return g(x);
+// }
+
+// ❌ 不能优化：调用后有其他操作
+function f(x) {
+  return g(x) + 1
+}
+
+// ❌ 不能优化：方法调用
+function f(x) {
+  return obj.g(x) // g 作为方法调用
+}
+
+// ❌ 不能优化：使用了 arguments
+function f() {
+  return g(arguments[0])
+}
+```
+
+## 实战应用
+
+### 深度遍历
+
+```javascript
+// 遍历 DOM 树（尾递归版本）
+function traverseDOM(node, callback, queue = []) {
+  if (!node) {
+    if (queue.length === 0) return
+    return traverseDOM(queue.shift(), callback, queue)
+  }
+
+  callback(node)
+  queue.push(...node.children)
+  return traverseDOM(queue.shift(), callback, queue)
+}
+
+// 使用循环版本更可靠
+function traverseDOMLoop(root, callback) {
+  const queue = [root]
+  while (queue.length > 0) {
+    const node = queue.shift()
+    callback(node)
+    queue.push(...node.children)
+  }
+}
+```
+
+### 路径查找
+
+```javascript
+// 在树结构中查找路径（尾递归）
+function findPath(node, target, path = []) {
+  if (!node) return null
+
+  const currentPath = [...path, node.value]
+
+  if (node.value === target) return currentPath
+
+  if (node.children) {
+    for (const child of node.children) {
+      const result = findPath(child, target, currentPath)
+      if (result) return result
+    }
+  }
+
+  return null
+}
+```
+
+## 小结
+
+| 要点       | 说明                         |
+| ---------- | ---------------------------- |
+| 尾调用     | 函数最后一步是调用另一个函数 |
+| 尾递归     | 递归函数的尾调用形式         |
+| 优化原理   | 复用栈帧，避免栈溢出         |
+| 浏览器支持 | 目前只有 Safari 支持         |
+| 替代方案   | 蹦床函数、循环、Generator    |
+
+虽然尾调用优化在大多数环境中没有实现，但理解这个概念对于编写高效的递归代码仍然很有价值。在实际开发中，建议对于深度递归使用循环或蹦床函数来避免栈溢出。

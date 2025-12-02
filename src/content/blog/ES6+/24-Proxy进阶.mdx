@@ -1,0 +1,493 @@
+---
+title: 'Proxy 进阶应用'
+description: '深入理解 Proxy 的 13 种拦截操作与实战应用：响应式系统、验证代理、缓存代理等'
+pubDate: 2024-01-24
+toc: true
+ogImage: true
+category: 'ES6+'
+tags: ['ES6', 'Proxy', '响应式', '验证', '缓存']
+---
+
+在掌握 Proxy 基础后，来看更多拦截操作和实际应用场景。
+
+## 全部拦截操作
+
+Proxy 支持 13 种拦截操作：
+
+### apply 拦截
+
+拦截函数调用：
+
+```javascript
+function sum(a, b) {
+  return a + b
+}
+
+const proxy = new Proxy(sum, {
+  apply(target, thisArg, args) {
+    console.log(`调用函数，参数: ${args}`)
+    return target.apply(thisArg, args)
+  },
+})
+
+proxy(1, 2) // '调用函数，参数: 1,2' 返回 3
+proxy.call(null, 1, 2) // 同上
+proxy.apply(null, [1, 2]) // 同上
+```
+
+### construct 拦截
+
+拦截 `new` 操作符：
+
+```javascript
+function Person(name) {
+  this.name = name
+}
+
+const PersonProxy = new Proxy(Person, {
+  construct(target, args, newTarget) {
+    console.log(`创建实例，参数: ${args}`)
+    return new target(...args)
+  },
+})
+
+new PersonProxy('张三') // '创建实例，参数: 张三'
+```
+
+### getPrototypeOf 拦截
+
+```javascript
+const handler = {
+  getPrototypeOf(target) {
+    console.log('获取原型')
+    return Object.getPrototypeOf(target)
+  },
+}
+
+const proxy = new Proxy({}, handler)
+Object.getPrototypeOf(proxy) // '获取原型'
+```
+
+### setPrototypeOf 拦截
+
+```javascript
+const handler = {
+  setPrototypeOf(target, proto) {
+    console.log('设置原型')
+    return Object.setPrototypeOf(target, proto)
+  },
+}
+
+const proxy = new Proxy({}, handler)
+Object.setPrototypeOf(proxy, {}) // '设置原型'
+```
+
+### isExtensible 拦截
+
+```javascript
+const handler = {
+  isExtensible(target) {
+    console.log('检查可扩展性')
+    return Object.isExtensible(target)
+  },
+}
+
+const proxy = new Proxy({}, handler)
+Object.isExtensible(proxy) // '检查可扩展性'
+```
+
+### preventExtensions 拦截
+
+```javascript
+const handler = {
+  preventExtensions(target) {
+    console.log('阻止扩展')
+    return Object.preventExtensions(target)
+  },
+}
+
+const proxy = new Proxy({}, handler)
+Object.preventExtensions(proxy) // '阻止扩展'
+```
+
+## 实战：响应式系统
+
+Vue 3 的响应式系统核心就是基于 Proxy：
+
+```javascript
+// 简化版响应式实现
+const targetMap = new WeakMap()
+let activeEffect = null
+
+function reactive(target) {
+  return new Proxy(target, {
+    get(target, key, receiver) {
+      // 收集依赖
+      track(target, key)
+      const result = Reflect.get(target, key, receiver)
+      // 深层响应式
+      if (typeof result === 'object' && result !== null) {
+        return reactive(result)
+      }
+      return result
+    },
+
+    set(target, key, value, receiver) {
+      const oldValue = target[key]
+      const result = Reflect.set(target, key, value, receiver)
+      if (oldValue !== value) {
+        // 触发更新
+        trigger(target, key)
+      }
+      return result
+    },
+  })
+}
+
+function track(target, key) {
+  if (!activeEffect) return
+
+  let depsMap = targetMap.get(target)
+  if (!depsMap) {
+    targetMap.set(target, (depsMap = new Map()))
+  }
+
+  let deps = depsMap.get(key)
+  if (!deps) {
+    depsMap.set(key, (deps = new Set()))
+  }
+
+  deps.add(activeEffect)
+}
+
+function trigger(target, key) {
+  const depsMap = targetMap.get(target)
+  if (!depsMap) return
+
+  const deps = depsMap.get(key)
+  if (deps) {
+    deps.forEach((effect) => effect())
+  }
+}
+
+function effect(fn) {
+  activeEffect = fn
+  fn()
+  activeEffect = null
+}
+
+// 使用
+const state = reactive({ count: 0 })
+
+effect(() => {
+  console.log('Count:', state.count)
+})
+
+state.count++ // 自动打印 'Count: 1'
+state.count++ // 自动打印 'Count: 2'
+```
+
+## 实战：日志代理
+
+```javascript
+function createLogger(target, name = 'Object') {
+  return new Proxy(target, {
+    get(target, property) {
+      console.log(`[GET] ${name}.${String(property)}`)
+      return target[property]
+    },
+
+    set(target, property, value) {
+      console.log(`[SET] ${name}.${String(property)} = ${value}`)
+      target[property] = value
+      return true
+    },
+
+    deleteProperty(target, property) {
+      console.log(`[DELETE] ${name}.${String(property)}`)
+      delete target[property]
+      return true
+    },
+
+    apply(target, thisArg, args) {
+      console.log(`[CALL] ${name}(${args.join(', ')})`)
+      return target.apply(thisArg, args)
+    },
+  })
+}
+
+const user = createLogger({ name: '张三', age: 25 }, 'user')
+user.name // [GET] user.name
+user.age = 26 // [SET] user.age = 26
+delete user.name // [DELETE] user.name
+```
+
+## 实战：缓存代理
+
+```javascript
+function memoize(fn) {
+  const cache = new Map()
+
+  return new Proxy(fn, {
+    apply(target, thisArg, args) {
+      const key = JSON.stringify(args)
+
+      if (cache.has(key)) {
+        console.log('From cache')
+        return cache.get(key)
+      }
+
+      console.log('Computing...')
+      const result = target.apply(thisArg, args)
+      cache.set(key, result)
+      return result
+    },
+  })
+}
+
+const fibonacci = memoize(function fib(n) {
+  if (n <= 1) return n
+  return fib(n - 1) + fib(n - 2)
+})
+
+fibonacci(40) // 'Computing...'（首次计算）
+fibonacci(40) // 'From cache'（使用缓存）
+```
+
+## 实战：只读代理
+
+```javascript
+function readonly(target) {
+  return new Proxy(target, {
+    set(target, property) {
+      console.warn(`Cannot set ${String(property)} on a readonly object`)
+      return true
+    },
+
+    deleteProperty(target, property) {
+      console.warn(`Cannot delete ${String(property)} from a readonly object`)
+      return true
+    },
+
+    get(target, property, receiver) {
+      const value = Reflect.get(target, property, receiver)
+      // 深层只读
+      if (typeof value === 'object' && value !== null) {
+        return readonly(value)
+      }
+      return value
+    },
+  })
+}
+
+const config = readonly({
+  api: 'https://api.example.com',
+  settings: {
+    debug: false,
+  },
+})
+
+config.api = 'xxx' // 警告，不会修改
+config.settings.debug = true // 警告，不会修改
+```
+
+## 实战：私有属性
+
+```javascript
+function createPrivate(target, privateProps = []) {
+  const privateSet = new Set(privateProps)
+
+  return new Proxy(target, {
+    get(target, property) {
+      if (privateSet.has(property)) {
+        throw new Error(`Cannot access private property: ${String(property)}`)
+      }
+      return target[property]
+    },
+
+    set(target, property, value) {
+      if (privateSet.has(property)) {
+        throw new Error(`Cannot set private property: ${String(property)}`)
+      }
+      target[property] = value
+      return true
+    },
+
+    has(target, property) {
+      if (privateSet.has(property)) {
+        return false
+      }
+      return property in target
+    },
+
+    ownKeys(target) {
+      return Object.keys(target).filter((key) => !privateSet.has(key))
+    },
+  })
+}
+
+const user = createPrivate({ name: '张三', _password: '123456', age: 25 }, [
+  '_password',
+])
+
+user.name // '张三'
+// user._password; // Error
+Object.keys(user) // ['name', 'age']
+'_password' in user // false
+```
+
+## 实战：类型强制
+
+```javascript
+function typed(schema) {
+  return new Proxy(
+    {},
+    {
+      set(target, property, value) {
+        const type = schema[property]
+
+        if (type && typeof value !== type) {
+          throw new TypeError(
+            `${String(property)} must be ${type}, got ${typeof value}`
+          )
+        }
+
+        target[property] = value
+        return true
+      },
+    }
+  )
+}
+
+const person = typed({
+  name: 'string',
+  age: 'number',
+  active: 'boolean',
+})
+
+person.name = '张三' // OK
+person.age = 25 // OK
+// person.age = '25'; // TypeError
+```
+
+## 实战：延迟加载
+
+```javascript
+function lazy(factory) {
+  let instance = null
+  let initialized = false
+
+  return new Proxy(
+    {},
+    {
+      get(target, property) {
+        if (!initialized) {
+          instance = factory()
+          initialized = true
+        }
+        return instance[property]
+      },
+
+      set(target, property, value) {
+        if (!initialized) {
+          instance = factory()
+          initialized = true
+        }
+        instance[property] = value
+        return true
+      },
+    }
+  )
+}
+
+const heavyObject = lazy(() => {
+  console.log('Initializing heavy object...')
+  return {
+    data: new Array(1000000).fill(0),
+    process() {
+      /* ... */
+    },
+  }
+})
+
+// 尚未初始化
+console.log('Before access')
+heavyObject.data // 'Initializing heavy object...'（首次访问时初始化）
+heavyObject.data // 已初始化，直接返回
+```
+
+## 实战：单例模式
+
+```javascript
+function singleton(Class) {
+  let instance = null
+
+  return new Proxy(Class, {
+    construct(target, args) {
+      if (!instance) {
+        instance = new target(...args)
+      }
+      return instance
+    },
+  })
+}
+
+class Database {
+  constructor(url) {
+    console.log('Creating database connection...')
+    this.url = url
+  }
+}
+
+const SingletonDatabase = singleton(Database)
+
+const db1 = new SingletonDatabase('localhost:5432')
+const db2 = new SingletonDatabase('localhost:5432')
+
+console.log(db1 === db2) // true
+```
+
+## Proxy 与 Reflect 配合
+
+Reflect 提供与 Proxy handler 方法一一对应的静态方法：
+
+```javascript
+const proxy = new Proxy(target, {
+  get(target, property, receiver) {
+    // 使用 Reflect 确保正确的 this 绑定
+    return Reflect.get(target, property, receiver)
+  },
+
+  set(target, property, value, receiver) {
+    return Reflect.set(target, property, value, receiver)
+  },
+
+  has(target, property) {
+    return Reflect.has(target, property)
+  },
+
+  deleteProperty(target, property) {
+    return Reflect.deleteProperty(target, property)
+  },
+})
+```
+
+## 小结
+
+| 拦截操作                 | 触发条件                          |
+| ------------------------ | --------------------------------- |
+| get                      | 读取属性                          |
+| set                      | 设置属性                          |
+| has                      | in 操作符                         |
+| deleteProperty           | delete 操作符                     |
+| ownKeys                  | Object.keys() 等                  |
+| getOwnPropertyDescriptor | Object.getOwnPropertyDescriptor() |
+| defineProperty           | Object.defineProperty()           |
+| getPrototypeOf           | Object.getPrototypeOf()           |
+| setPrototypeOf           | Object.setPrototypeOf()           |
+| isExtensible             | Object.isExtensible()             |
+| preventExtensions        | Object.preventExtensions()        |
+| apply                    | 函数调用                          |
+| construct                | new 操作符                        |
+
+Proxy 是实现元编程的强大工具，可以用于响应式系统、日志、缓存、权限控制等各种场景。

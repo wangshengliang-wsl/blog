@@ -1,630 +1,1025 @@
 ---
 title: Astro 组件与样式
-description: 掌握 Astro 组件开发，涵盖 Astro 组件、框架组件集成、样式管理、CSS 方案及群岛架构的实践
-pubDate: 2025-11-27
+description: 掌握 Astro 组件系统的核心概念，学习 Props、Slots、框架组件集成以及多种样式方案
+pubDate: 2025-12-02
 toc: true
 ogImage: true
 category: Astro
+tags: ['Astro', '组件', '样式', 'UnoCSS', 'React', 'Vue']
 ---
 
-Astro 组件是构建页面的基础单元，同时支持集成 React、Vue、Svelte 等框架组件。本文深入讲解组件开发和样式管理。
+## Astro 组件基础
 
-> 本文基于 Astro v5.x 编写。
+🙋 Astro 组件是构建页面的基本单元。和 React/Vue 组件不同，Astro 组件**默认在服务端渲染**，输出纯 HTML，不会发送任何 JavaScript 到客户端。
 
-## Astro 组件
+### 组件结构：Frontmatter + Template
 
-### 组件结构
-
-Astro 组件由三部分组成：
+每个 `.astro` 文件都是一个组件，结构分为两部分：
 
 ```astro
 ---
-// 1. 组件脚本（服务端执行）
-import SomeComponent from './SomeComponent.astro'
+// 🔷 组件脚本 (Frontmatter)
+// 在服务端执行，支持 JavaScript/TypeScript
 
+import Header from './Header.astro'
+import { formatDate } from '../utils/date'
+
+// 接收 Props
 interface Props {
   title: string
-  count?: number
+  date: Date
 }
+const { title, date } = Astro.props
 
-const { title, count = 0 } = Astro.props
-const items = ['A', 'B', 'C']
+// 定义变量
+const formattedDate = formatDate(date)
+const items = ['苹果', '香蕉', '橙子']
 ---
 
-<!-- 2. 组件模板（HTML） -->
-<div class="container">
+<!-- 🔷 组件模板 --><!-- 类似 JSX 的 HTML 模板 -->
+<article>
+  <Header />
   <h1>{title}</h1>
-  <p>Count: {count}</p>
-  <SomeComponent />
-</div>
+  <time>{formattedDate}</time>
+  <ul>
+    {items.map((item) => <li>{item}</li>)}
+  </ul>
+</article>
 
-<!-- 3. 组件样式 -->
 <style>
-  .container {
-    padding: 1rem;
-  }
-  h1 {
-    color: navy;
+  /* 🔷 组件样式（默认 scoped） */
+  article {
+    max-width: 800px;
+    margin: 0 auto;
   }
 </style>
 ```
 
-### Props 类型定义
+### Props 定义与类型声明
+
+使用 TypeScript 接口定义 Props 类型：
 
 ```astro
 ---
-// 使用 interface
+// 方式 1: 直接定义 Props 接口
 interface Props {
   title: string
-  description?: string
+  subtitle?: string // 可选
+  count: number
   tags: string[]
-  author: {
-    name: string
-    avatar?: string
-  }
 }
 
-// 或使用 type
-type Props = {
-  variant: 'primary' | 'secondary' | 'danger'
-  size?: 'sm' | 'md' | 'lg'
-}
-
-const { title, description = '默认描述', tags, author } = Astro.props
+const { title, subtitle, count, tags } = Astro.props
 ---
 ```
 
-### Slots 插槽
-
-**默认插槽**：
+也可以导入共享的类型：
 
 ```astro
 ---
-// Card.astro
+// 方式 2: 导入类型
+import type { PostSchema } from '~/content/schema'
+
+interface Props {
+  post: PostSchema
+}
+
+const { post } = Astro.props
+---
+```
+
+### Astro.props 使用方式
+
+`Astro.props` 包含传递给组件的所有属性：
+
+```astro
+---
+// 解构赋值（推荐）
+const { title, author = '匿名' } = Astro.props
+
+// 或直接访问
+const props = Astro.props
+console.log(props.title)
+---
+
+<h1>{title}</h1>
+<p>作者: {author}</p>
+```
+
+🎯 **默认值**: 使用解构赋值时可以设置默认值，处理可选 Props。
+
+### 传递 Props
+
+使用组件时通过属性传递数据：
+
+```astro
+---
+import Card from './Card.astro'
+
+const post = {
+  title: 'Hello Astro',
+  description: '入门教程',
+  tags: ['astro', 'tutorial'],
+}
+---
+
+<!-- 传递单个属性 -->
+<Card title="标题" count={42} />
+
+<!-- 传递对象 -->
+<Card post={post} />
+
+<!-- 展开对象属性 -->
+<Card {...post} />
+
+<!-- 动态属性 -->
+<Card title={post.title} tags={post.tags} />
+```
+
+## 插槽系统
+
+插槽（Slot）让组件可以接收并渲染子内容，类似 Vue 的 slot 或 React 的 children。
+
+### 默认插槽 `<slot />`
+
+最简单的插槽用法：
+
+```astro
+---
+// src/components/Card.astro
+interface Props {
+  title: string
+}
+const { title } = Astro.props
 ---
 
 <div class="card">
-  <slot />
+  <h2>{title}</h2>
+  <div class="content">
+    <slot />
+    <!-- 子内容渲染在这里 -->
+  </div>
 </div>
 ```
 
+使用时：
+
 ```astro
-<Card>
-  <p>这是卡片内容</p>
+---
+import Card from './Card.astro'
+---
+
+<Card title="我的卡片">
+  <p>这段内容会插入到 slot 位置</p>
+  <button>点击我</button>
 </Card>
 ```
 
-**具名插槽**：
+渲染结果：
+
+```html
+<div class="card">
+  <h2>我的卡片</h2>
+  <div class="content">
+    <p>这段内容会插入到 slot 位置</p>
+    <button>点击我</button>
+  </div>
+</div>
+```
+
+### 具名插槽 `<slot name="xxx" />`
+
+一个组件可以有多个插槽：
 
 ```astro
 ---
-// Modal.astro
+// src/components/Layout.astro
 ---
 
-<div class="modal">
+<div class="layout">
   <header>
-    <slot name="header">默认标题</slot>
+    <slot name="header" />
   </header>
+
   <main>
     <slot />
+    <!-- 默认插槽 -->
   </main>
+
   <footer>
     <slot name="footer" />
   </footer>
 </div>
 ```
 
-```astro
-<Modal>
-  <h2 slot="header">自定义标题</h2>
-  <p>Modal 内容</p>
-  <div slot="footer">
-    <button>取消</button>
-    <button>确认</button>
-  </div>
-</Modal>
-```
-
-**检查插槽是否存在**：
+使用具名插槽：
 
 ```astro
 ---
-const hasFooter = Astro.slots.has('footer')
+import Layout from './Layout.astro'
+---
+
+<Layout>
+  <nav slot="header">导航栏</nav>
+
+  <article>这是主要内容，放入默认插槽</article>
+
+  <p slot="footer">版权信息 © 2025</p>
+</Layout>
+```
+
+🔶 **注意**: 使用 `slot="name"` 属性指定内容放入哪个插槽。
+
+### 插槽回退内容
+
+当没有传入内容时显示默认值：
+
+```astro
+---
+// src/components/Button.astro
+---
+
+<button class="btn">
+  <slot>
+    默认按钮文字 <!-- 没有传入内容时显示 -->
+  </slot>
+</button>
+```
+
+```astro
+<!-- 显示 "默认按钮文字" -->
+<Button />
+
+<!-- 显示 "点击提交" -->
+<Button>点击提交</Button>
+```
+
+### 检查插槽是否有内容
+
+使用 `Astro.slots` API：
+
+```astro
+---
+const hasHeader = Astro.slots.has('header')
 ---
 
 <div class="card">
-  <slot />
   {
-    hasFooter && (
-      <footer>
-        <slot name="footer" />
-      </footer>
+    hasHeader && (
+      <header>
+        <slot name="header" />
+      </header>
     )
   }
+
+  <main>
+    <slot />
+  </main>
 </div>
 ```
 
-### 渲染插槽内容
+## 组件组合
+
+### 布局组件 (Layout)
+
+布局组件定义页面的公共结构：
 
 ```astro
 ---
-const html = await Astro.slots.render('default')
+// src/layouts/BaseLayout.astro
+import '~/styles/global.css'
+import Header from '~/components/Header.astro'
+import Footer from '~/components/Footer.astro'
+
+interface Props {
+  title: string
+  description?: string
+}
+
+const { title, description } = Astro.props
 ---
 
-<div set:html={html} />
+<!doctype html>
+<html lang="zh-Hans">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    <meta name="description" content={description} />
+    <title>{title}</title>
+  </head>
+  <body>
+    <Header />
+    <main>
+      <slot />
+    </main>
+    <Footer />
+  </body>
+</html>
+```
+
+页面使用布局：
+
+```astro
+---
+// src/pages/about.astro
+import BaseLayout from '~/layouts/BaseLayout.astro'
+---
+
+<BaseLayout title="关于我" description="了解更多关于我的信息">
+  <h1>关于我</h1>
+  <p>这是关于页面的内容...</p>
+</BaseLayout>
+```
+
+### 可复用 UI 组件
+
+将重复的 UI 抽取为组件：
+
+```astro
+---
+// src/components/PostCard.astro
+interface Props {
+  title: string
+  description: string
+  date: Date
+  href: string
+}
+
+const { title, description, date, href } = Astro.props
+const formattedDate = date.toLocaleDateString('zh-CN')
+---
+
+<article class="post-card">
+  <a href={href}>
+    <h3>{title}</h3>
+    <p>{description}</p>
+    <time datetime={date.toISOString()}>{formattedDate}</time>
+  </a>
+</article>
+
+<style>
+  .post-card {
+    padding: 1.5rem;
+    border: 1px solid #eee;
+    border-radius: 8px;
+    transition: box-shadow 0.2s;
+  }
+
+  .post-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+
+  h3 {
+    margin: 0 0 0.5rem;
+    color: #333;
+  }
+
+  p {
+    color: #666;
+    margin: 0 0 1rem;
+  }
+
+  time {
+    font-size: 0.875rem;
+    color: #999;
+  }
+</style>
+```
+
+### 组件导入与路径别名
+
+使用路径别名简化导入：
+
+```astro
+---
+// 使用别名（推荐）
+import Header from '~/components/Header.astro'
+import { SITE } from '~/config'
+import { formatDate } from '~/utils/date'
+
+// 而不是相对路径
+// import Header from '../../components/Header.astro'
+---
+```
+
+配置路径别名（`tsconfig.json`）：
+
+```json
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "~/*": ["./src/*"]
+    }
+  }
+}
 ```
 
 ## 框架组件集成
 
-Astro 支持在同一项目中使用多种 UI 框架。
+Astro 最强大的特性之一是可以混用不同框架的组件。
 
 ### 安装框架集成
 
 ```bash
 # React
-npx astro add react
+pnpm astro add react
 
 # Vue
-npx astro add vue
+pnpm astro add vue
 
 # Svelte
-npx astro add svelte
+pnpm astro add svelte
 
 # Solid
-npx astro add solid-js
-
-# Preact
-npx astro add preact
+pnpm astro add solid-js
 ```
 
-### 使用 React 组件
+### React/Vue/Svelte 组件导入
 
-```tsx
-// src/components/Counter.tsx
-import { useState } from 'react'
-
-export default function Counter() {
-  const [count, setCount] = useState(0)
-
-  return (
-    <div>
-      <p>Count: {count}</p>
-      <button onClick={() => setCount(count + 1)}>+1</button>
-    </div>
-  )
-}
-```
+安装后即可直接导入框架组件：
 
 ```astro
 ---
-import Counter from '../components/Counter'
+// 在 Astro 组件中混用多个框架
+import ReactCounter from '../components/ReactCounter.jsx'
+import VueTimer from '../components/VueTimer.vue'
+import SvelteToggle from '../components/SvelteToggle.svelte'
 ---
 
-<Counter client:load />
+<div>
+  <h1>混合框架演示</h1>
+  <ReactCounter client:load />
+  <VueTimer client:idle />
+  <SvelteToggle client:visible />
+</div>
 ```
 
-### 使用 Vue 组件
+### client:\* 指令详解
 
-```vue
-<!-- src/components/Counter.vue -->
-<script setup>
-import { ref } from 'vue'
+🎯 框架组件默认只渲染 HTML，不会加载 JavaScript。要启用交互，需要添加 `client:*` 指令。
 
-const count = ref(0)
-</script>
+| 指令             | 加载时机       | 使用场景           |
+| ---------------- | -------------- | ------------------ |
+| `client:load`    | 页面加载时立即 | 需要立即交互的组件 |
+| `client:idle`    | 页面空闲时     | 非关键交互组件     |
+| `client:visible` | 组件进入视口时 | 页面下方的组件     |
+| `client:media`   | 匹配媒体查询时 | 响应式组件         |
+| `client:only`    | 只在客户端渲染 | 依赖浏览器 API     |
 
-<template>
-  <div>
-    <p>Count: {{ count }}</p>
-    <button @click="count++">+1</button>
-  </div>
-</template>
+**client:load** - 最高优先级
+
+```astro
+<!-- 页面加载时立即 hydrate -->
+<SearchBar client:load />
 ```
+
+**client:idle** - 延迟加载
+
+```astro
+<!-- 页面空闲时加载，使用 requestIdleCallback -->
+<NewsletterForm client:idle />
+```
+
+**client:visible** - 懒加载
+
+```astro
+<!-- 滚动到可见区域时加载 -->
+<CommentSection client:visible />
+<InfiniteScroll client:visible />
+```
+
+**client:media** - 条件加载
+
+```astro
+<!-- 仅在移动端加载 -->
+<MobileMenu client:media="(max-width: 768px)" />
+```
+
+**client:only** - 纯客户端渲染
+
+```astro
+<!-- 不在服务端渲染，只在客户端渲染 --><!-- 必须指定框架 -->
+<BrowserOnlyChart client:only="react" />
+```
+
+🔶 **注意**: `client:only` 需要指定框架名称，因为服务端不会执行渲染。
+
+### 混合框架组件
+
+一个 Astro 页面可以同时使用多个框架：
 
 ```astro
 ---
-import Counter from '../components/Counter.vue'
+import Layout from '../layouts/Layout.astro'
+import ReactHeader from '../components/ReactHeader.jsx'
+import VueFooter from '../components/VueFooter.vue'
+import SvelteButton from '../components/SvelteButton.svelte'
 ---
 
-<Counter client:load />
+<Layout>
+  <ReactHeader client:load />
+
+  <main>
+    <h1>这是 Astro 内容</h1>
+    <SvelteButton client:visible> 点击我 </SvelteButton>
+  </main>
+
+  <VueFooter client:idle />
+</Layout>
 ```
 
-### 客户端指令（Client Directives）
+🤔 **什么时候这样做有意义？**
 
-框架组件默认只在服务端渲染为 HTML。使用客户端指令启用交互：
+- 迁移老项目时，逐步替换组件
+- 团队成员熟悉不同框架
+- 利用特定框架的优秀组件库
 
-| 指令             | 说明                   |
-| ---------------- | ---------------------- |
-| `client:load`    | 页面加载时立即 hydrate |
-| `client:idle`    | 浏览器空闲时 hydrate   |
-| `client:visible` | 组件进入视口时 hydrate |
-| `client:media`   | 满足媒体查询时 hydrate |
-| `client:only`    | 跳过 SSR，仅客户端渲染 |
+## 样式方案
 
-```astro
-<!-- 立即加载（关键交互） -->
-<Counter client:load />
+### Scoped CSS（组件内样式）
 
-<!-- 空闲时加载（非关键交互） -->
-<Newsletter client:idle />
-
-<!-- 可见时加载（页面下方组件） -->
-<Comments client:visible />
-
-<!-- 移动端才加载 -->
-<MobileNav client:media="(max-width: 768px)" />
-
-<!-- 仅客户端渲染（使用浏览器 API 的组件） -->
-<NoSSRComponent client:only="react" />
-```
-
-### 传递 Props 和 Children
+Astro 组件中的 `<style>` 默认是 scoped 的：
 
 ```astro
 ---
-import ReactComponent from './ReactComponent'
+// Button.astro
 ---
 
-<!-- 传递 props -->
-<ReactComponent client:load title="Hello" count={42} items={['a', 'b']} />
-
-<!-- 传递 children -->
-<ReactComponent client:load>
-  <p>这是子内容</p>
-</ReactComponent>
-```
-
-### 多框架混用
-
-```astro
----
-import ReactCounter from './ReactCounter'
-import VueCounter from './VueCounter.vue'
-import SvelteCounter from './SvelteCounter.svelte'
----
-
-<h2>React</h2>
-<ReactCounter client:visible />
-
-<h2>Vue</h2>
-<VueCounter client:visible />
-
-<h2>Svelte</h2>
-<SvelteCounter client:visible />
-```
-
-## 样式管理
-
-### 作用域样式
-
-Astro 组件内的 `<style>` 默认是作用域样式：
-
-```astro
-<h1>标题</h1>
+<button class="btn">点击</button>
 
 <style>
-  /* 只作用于当前组件 */
-  h1 {
+  /* 只影响当前组件的 .btn */
+  .btn {
+    padding: 0.5rem 1rem;
+    background: blue;
+    color: white;
+    border: none;
+    border-radius: 4px;
+  }
+
+  .btn:hover {
+    background: darkblue;
+  }
+</style>
+```
+
+Astro 通过添加唯一的 `data-astro-cid-xxx` 属性实现样式隔离：
+
+```html
+<!-- 渲染结果 -->
+<button class="btn" data-astro-cid-abc123>点击</button>
+<style>
+  .btn[data-astro-cid-abc123] {
+    /* styles */
+  }
+</style>
+```
+
+### 全局样式
+
+方式 1: 使用 `is:global` 指令
+
+```astro
+<style is:global>
+  /* 这些样式是全局的 */
+  body {
+    margin: 0;
+    font-family: system-ui, sans-serif;
+  }
+
+  a {
+    color: blue;
+  }
+</style>
+```
+
+方式 2: 在组件脚本中导入
+
+```astro
+---
+// 导入全局样式文件
+import '../styles/global.css'
+---
+```
+
+方式 3: 使用 `:global()` 选择器
+
+```astro
+<style>
+  /* 只有 .wrapper 内的 p 是全局的 */
+  .wrapper :global(p) {
     color: red;
   }
 </style>
 ```
 
-编译后会生成唯一类名：
+### CSS 变量与主题切换
 
-```html
-<h1 class="astro-XXXXXX">标题</h1>
+使用 CSS 变量实现主题切换：
+
+```css
+/* src/styles/theme.css */
+:root {
+  /* 亮色主题 */
+  --color-bg: #ffffff;
+  --color-text: #333333;
+  --color-primary: #0066cc;
+  --color-secondary: #666666;
+}
+
+:root.dark {
+  /* 暗色主题 */
+  --color-bg: #1a1a1a;
+  --color-text: #e5e5e5;
+  --color-primary: #66b3ff;
+  --color-secondary: #999999;
+}
 ```
 
-### 全局样式
-
-**使用 `is:global`**：
-
-```astro
-<style is:global>
-  /* 全局样式 */
-  body {
-    margin: 0;
-    font-family: system-ui;
-  }
-</style>
-```
-
-**使用 `:global()` 选择器**：
+组件中使用变量：
 
 ```astro
 <style>
-  /* 局部样式 */
-  .container {
-    padding: 1rem;
+  .card {
+    background: var(--color-bg);
+    color: var(--color-text);
+    border: 1px solid var(--color-secondary);
   }
 
-  /* 全局样式 */
-  :global(body) {
-    background: #f5f5f5;
-  }
-
-  /* 嵌套全局 */
-  .container :global(h1) {
-    color: navy;
+  .card a {
+    color: var(--color-primary);
   }
 </style>
 ```
 
-### 导入外部样式
+主题切换脚本：
 
 ```astro
----
-// 导入全局 CSS
-import '../styles/global.css'
-
-// 导入 npm 包样式
-import 'normalize.css'
----
-```
-
-### CSS 变量
-
-```astro
----
-const primaryColor = '#007bff'
-const fontSize = '16px'
----
-
-<div class="box">内容</div>
-
-<style define:vars={{ primaryColor, fontSize }}>
-  .box {
-    color: var(--primaryColor);
-    font-size: var(--fontSize);
+<script>
+  function toggleTheme() {
+    document.documentElement.classList.toggle('dark')
+    const isDark = document.documentElement.classList.contains('dark')
+    localStorage.setItem('theme', isDark ? 'dark' : 'light')
   }
-</style>
+
+  // 初始化主题
+  const savedTheme = localStorage.getItem('theme')
+  if (savedTheme === 'dark') {
+    document.documentElement.classList.add('dark')
+  }
+</script>
 ```
 
-### 外部样式表
+### UnoCSS 在当前项目中的应用
 
-```astro
-<head>
-  <!-- 本地样式 -->
-  <link rel="stylesheet" href="/styles/global.css" />
+当前博客使用 UnoCSS 作为原子化 CSS 方案。UnoCSS 是一个即时原子化 CSS 引擎，性能优于 Tailwind CSS。
 
-  <!-- 外部 CDN -->
-  <link rel="stylesheet" href="https://cdn.example.com/style.css" />
-</head>
-```
+**配置 UnoCSS**:
 
-## CSS 方案
-
-### Tailwind CSS
-
-```bash
-npx astro add tailwind
-```
-
-```astro
-<div class="bg-blue-500 text-white p-4 rounded-lg">Tailwind CSS</div>
-```
-
-### UnoCSS
-
-```bash
-npx astro add unocss
-```
-
-```javascript
+```typescript
 // uno.config.ts
 import { defineConfig, presetUno, presetIcons } from 'unocss'
 
 export default defineConfig({
-  presets: [presetUno(), presetIcons()],
+  presets: [
+    presetUno(), // 默认预设（类似 Tailwind）
+    presetIcons({
+      // 图标预设
+      scale: 1.2,
+      cdn: 'https://esm.sh/',
+    }),
+  ],
+  shortcuts: {
+    btn: 'px-4 py-2 rounded bg-blue-500 text-white hover:bg-blue-600',
+    card: 'p-4 rounded-lg shadow-md bg-white dark:bg-gray-800',
+  },
 })
 ```
 
-### CSS Modules
-
-```css
-/* Button.module.css */
-.button {
-  padding: 0.5rem 1rem;
-  border-radius: 4px;
-}
-
-.primary {
-  background: blue;
-  color: white;
-}
-```
+**在 Astro 中使用**:
 
 ```astro
 ---
-import styles from './Button.module.css'
+// astro.config.ts 中已配置 unocss 集成
 ---
 
-<button class={`${styles.button} ${styles.primary}`}> 按钮 </button>
-```
-
-### Sass/SCSS
-
-```bash
-npm install sass
-```
-
-```astro
-<style lang="scss">
-  $primary-color: #007bff;
-
-  .container {
-    padding: 1rem;
-
-    h1 {
-      color: $primary-color;
-    }
-
-    &:hover {
-      background: lighten($primary-color, 40%);
-    }
-  }
-</style>
-```
-
-### Less
-
-```bash
-npm install less
-```
-
-```astro
-<style lang="less">
-  @primary-color: #007bff;
-
-  .container {
-    h1 {
-      color: @primary-color;
-    }
-  }
-</style>
-```
-
-## class:list 指令
-
-动态类名管理：
-
-```astro
----
-const isActive = true
-const size = 'large'
----
-
-<div
-  class:list={[
-    'base-class',
-    { active: isActive },
-    { 'is-large': size === 'large' },
-  ]}
->
-  内容
+<div class="flex items-center gap-4 p-6">
+  <button class="btn">点击</button>
+  <div class="card">
+    <h3 class="text-lg font-bold mb-2">标题</h3>
+    <p class="text-gray-600 dark:text-gray-400">内容</p>
+  </div>
 </div>
 
-<!-- 输出: <div class="base-class active is-large"> -->
+<!-- 使用图标 -->
+<span class="i-carbon-moon text-2xl"></span>
+<span class="i-ri-sun-line text-2xl"></span>
 ```
 
-支持的值类型：
+**UnoCSS vs Tailwind CSS**:
+
+| 特性       | UnoCSS             | Tailwind CSS |
+| ---------- | ------------------ | ------------ |
+| 构建速度   | 极快（按需生成）   | 快           |
+| 配置灵活性 | 高（可自定义引擎） | 中           |
+| 图标支持   | 内置 preset        | 需额外配置   |
+| 生态系统   | 增长中             | 成熟         |
+
+## 实战：分析 AntfuStyle 组件
+
+让我们看看当前博客的组件是如何组织的。
+
+### Header/Footer 布局组件
+
+**BaseLayout.astro** - 基础布局：
 
 ```astro
-<div
-  class:list={[
-    'string-class', // 字符串
-    { active: true }, // 对象（条件类）
-    ['array', 'of', 'classes'], // 数组
-    undefined, // 忽略
-    null, // 忽略
-    false, // 忽略
-  ]}
+---
+// src/layouts/BaseLayout.astro
+import '@unocss/reset/tailwind.css'
+import '~/styles/main.css'
+import '~/styles/prose.css'
+
+import Head from '~/components/base/Head.astro'
+import NavBar from '~/components/nav/NavBar.astro'
+import Footer from '~/components/base/Footer.astro'
+import Background from '~/components/backgrounds/Background.astro'
+
+interface Props {
+  title?: string
+  description?: string
+  bgType?: 'plum' | 'dot' | 'rose' | 'particle' | false
+}
+
+const { title, description, bgType } = Astro.props
+---
+
+<!doctype html>
+<html lang="zh-Hans">
+  <head>
+    <Head {title} {description} />
+  </head>
+  <body
+    class="relative flex flex-col min-h-screen font-sans text-gray-700 dark:text-gray-200"
+  >
+    {bgType && <Background type={bgType} />}
+    <NavBar />
+    <main id="main" class="px-7 py-10">
+      <slot />
+    </main>
+    <Footer />
+  </body>
+</html>
+```
+
+🎯 关键设计：
+
+- 导入全局样式和 CSS Reset
+- 使用 Props 控制背景类型
+- 通过 slot 插入页面内容
+- 使用 UnoCSS 原子类
+
+### 卡片/按钮等 UI 组件
+
+一个典型的卡片组件：
+
+```astro
+---
+// src/components/PostCard.astro
+interface Props {
+  title: string
+  description?: string
+  date: Date
+  href: string
+  tags?: string[]
+}
+
+const { title, description, date, href, tags = [] } = Astro.props
+---
+
+<a
+  href={href}
+  class="group block p-4 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-colors"
 >
-</div>
-```
+  <h3
+    class="text-lg font-semibold text-gray-900 dark:text-gray-100 group-hover:text-blue-500 transition-colors"
+  >
+    {title}
+  </h3>
 
-## 资源导入
-
-### 图片
-
-```astro
----
-// 从 src/assets 导入（会被优化）
-import logo from '../assets/logo.png'
-
-// 或使用 Image 组件
-import { Image } from 'astro:assets'
-import heroImage from '../assets/hero.jpg'
----
-
-<!-- 导入的图片 -->
-<img src={logo.src} alt="Logo" />
-
-<!-- Image 组件（自动优化） -->
-<Image src={heroImage} alt="Hero" width={800} height={400} />
-
-<!-- public 目录图片（不优化） -->
-<img src="/images/photo.jpg" alt="Photo" />
-```
-
-### 字体
-
-```astro
-<style>
-  @font-face {
-    font-family: 'CustomFont';
-    src: url('/fonts/custom.woff2') format('woff2');
-    font-display: swap;
+  {
+    description && (
+      <p class="mt-2 text-gray-600 dark:text-gray-400 line-clamp-2">
+        {description}
+      </p>
+    )
   }
 
-  body {
-    font-family: 'CustomFont', sans-serif;
+  <div class="mt-3 flex items-center justify-between text-sm">
+    <time class="text-gray-500 dark:text-gray-500">
+      {date.toLocaleDateString('zh-CN')}
+    </time>
+
+    {
+      tags.length > 0 && (
+        <div class="flex gap-2">
+          {tags.slice(0, 3).map((tag) => (
+            <span class="px-2 py-0.5 bg-gray-100 dark:bg-gray-800 rounded text-xs">
+              {tag}
+            </span>
+          ))}
+        </div>
+      )
+    }
+  </div>
+</a>
+```
+
+### 主题切换实现原理
+
+主题切换按钮组件：
+
+```astro
+---
+// src/components/ThemeToggle.astro
+---
+
+<button
+  id="theme-toggle"
+  class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+  aria-label="切换主题"
+>
+  <span class="i-ri-sun-line dark:hidden text-xl"></span>
+  <span class="i-ri-moon-line hidden dark:inline text-xl"></span>
+</button>
+
+<script>
+  const toggle = document.getElementById('theme-toggle')
+
+  // 检测系统主题偏好
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)')
+
+  // 初始化主题
+  function initTheme() {
+    const saved = localStorage.getItem('theme')
+    if (saved) {
+      document.documentElement.classList.toggle('dark', saved === 'dark')
+    } else if (prefersDark.matches) {
+      document.documentElement.classList.add('dark')
+    }
   }
-</style>
+
+  // 切换主题
+  function toggleTheme() {
+    const isDark = document.documentElement.classList.toggle('dark')
+    localStorage.setItem('theme', isDark ? 'dark' : 'light')
+  }
+
+  initTheme()
+  toggle?.addEventListener('click', toggleTheme)
+
+  // 监听系统主题变化
+  prefersDark.addEventListener('change', (e) => {
+    if (!localStorage.getItem('theme')) {
+      document.documentElement.classList.toggle('dark', e.matches)
+    }
+  })
+</script>
 ```
 
-### JSON
+### 动画背景组件 (Plum/Dot/Rose)
+
+当前博客支持多种动画背景。以 Plum（梅花）背景为例：
 
 ```astro
 ---
-import data from '../data/config.json'
+// src/components/backgrounds/Background.astro
+interface Props {
+  type: 'plum' | 'dot' | 'rose' | 'particle'
+}
+
+const { type } = Astro.props
 ---
 
-<ul>
-  {data.items.map((item) => <li>{item.name}</li>)}
-</ul>
+{type === 'plum' && <PlumBackground />}
+{type === 'dot' && <DotBackground />}
+{type === 'rose' && <RoseBackground />}
+{type === 'particle' && <ParticleBackground />}
 ```
 
-## 组件库推荐
-
-### Astro 原生组件
-
-- [Astro SEO](https://github.com/jonasmerlin/astro-seo) - SEO 组件
-- [Astro Icon](https://github.com/natemoo-re/astro-icon) - 图标组件
-
-### UI 框架组件
-
-配合客户端指令使用：
-
-- **React**: Radix UI、shadcn/ui
-- **Vue**: Element Plus、Naive UI
-- **Svelte**: Skeleton、DaisyUI
-
-## 最佳实践
-
-### 1. 组件职责单一
-
-```text
-src/components/
-├── ui/              # 基础 UI 组件
-│   ├── Button.astro
-│   └── Card.astro
-├── layout/          # 布局组件
-│   ├── Header.astro
-│   └── Footer.astro
-└── feature/         # 业务组件
-    └── PostCard.astro
-```
-
-### 2. 优先使用 Astro 组件
-
-静态内容使用 Astro 组件，只有需要交互时才使用框架组件。
-
-### 3. 延迟加载框架组件
+Plum 背景使用 Canvas 绘制生长动画：
 
 ```astro
-<!-- 使用 client:visible 而非 client:load -->
-<HeavyComponent client:visible />
+---
+// src/components/backgrounds/PlumBackground.astro
+---
+
+<canvas id="plum-canvas" class="fixed inset-0 pointer-events-none -z-10 op-50"
+></canvas>
+
+<script>
+  const canvas = document.getElementById('plum-canvas') as HTMLCanvasElement
+  const ctx = canvas.getContext('2d')!
+
+  // 设置画布尺寸
+  function resize() {
+    canvas.width = window.innerWidth
+    canvas.height = window.innerHeight
+  }
+
+  resize()
+  window.addEventListener('resize', resize)
+
+  // 绘制梅花枝干生长动画...
+  // （具体实现略，使用 requestAnimationFrame 绘制贝塞尔曲线）
+</script>
 ```
 
-### 4. 样式隔离
+## 组件最佳实践
 
-使用作用域样式或 CSS Modules，避免样式冲突。
+### Props 类型完整定义
+
+```astro
+---
+// ✅ 完整的类型定义
+interface Props {
+  /** 文章标题 */
+  title: string
+  /** 文章描述（可选） */
+  description?: string
+  /** 发布日期 */
+  date: Date
+  /** 是否显示作者 */
+  showAuthor?: boolean
+}
+
+const {
+  title,
+  description,
+  date,
+  showAuthor = true, // 默认值
+} = Astro.props
+---
+```
+
+### 合理使用 Slots
+
+```astro
+---
+// 复杂布局使用多个具名插槽
+---
+
+<article class="post">
+  <header>
+    <slot name="title" />
+    <slot name="meta" />
+  </header>
+
+  <div class="content">
+    <slot />
+    <!-- 默认插槽放主要内容 -->
+  </div>
+
+  {
+    Astro.slots.has('footer') && (
+      <footer>
+        <slot name="footer" />
+      </footer>
+    )
+  }
+</article>
+```
+
+### 样式组织
+
+```
+src/styles/
+├── global.css      # 全局基础样式
+├── prose.css       # 文章内容样式
+├── markdown.css    # Markdown 样式
+└── page.css        # 页面级样式
+```
+
+## 下一步
+
+🎯 现在你已经掌握了 Astro 组件系统：
+
+- 组件的基本结构和 Props 传递
+- 插槽系统的使用
+- 框架组件集成和 client:\* 指令
+- 多种样式方案
+
+下一篇文章，我们将深入学习 Astro 5 的**内容集合**，包括：
+
+- Content Layer API 的使用
+- Schema 定义和验证
+- 集合查询和渲染
+- 当前博客的内容架构分析
 
 ## 参考资料
 
-- [Astro 组件文档](https://docs.astro.build/zh-cn/core-concepts/astro-components/)
-- [框架组件](https://docs.astro.build/zh-cn/core-concepts/framework-components/)
-- [样式指南](https://docs.astro.build/zh-cn/guides/styling/)
-- [客户端指令](https://docs.astro.build/zh-cn/reference/directives-reference/#client-directives)
+- [Astro 组件文档](https://docs.astro.build/en/basics/astro-components/)
+- [Astro 样式指南](https://docs.astro.build/en/guides/styling/)
+- [UnoCSS 文档](https://unocss.dev/)
+- [Astro 框架集成](https://docs.astro.build/en/guides/framework-components/)

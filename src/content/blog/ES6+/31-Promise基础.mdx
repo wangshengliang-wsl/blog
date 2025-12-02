@@ -1,0 +1,429 @@
+---
+title: 'Promise 基础'
+description: '深入理解 ES6 Promise 的三种状态、then/catch 链式调用与错误处理'
+pubDate: 2024-01-31
+toc: true
+ogImage: true
+category: 'ES6+'
+tags: ['ES6', 'Promise', '异步', 'then', 'catch']
+---
+
+Promise 是 ES6 引入的异步编程解决方案，解决了回调地狱问题。
+
+## 回调地狱
+
+Promise 之前，异步操作依赖回调：
+
+```javascript
+// 回调地狱
+getData(function (a) {
+  getMoreData(a, function (b) {
+    getMoreData(b, function (c) {
+      getMoreData(c, function (d) {
+        // 深层嵌套...
+      })
+    })
+  })
+})
+```
+
+## 创建 Promise
+
+### 基本语法
+
+```javascript
+const promise = new Promise((resolve, reject) => {
+  // 异步操作
+  setTimeout(() => {
+    const success = true
+    if (success) {
+      resolve('成功的结果')
+    } else {
+      reject(new Error('失败的原因'))
+    }
+  }, 1000)
+})
+```
+
+### 三种状态
+
+Promise 有三种状态，状态一旦改变就不可逆：
+
+```javascript
+// pending（进行中）-> fulfilled（已成功）
+// pending（进行中）-> rejected（已失败）
+
+const p1 = new Promise((resolve, reject) => {
+  resolve('成功') // 状态变为 fulfilled
+  reject('失败') // 无效，状态已经改变
+})
+
+const p2 = new Promise((resolve, reject) => {
+  reject('失败') // 状态变为 rejected
+  resolve('成功') // 无效
+})
+```
+
+## then() 方法
+
+### 基本用法
+
+```javascript
+promise.then(
+  (value) => {
+    // fulfilled 时执行
+    console.log('成功:', value)
+  },
+  (reason) => {
+    // rejected 时执行
+    console.log('失败:', reason)
+  }
+)
+
+// 只处理成功
+promise.then((value) => {
+  console.log('成功:', value)
+})
+```
+
+### 链式调用
+
+`then()` 返回新的 Promise，支持链式调用：
+
+```javascript
+Promise.resolve(1)
+  .then((value) => {
+    console.log(value) // 1
+    return value + 1
+  })
+  .then((value) => {
+    console.log(value) // 2
+    return value + 1
+  })
+  .then((value) => {
+    console.log(value) // 3
+  })
+```
+
+### 返回值规则
+
+```javascript
+// 返回普通值
+Promise.resolve(1)
+  .then((v) => v + 1)
+  .then((v) => console.log(v)) // 2
+
+// 返回 Promise
+Promise.resolve(1)
+  .then((v) => Promise.resolve(v + 1))
+  .then((v) => console.log(v)) // 2
+
+// 返回 thenable 对象
+Promise.resolve(1)
+  .then((v) => ({
+    then(resolve) {
+      resolve(v + 1)
+    },
+  }))
+  .then((v) => console.log(v)) // 2
+```
+
+## catch() 方法
+
+`catch()` 是 `then(null, rejection)` 的语法糖：
+
+```javascript
+promise
+  .then((value) => {
+    console.log('成功:', value)
+  })
+  .catch((error) => {
+    console.log('失败:', error)
+  })
+
+// 等价于
+promise.then(
+  (value) => console.log('成功:', value),
+  (error) => console.log('失败:', error)
+)
+```
+
+### 错误冒泡
+
+错误会沿着链向下传递，直到被捕获：
+
+```javascript
+Promise.resolve()
+  .then(() => {
+    throw new Error('错误1')
+  })
+  .then(() => {
+    console.log('不会执行')
+  })
+  .catch((err) => {
+    console.log('捕获:', err.message) // 捕获: 错误1
+  })
+```
+
+### 推荐用法
+
+总是使用 `catch()` 而不是 `then` 的第二个参数：
+
+```javascript
+// 不推荐
+promise.then(
+  (value) => {
+    // 这里抛出的错误不会被第二个参数捕获
+    throw new Error('处理时出错')
+  },
+  (error) => {
+    console.log('只能捕获 promise 的错误')
+  }
+)
+
+// 推荐
+promise
+  .then((value) => {
+    throw new Error('处理时出错')
+  })
+  .catch((error) => {
+    // 可以捕获所有错误
+    console.log('捕获:', error.message)
+  })
+```
+
+## finally() 方法
+
+无论成功失败都会执行：
+
+```javascript
+promise
+  .then((value) => {
+    console.log('成功:', value)
+  })
+  .catch((error) => {
+    console.log('失败:', error)
+  })
+  .finally(() => {
+    console.log('清理工作')
+  })
+```
+
+`finally()` 的特点：
+
+```javascript
+// 不接收参数
+Promise.resolve(1)
+  .finally(() => {
+    // 不知道是成功还是失败
+  })
+  .then((value) => console.log(value)) // 1
+
+// 会传递值
+Promise.resolve(1)
+  .finally(() => {
+    return 2 // 返回值被忽略
+  })
+  .then((value) => console.log(value)) // 1
+
+// 抛出错误会传递
+Promise.resolve(1)
+  .finally(() => {
+    throw new Error('finally 出错')
+  })
+  .catch((err) => console.log(err.message)) // finally 出错
+```
+
+## Promise.resolve()
+
+创建一个已完成的 Promise：
+
+```javascript
+// 普通值
+Promise.resolve(1).then((v) => console.log(v)) // 1
+
+// Promise（原样返回）
+const p = Promise.resolve(1)
+Promise.resolve(p) === p // true
+
+// thenable 对象
+Promise.resolve({
+  then(resolve) {
+    resolve('thenable')
+  },
+}).then((v) => console.log(v)) // 'thenable'
+```
+
+## Promise.reject()
+
+创建一个已拒绝的 Promise：
+
+```javascript
+Promise.reject(new Error('失败')).catch((err) => console.log(err.message)) // '失败'
+
+// 注意：reject 不会解包参数
+Promise.reject(Promise.resolve(1)).catch((v) => console.log(v)) // Promise {<fulfilled>: 1}
+```
+
+## 实战应用
+
+### 封装异步操作
+
+```javascript
+function fetchJSON(url) {
+  return new Promise((resolve, reject) => {
+    fetch(url)
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`)
+        }
+        return response.json()
+      })
+      .then(resolve)
+      .catch(reject)
+  })
+}
+
+// 更简洁的写法
+async function fetchJSON(url) {
+  const response = await fetch(url)
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}`)
+  }
+  return response.json()
+}
+```
+
+### 超时控制
+
+```javascript
+function timeout(promise, ms) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Timeout')), ms)
+    ),
+  ])
+}
+
+timeout(fetch('/api/data'), 5000)
+  .then((response) => response.json())
+  .catch((error) => {
+    if (error.message === 'Timeout') {
+      console.log('请求超时')
+    }
+  })
+```
+
+### 延迟执行
+
+```javascript
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+async function example() {
+  console.log('开始')
+  await delay(1000)
+  console.log('1秒后')
+  await delay(2000)
+  console.log('再过2秒')
+}
+```
+
+### 重试机制
+
+```javascript
+function retry(fn, maxAttempts = 3, delay = 1000) {
+  return new Promise((resolve, reject) => {
+    function attempt(n) {
+      fn()
+        .then(resolve)
+        .catch((error) => {
+          if (n >= maxAttempts) {
+            reject(error)
+          } else {
+            console.log(`尝试 ${n} 失败，${delay}ms 后重试`)
+            setTimeout(() => attempt(n + 1), delay)
+          }
+        })
+    }
+    attempt(1)
+  })
+}
+
+retry(() => fetch('/api/unstable'))
+  .then((response) => console.log('成功'))
+  .catch((error) => console.log('全部失败'))
+```
+
+## 常见错误
+
+### 🔶 忘记 return
+
+```javascript
+// 错误：没有 return，下一个 then 收到 undefined
+Promise.resolve()
+  .then(() => {
+    fetch('/api/data') // 忘记 return
+  })
+  .then((data) => {
+    console.log(data) // undefined
+  })
+
+// 正确
+Promise.resolve()
+  .then(() => {
+    return fetch('/api/data')
+  })
+  .then((response) => response.json())
+```
+
+### 🔶 在 then 中嵌套 Promise
+
+```javascript
+// 不推荐
+promise.then((value) => {
+  fetchData().then((data) => {
+    // 嵌套...
+  })
+})
+
+// 推荐
+promise
+  .then((value) => fetchData())
+  .then((data) => {
+    // 扁平化
+  })
+```
+
+### 🔶 没有处理错误
+
+```javascript
+// 错误可能被静默吞掉
+promise.then((value) => {
+  throw new Error('未处理的错误')
+})
+
+// 总是添加 catch
+promise
+  .then((value) => {
+    throw new Error('错误')
+  })
+  .catch((error) => {
+    console.error(error)
+  })
+```
+
+## 小结
+
+| 方法              | 说明                 |
+| ----------------- | -------------------- |
+| new Promise()     | 创建 Promise         |
+| then()            | 成功回调             |
+| catch()           | 错误处理             |
+| finally()         | 最终执行             |
+| Promise.resolve() | 创建已完成的 Promise |
+| Promise.reject()  | 创建已拒绝的 Promise |
+
+Promise 是现代 JavaScript 异步编程的基础，理解它的工作原理对于掌握 async/await 至关重要。

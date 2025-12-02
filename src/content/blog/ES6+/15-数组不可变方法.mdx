@@ -1,0 +1,386 @@
+---
+title: '数组不可变方法'
+description: '深入理解 ES2023 数组不可变方法：toSorted、toReversed、toSpliced、with 的用法与最佳实践'
+pubDate: 2024-01-15
+toc: true
+ogImage: true
+category: 'ES6+'
+tags: ['ES2023', '数组', '不可变', 'toSorted', 'toReversed']
+---
+
+ES2023 新增了四个数组不可变方法，它们返回新数组而不修改原数组，非常适合函数式编程和状态管理。
+
+## 为什么需要不可变方法
+
+JavaScript 数组的许多方法会修改原数组：
+
+```javascript
+const arr = [3, 1, 2]
+
+// 这些方法会修改原数组
+arr.sort() // arr 变成了 [1, 2, 3]
+arr.reverse() // arr 变成了 [3, 2, 1]
+arr.splice(1, 1) // arr 变成了 [3, 1]
+
+// 在 React/Vue 等框架中，这会导致问题
+const [items, setItems] = useState([3, 1, 2])
+// items.sort(); // ❌ 直接修改状态，React 检测不到变化
+// setItems([...items].sort()); // ✅ 必须先复制
+```
+
+ES2023 的不可变方法解决了这个问题：
+
+```javascript
+const arr = [3, 1, 2]
+
+arr.toSorted() // 返回 [1, 2, 3]，arr 仍是 [3, 1, 2]
+arr.toReversed() // 返回 [2, 1, 3]，arr 仍是 [3, 1, 2]
+```
+
+## toSorted()
+
+不修改原数组的排序方法：
+
+```javascript
+const numbers = [3, 1, 4, 1, 5, 9]
+
+// 原有 sort() 会修改原数组
+const sorted1 = numbers.slice().sort((a, b) => a - b) // 需要先复制
+console.log(numbers) // [3, 1, 4, 1, 5, 9]
+
+// toSorted() 直接返回新数组
+const sorted2 = numbers.toSorted((a, b) => a - b)
+console.log(sorted2) // [1, 1, 3, 4, 5, 9]
+console.log(numbers) // [3, 1, 4, 1, 5, 9]（不变）
+```
+
+### 排序对象数组
+
+```javascript
+const users = [
+  { name: '张三', age: 30 },
+  { name: '李四', age: 25 },
+  { name: '王五', age: 35 },
+]
+
+// 按年龄升序
+const byAge = users.toSorted((a, b) => a.age - b.age)
+// [{ name: '李四', age: 25 }, { name: '张三', age: 30 }, { name: '王五', age: 35 }]
+
+// 按姓名字母序
+const byName = users.toSorted((a, b) => a.name.localeCompare(b.name, 'zh'))
+
+// 原数组不变
+console.log(users[0].name) // '张三'
+```
+
+### 链式调用
+
+```javascript
+const products = [
+  { name: 'A', price: 100, stock: 5 },
+  { name: 'B', price: 200, stock: 0 },
+  { name: 'C', price: 150, stock: 3 },
+]
+
+// 筛选有库存的商品，按价格排序
+const available = products
+  .filter((p) => p.stock > 0)
+  .toSorted((a, b) => a.price - b.price)
+// [{ name: 'A', price: 100, stock: 5 }, { name: 'C', price: 150, stock: 3 }]
+```
+
+## toReversed()
+
+不修改原数组的反转方法：
+
+```javascript
+const arr = [1, 2, 3, 4, 5]
+
+const reversed = arr.toReversed()
+console.log(reversed) // [5, 4, 3, 2, 1]
+console.log(arr) // [1, 2, 3, 4, 5]（不变）
+```
+
+### 实际应用
+
+```javascript
+// 消息列表最新在前
+const messages = [
+  { id: 1, text: '第一条', time: '10:00' },
+  { id: 2, text: '第二条', time: '10:05' },
+  { id: 3, text: '第三条', time: '10:10' },
+]
+
+// 最新消息在前显示
+const latestFirst = messages.toReversed()
+
+// 原数组保持时间顺序，用于数据存储
+console.log(messages[0].id) // 1
+```
+
+## toSpliced()
+
+不修改原数组的 splice 方法：
+
+```javascript
+const arr = [1, 2, 3, 4, 5]
+
+// splice(start, deleteCount, ...items)
+// toSpliced(start, deleteCount, ...items)
+
+// 删除元素
+const deleted = arr.toSpliced(2, 1)
+console.log(deleted) // [1, 2, 4, 5]
+console.log(arr) // [1, 2, 3, 4, 5]（不变）
+
+// 插入元素
+const inserted = arr.toSpliced(2, 0, 'a', 'b')
+console.log(inserted) // [1, 2, 'a', 'b', 3, 4, 5]
+
+// 替换元素
+const replaced = arr.toSpliced(2, 2, 'x', 'y', 'z')
+console.log(replaced) // [1, 2, 'x', 'y', 'z', 5]
+```
+
+### 实际应用
+
+```javascript
+// 待办事项列表
+const todos = [
+  { id: 1, text: '任务1', done: false },
+  { id: 2, text: '任务2', done: true },
+  { id: 3, text: '任务3', done: false },
+]
+
+// 删除任务
+function deleteTodo(todos, id) {
+  const index = todos.findIndex((t) => t.id === id)
+  if (index === -1) return todos
+  return todos.toSpliced(index, 1)
+}
+
+// 添加任务
+function addTodo(todos, text) {
+  const newTodo = { id: Date.now(), text, done: false }
+  return todos.toSpliced(todos.length, 0, newTodo)
+  // 或者 return [...todos, newTodo];
+}
+
+// 在指定位置插入
+function insertTodo(todos, index, text) {
+  const newTodo = { id: Date.now(), text, done: false }
+  return todos.toSpliced(index, 0, newTodo)
+}
+```
+
+## with()
+
+替换指定索引的元素：
+
+```javascript
+const arr = [1, 2, 3, 4, 5]
+
+const updated = arr.with(2, 'three')
+console.log(updated) // [1, 2, 'three', 4, 5]
+console.log(arr) // [1, 2, 3, 4, 5]（不变）
+
+// 支持负索引
+const lastUpdated = arr.with(-1, 'five')
+console.log(lastUpdated) // [1, 2, 3, 4, 'five']
+
+// 索引越界会报错
+// arr.with(10, 'x'); // RangeError
+```
+
+### 链式调用
+
+```javascript
+const arr = [1, 2, 3]
+
+// 一次修改多个位置
+const multi = arr.with(0, 'a').with(1, 'b').with(2, 'c')
+console.log(multi) // ['a', 'b', 'c']
+```
+
+### 实际应用
+
+```javascript
+// 更新数组中某个对象的属性
+const users = [
+  { id: 1, name: '张三', active: true },
+  { id: 2, name: '李四', active: true },
+  { id: 3, name: '王五', active: false },
+]
+
+function updateUser(users, id, updates) {
+  const index = users.findIndex((u) => u.id === id)
+  if (index === -1) return users
+  return users.with(index, { ...users[index], ...updates })
+}
+
+const updated = updateUser(users, 2, { active: false })
+// [
+//   { id: 1, name: '张三', active: true },
+//   { id: 2, name: '李四', active: false },  // 更新了
+//   { id: 3, name: '王五', active: false }
+// ]
+```
+
+## 对比：可变 vs 不可变
+
+| 可变方法   | 不可变方法   | 作用      |
+| ---------- | ------------ | --------- |
+| sort()     | toSorted()   | 排序      |
+| reverse()  | toReversed() | 反转      |
+| splice()   | toSpliced()  | 删除/插入 |
+| arr[i] = x | with(i, x)   | 替换元素  |
+
+```javascript
+const original = [3, 1, 2]
+
+// 可变方法（修改原数组）
+const mutable = original.slice() // 先复制
+mutable.sort()
+mutable.reverse()
+mutable.splice(1, 1, 'x')
+mutable[0] = 'a'
+
+// 不可变方法（返回新数组）
+const immutable = original
+  .toSorted()
+  .toReversed()
+  .toSpliced(1, 1, 'x')
+  .with(0, 'a')
+```
+
+## 在框架中使用
+
+### React
+
+```javascript
+function TodoList() {
+  const [todos, setTodos] = useState([
+    { id: 1, text: '学习', done: false },
+    { id: 2, text: '工作', done: false }
+  ]);
+
+  const toggleTodo = (id) => {
+    setTodos(prev => {
+      const index = prev.findIndex(t => t.id === id);
+      return prev.with(index, {
+        ...prev[index],
+        done: !prev[index].done
+      });
+    });
+  };
+
+  const deleteTodo = (id) => {
+    setTodos(prev => {
+      const index = prev.findIndex(t => t.id === id);
+      return prev.toSpliced(index, 1);
+    });
+  };
+
+  const sortByDone = () => {
+    setTodos(prev => prev.toSorted((a, b) => a.done - b.done));
+  };
+
+  return (/* ... */);
+}
+```
+
+### Vue
+
+```javascript
+const todos = ref([
+  { id: 1, text: '学习', done: false },
+  { id: 2, text: '工作', done: false },
+])
+
+function toggleTodo(id) {
+  const index = todos.value.findIndex((t) => t.id === id)
+  todos.value = todos.value.with(index, {
+    ...todos.value[index],
+    done: !todos.value[index].done,
+  })
+}
+
+function deleteTodo(id) {
+  const index = todos.value.findIndex((t) => t.id === id)
+  todos.value = todos.value.toSpliced(index, 1)
+}
+```
+
+## 性能考虑
+
+不可变方法每次都会创建新数组，对于大数组或频繁操作需要注意：
+
+```javascript
+// 🔶 频繁更新时可能有性能问题
+for (let i = 0; i < 1000; i++) {
+  arr = arr.with(i, newValue) // 每次都创建新数组
+}
+
+// ✅ 批量更新后再替换
+const updates = []
+for (let i = 0; i < 1000; i++) {
+  updates.push([i, newValue])
+}
+arr = updates.reduce((a, [i, v]) => a.with(i, v), arr)
+
+// ✅ 或者使用可变方法在局部操作
+const newArr = [...arr]
+for (let i = 0; i < 1000; i++) {
+  newArr[i] = newValue
+}
+arr = newArr
+```
+
+## 兼容性处理
+
+如果需要支持旧环境，可以使用 polyfill：
+
+```javascript
+// 简单的 polyfill 示例
+if (!Array.prototype.toSorted) {
+  Array.prototype.toSorted = function (compareFn) {
+    return [...this].sort(compareFn)
+  }
+}
+
+if (!Array.prototype.toReversed) {
+  Array.prototype.toReversed = function () {
+    return [...this].reverse()
+  }
+}
+
+if (!Array.prototype.toSpliced) {
+  Array.prototype.toSpliced = function (start, deleteCount, ...items) {
+    const copy = [...this]
+    copy.splice(start, deleteCount, ...items)
+    return copy
+  }
+}
+
+if (!Array.prototype.with) {
+  Array.prototype.with = function (index, value) {
+    const copy = [...this]
+    copy[index < 0 ? this.length + index : index] = value
+    return copy
+  }
+}
+```
+
+## 小结
+
+ES2023 的不可变数组方法让 JavaScript 更适合函数式编程：
+
+| 方法         | 用途      | 相当于             |
+| ------------ | --------- | ------------------ |
+| toSorted()   | 排序      | [...arr].sort()    |
+| toReversed() | 反转      | [...arr].reverse() |
+| toSpliced()  | 删除/插入 | 复制 + splice()    |
+| with()       | 替换元素  | 复制 + 赋值        |
+
+这些方法特别适合 React、Vue 等框架中的状态管理，避免了手动复制数组的繁琐操作。

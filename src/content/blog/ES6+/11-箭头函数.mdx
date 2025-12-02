@@ -1,0 +1,404 @@
+---
+title: '箭头函数详解'
+description: '全面理解 ES6 箭头函数的语法、this 绑定机制及使用限制'
+pubDate: 2024-01-11
+toc: true
+ogImage: true
+category: 'ES6+'
+tags: ['ES6', '箭头函数', '函数', 'this']
+---
+
+箭头函数是 ES6 最常用的特性之一，它不仅语法更简洁，还解决了 `this` 绑定的历史难题。
+
+## 基本语法
+
+### 简写规则
+
+```javascript
+// 完整语法
+const add = (a, b) => {
+  return a + b
+}
+
+// 单个表达式可省略大括号和 return
+const add2 = (a, b) => a + b
+
+// 单个参数可省略括号
+const double = (n) => n * 2
+
+// 无参数必须有括号
+const greet = () => 'Hello'
+
+// 返回对象字面量需要括号（避免与函数体混淆）
+const createUser = (name) => ({ name, id: Date.now() })
+```
+
+### 多行函数体
+
+```javascript
+const processArray = (arr) => {
+  const filtered = arr.filter((x) => x > 0)
+  const mapped = filtered.map((x) => x * 2)
+  return mapped.reduce((a, b) => a + b, 0)
+}
+```
+
+## this 绑定
+
+### 传统函数的 this 问题
+
+```javascript
+const obj = {
+  name: '张三',
+  friends: ['李四', '王五'],
+
+  showFriends: function () {
+    this.friends.forEach(function (friend) {
+      console.log(this.name + ' 的朋友：' + friend)
+      // this 是 undefined（严格模式）或 window
+    })
+  },
+}
+
+obj.showFriends() // undefined 的朋友：李四 ...
+```
+
+ES5 解决方案：
+
+```javascript
+// 方案1：保存 this
+showFriends: function() {
+  var that = this;
+  this.friends.forEach(function(friend) {
+    console.log(that.name + ' 的朋友：' + friend);
+  });
+}
+
+// 方案2：bind
+showFriends: function() {
+  this.friends.forEach(function(friend) {
+    console.log(this.name + ' 的朋友：' + friend);
+  }.bind(this));
+}
+
+// 方案3：forEach 第二个参数
+showFriends: function() {
+  this.friends.forEach(function(friend) {
+    console.log(this.name + ' 的朋友：' + friend);
+  }, this);
+}
+```
+
+### 箭头函数的解决方案
+
+箭头函数没有自己的 `this`，它从定义时的外层作用域继承 `this`：
+
+```javascript
+const obj = {
+  name: '张三',
+  friends: ['李四', '王五'],
+
+  showFriends() {
+    this.friends.forEach((friend) => {
+      console.log(this.name + ' 的朋友：' + friend)
+      // this 正确指向 obj
+    })
+  },
+}
+
+obj.showFriends()
+// 张三 的朋友：李四
+// 张三 的朋友：王五
+```
+
+🤔 **关键理解**：箭头函数的 `this` 在定义时确定，而不是调用时：
+
+```javascript
+const obj = {
+  name: '张三',
+  // 作为方法时，定义时外层是全局作用域
+  getName: () => this.name, // this 指向全局
+}
+
+console.log(obj.getName()) // undefined
+
+// 正确做法：使用普通函数
+const obj2 = {
+  name: '张三',
+  getName() {
+    return this.name
+  },
+}
+```
+
+## 不适用的场景
+
+### 🔶 对象方法
+
+```javascript
+// 错误：箭头函数作为对象方法
+const obj = {
+  name: '张三',
+  greet: () => {
+    console.log(`Hello, ${this.name}`) // this 不指向 obj
+  },
+}
+
+// 正确：使用方法简写
+const obj2 = {
+  name: '张三',
+  greet() {
+    console.log(`Hello, ${this.name}`)
+  },
+}
+```
+
+### 🔶 原型方法
+
+```javascript
+function Person(name) {
+  this.name = name
+}
+
+// 错误
+Person.prototype.greet = () => {
+  console.log(this.name) // this 不指向实例
+}
+
+// 正确
+Person.prototype.greet = function () {
+  console.log(this.name)
+}
+```
+
+### 🔶 构造函数
+
+```javascript
+// 错误：箭头函数不能作为构造函数
+const Person = (name) => {
+  this.name = name
+}
+
+// new Person('张三'); // TypeError: Person is not a constructor
+
+// 正确：使用 class 或普通函数
+class Person {
+  constructor(name) {
+    this.name = name
+  }
+}
+```
+
+### 🔶 需要动态 this 的场景
+
+```javascript
+// DOM 事件处理
+button.addEventListener('click', () => {
+  console.log(this) // window，不是 button
+})
+
+button.addEventListener('click', function () {
+  console.log(this) // button 元素
+})
+
+// 或者直接用 event.target
+button.addEventListener('click', (event) => {
+  console.log(event.target) // button 元素
+})
+```
+
+### 🔶 需要 arguments 的场景
+
+```javascript
+// 箭头函数没有 arguments
+const fn = () => {
+  console.log(arguments) // ReferenceError
+}
+
+// 使用 rest 参数替代
+const fn2 = (...args) => {
+  console.log(args)
+}
+
+// 或者使用普通函数
+const fn3 = function () {
+  console.log(arguments)
+}
+```
+
+## 其他特性
+
+### 没有 prototype
+
+```javascript
+const arrow = () => {}
+console.log(arrow.prototype) // undefined
+
+function normal() {}
+console.log(normal.prototype) // {}
+```
+
+### 不能用 new
+
+```javascript
+const Arrow = () => {}
+// new Arrow(); // TypeError: Arrow is not a constructor
+```
+
+### 不能用作 Generator
+
+```javascript
+// const gen = *() => {}; // SyntaxError
+```
+
+### 没有 super 和 new.target
+
+箭头函数从外层作用域继承这些值。
+
+## 实战应用
+
+### 数组方法链
+
+```javascript
+const users = [
+  { name: '张三', age: 25, score: 80 },
+  { name: '李四', age: 30, score: 90 },
+  { name: '王五', age: 22, score: 85 },
+]
+
+const result = users
+  .filter((u) => u.age >= 25)
+  .map((u) => ({ ...u, grade: u.score >= 85 ? 'A' : 'B' }))
+  .sort((a, b) => b.score - a.score)
+
+console.log(result)
+// [
+//   { name: '李四', age: 30, score: 90, grade: 'A' },
+//   { name: '张三', age: 25, score: 80, grade: 'B' }
+// ]
+```
+
+### Promise 链
+
+```javascript
+fetch('/api/user')
+  .then((res) => res.json())
+  .then((user) => fetch(`/api/posts?userId=${user.id}`))
+  .then((res) => res.json())
+  .then((posts) => console.log(posts))
+  .catch((err) => console.error(err))
+```
+
+### 回调函数
+
+```javascript
+// 定时器
+setTimeout(() => {
+  console.log('延迟执行')
+}, 1000)
+
+// 数组方法
+;[1, 2, 3].forEach((n) => console.log(n))
+;[1, 2, 3].map((n) => n * 2)
+;[1, 2, 3].filter((n) => n > 1)
+;[1, 2, 3].reduce((sum, n) => sum + n, 0)
+;[1, 2, 3].find((n) => n > 1)
+;[1, 2, 3].every((n) => n > 0)
+;[1, 2, 3].some((n) => n > 2)
+```
+
+### 条件返回
+
+```javascript
+const getDiscount = (membership) =>
+  membership === 'gold'
+    ? 0.2
+    : membership === 'silver'
+      ? 0.1
+      : membership === 'bronze'
+        ? 0.05
+        : 0
+
+getDiscount('gold') // 0.2
+```
+
+### 立即执行
+
+```javascript
+// 箭头函数 IIFE
+;(() => {
+  console.log('立即执行')
+})()
+
+// 返回值
+const result = (() => {
+  const x = 10
+  const y = 20
+  return x + y
+})()
+```
+
+### 类方法绑定
+
+```javascript
+class Counter {
+  count = 0
+
+  // 使用箭头函数确保 this 绑定
+  increment = () => {
+    this.count++
+  }
+
+  // 等价于在构造函数中绑定
+  // constructor() {
+  //   this.increment = this.increment.bind(this);
+  // }
+}
+
+const counter = new Counter()
+const { increment } = counter
+increment() // this 仍然指向 counter
+console.log(counter.count) // 1
+```
+
+### React 事件处理
+
+```javascript
+class Button extends React.Component {
+  state = { count: 0 }
+
+  // 箭头函数自动绑定 this
+  handleClick = () => {
+    this.setState((state) => ({ count: state.count + 1 }))
+  }
+
+  render() {
+    return (
+      <button onClick={this.handleClick}>点击次数: {this.state.count}</button>
+    )
+  }
+}
+```
+
+## 使用建议
+
+| 场景               | 推荐                        |
+| ------------------ | --------------------------- |
+| 回调函数           | ✅ 箭头函数                 |
+| 数组方法           | ✅ 箭头函数                 |
+| Promise 链         | ✅ 箭头函数                 |
+| 对象方法           | ❌ 使用方法简写             |
+| 构造函数           | ❌ 使用 class               |
+| 需要 this 动态绑定 | ❌ 使用普通函数             |
+| 需要 arguments     | ❌ 使用普通函数或 rest 参数 |
+
+## 小结
+
+箭头函数的核心特点：
+
+1. **语法简洁**：更短的函数写法
+2. **this 继承**：从定义时的外层作用域继承 this
+3. **没有 arguments**：使用 rest 参数替代
+4. **不能 new**：不能作为构造函数
+
+箭头函数非常适合函数式编程风格，但要理解它的限制，在合适的场景使用。

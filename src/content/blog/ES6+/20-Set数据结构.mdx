@@ -1,0 +1,409 @@
+---
+title: 'Set 数据结构'
+description: '全面掌握 ES6 Set 集合的基本用法、遍历方法以及 WeakSet 的应用场景'
+pubDate: 2024-01-20
+toc: true
+ogImage: true
+category: 'ES6+'
+tags: ['ES6', 'Set', '集合', 'WeakSet', '数据结构']
+---
+
+Set 是 ES6 新增的数据结构，类似于数组，但成员的值是唯一的。
+
+## 基本用法
+
+### 创建 Set
+
+```javascript
+// 空 Set
+const set1 = new Set()
+
+// 从数组创建
+const set2 = new Set([1, 2, 3, 2, 1])
+console.log(set2) // Set {1, 2, 3}（自动去重）
+
+// 从字符串创建
+const set3 = new Set('hello')
+console.log(set3) // Set {'h', 'e', 'l', 'o'}
+
+// 从其他可迭代对象创建
+const set4 = new Set(
+  new Map([
+    ['a', 1],
+    ['b', 2],
+  ]).keys()
+)
+```
+
+### 添加元素
+
+```javascript
+const set = new Set()
+
+set.add(1)
+set.add(2)
+set.add(2) // 重复值不会添加
+set.add('2') // 不同类型可以添加
+set.add(NaN)
+set.add(NaN) // NaN 只会添加一次
+
+console.log(set) // Set {1, 2, '2', NaN}
+
+// 链式调用
+set.add(3).add(4).add(5)
+```
+
+### 判断存在
+
+```javascript
+const set = new Set([1, 2, 3])
+
+set.has(1) // true
+set.has(4) // false
+set.has(NaN) // 可以正确检测 NaN
+
+// 对比数组
+const arr = [1, 2, 3]
+arr.includes(1) // true
+```
+
+### 删除元素
+
+```javascript
+const set = new Set([1, 2, 3, 4, 5])
+
+set.delete(3) // true（删除成功）
+set.delete(10) // false（元素不存在）
+
+console.log(set) // Set {1, 2, 4, 5}
+
+// 清空
+set.clear()
+console.log(set.size) // 0
+```
+
+### size 属性
+
+```javascript
+const set = new Set([1, 2, 3])
+console.log(set.size) // 3
+
+// 对比数组的 length
+```
+
+## 遍历方法
+
+Set 有四个遍历方法，遍历顺序就是插入顺序：
+
+```javascript
+const set = new Set(['a', 'b', 'c'])
+
+// keys()（与 values() 相同，因为 Set 没有键名）
+for (const key of set.keys()) {
+  console.log(key) // 'a', 'b', 'c'
+}
+
+// values()
+for (const value of set.values()) {
+  console.log(value) // 'a', 'b', 'c'
+}
+
+// entries()（返回 [value, value]）
+for (const [key, value] of set.entries()) {
+  console.log(key, value) // 'a' 'a', 'b' 'b', 'c' 'c'
+}
+
+// forEach
+set.forEach((value, key, set) => {
+  console.log(value) // 'a', 'b', 'c'
+})
+
+// for...of（默认使用 values()）
+for (const value of set) {
+  console.log(value)
+}
+```
+
+### 转为数组
+
+```javascript
+const set = new Set([1, 2, 3])
+
+// 扩展运算符
+const arr1 = [...set] // [1, 2, 3]
+
+// Array.from
+const arr2 = Array.from(set) // [1, 2, 3]
+```
+
+## 实际应用
+
+### 数组去重
+
+```javascript
+// 最简洁的去重方法
+const unique = (arr) => [...new Set(arr)]
+
+unique([1, 2, 2, 3, 3, 3]) // [1, 2, 3]
+
+// 字符串去重
+const uniqueChars = (str) => [...new Set(str)].join('')
+uniqueChars('aabbcc') // 'abc'
+```
+
+### 集合运算
+
+```javascript
+const a = new Set([1, 2, 3])
+const b = new Set([2, 3, 4])
+
+// 并集
+const union = new Set([...a, ...b])
+// Set {1, 2, 3, 4}
+
+// 交集
+const intersection = new Set([...a].filter((x) => b.has(x)))
+// Set {2, 3}
+
+// 差集（a - b）
+const difference = new Set([...a].filter((x) => !b.has(x)))
+// Set {1}
+
+// 对称差集
+const symmetricDifference = new Set([
+  ...[...a].filter((x) => !b.has(x)),
+  ...[...b].filter((x) => !a.has(x)),
+])
+// Set {1, 4}
+```
+
+### ES2025 集合方法
+
+ES2025 为 Set 新增了原生集合方法：
+
+```javascript
+const a = new Set([1, 2, 3])
+const b = new Set([2, 3, 4])
+
+// 并集
+a.union(b) // Set {1, 2, 3, 4}
+
+// 交集
+a.intersection(b) // Set {2, 3}
+
+// 差集
+a.difference(b) // Set {1}
+
+// 对称差集
+a.symmetricDifference(b) // Set {1, 4}
+
+// 判断子集
+new Set([2, 3]).isSubsetOf(a) // true
+
+// 判断超集
+a.isSupersetOf(new Set([2, 3])) // true
+
+// 判断是否不相交
+a.isDisjointFrom(new Set([5, 6])) // true
+```
+
+### 标签/分类管理
+
+```javascript
+class TagManager {
+  #tags = new Set()
+
+  add(tag) {
+    this.#tags.add(tag.toLowerCase())
+    return this
+  }
+
+  remove(tag) {
+    this.#tags.delete(tag.toLowerCase())
+    return this
+  }
+
+  has(tag) {
+    return this.#tags.has(tag.toLowerCase())
+  }
+
+  get all() {
+    return [...this.#tags]
+  }
+
+  get count() {
+    return this.#tags.size
+  }
+}
+
+const tags = new TagManager()
+tags.add('JavaScript').add('TypeScript').add('JavaScript')
+console.log(tags.all) // ['javascript', 'typescript']
+```
+
+### 追踪唯一值
+
+```javascript
+// 追踪已访问的 URL
+const visitedUrls = new Set()
+
+function trackVisit(url) {
+  if (visitedUrls.has(url)) {
+    console.log('Already visited:', url)
+    return false
+  }
+  visitedUrls.add(url)
+  console.log('New visit:', url)
+  return true
+}
+
+trackVisit('/home') // 'New visit: /home'
+trackVisit('/about') // 'New visit: /about'
+trackVisit('/home') // 'Already visited: /home'
+```
+
+## WeakSet
+
+WeakSet 与 Set 类似，但有几个重要区别：
+
+### 特点
+
+1. **只能存储对象**（不能存储原始值）
+2. **弱引用**（不阻止垃圾回收）
+3. **不可遍历**（没有 size、keys、values 等）
+
+```javascript
+const ws = new WeakSet()
+
+// 只能添加对象
+ws.add({ name: '张三' })
+ws.add([1, 2, 3])
+// ws.add(1); // TypeError
+
+// 基本操作
+const obj = { id: 1 }
+ws.add(obj)
+ws.has(obj) // true
+ws.delete(obj)
+ws.has(obj) // false
+
+// 不可遍历
+// ws.size // undefined
+// ws.keys() // 不存在
+// for (const item of ws) {} // TypeError
+```
+
+### 弱引用特性
+
+```javascript
+let obj = { data: 'important' }
+const ws = new WeakSet()
+ws.add(obj)
+
+console.log(ws.has(obj)) // true
+
+obj = null // 移除强引用
+// 此时 WeakSet 中的对象可以被垃圾回收
+// 下次垃圾回收后，WeakSet 会自动清除该对象
+```
+
+### WeakSet 应用场景
+
+#### 标记对象
+
+```javascript
+// 追踪哪些对象已被处理
+const processed = new WeakSet()
+
+function process(obj) {
+  if (processed.has(obj)) {
+    console.log('Already processed')
+    return
+  }
+
+  // 处理对象
+  console.log('Processing...')
+  processed.add(obj)
+}
+
+const data = { value: 1 }
+process(data) // 'Processing...'
+process(data) // 'Already processed'
+
+// 当 data 被销毁时，WeakSet 中的引用也会自动清除
+```
+
+#### 存储 DOM 元素状态
+
+```javascript
+const disabledElements = new WeakSet()
+
+function disableElement(el) {
+  disabledElements.add(el)
+  el.disabled = true
+}
+
+function enableElement(el) {
+  disabledElements.delete(el)
+  el.disabled = false
+}
+
+function isDisabled(el) {
+  return disabledElements.has(el)
+}
+
+// 当 DOM 元素被移除时，WeakSet 中的引用自动清除
+// 不会造成内存泄漏
+```
+
+#### 私有数据存储
+
+```javascript
+const privateData = new WeakSet()
+
+class Validator {
+  constructor() {
+    privateData.add(this)
+  }
+
+  validate() {
+    if (!privateData.has(this)) {
+      throw new Error('Invalid instance')
+    }
+    // 验证逻辑
+  }
+}
+
+const validator = new Validator()
+validator.validate() // OK
+
+// 防止其他对象假冒
+const fake = { validate: Validator.prototype.validate }
+// fake.validate(); // Error: Invalid instance
+```
+
+## Set vs WeakSet 对比
+
+| 特性       | Set      | WeakSet  |
+| ---------- | -------- | -------- |
+| 存储值类型 | 任意值   | 仅对象   |
+| 引用类型   | 强引用   | 弱引用   |
+| 可遍历     | 是       | 否       |
+| size 属性  | 有       | 无       |
+| 垃圾回收   | 手动管理 | 自动清理 |
+
+## 小结
+
+| 方法/属性                 | 说明             |
+| ------------------------- | ---------------- |
+| new Set()                 | 创建空 Set       |
+| new Set(iterable)         | 从可迭代对象创建 |
+| add(value)                | 添加值           |
+| has(value)                | 检查是否存在     |
+| delete(value)             | 删除值           |
+| clear()                   | 清空             |
+| size                      | 元素数量         |
+| keys()/values()/entries() | 遍历器           |
+| forEach()                 | 遍历             |
+
+Set 是处理唯一值集合的理想选择，WeakSet 则适合需要弱引用的场景。

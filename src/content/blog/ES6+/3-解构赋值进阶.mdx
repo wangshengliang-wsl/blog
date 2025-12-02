@@ -1,0 +1,400 @@
+---
+title: '解构赋值进阶'
+description: '深入探讨嵌套解构、函数参数解构、复杂数据处理等解构赋值的高级用法'
+pubDate: 2024-01-03
+toc: true
+ogImage: true
+category: 'ES6+'
+tags: ['ES6', '解构赋值', '嵌套解构', '默认值']
+---
+
+掌握了基础解构后，来看一些更复杂的场景和技巧。
+
+## 嵌套解构
+
+### 嵌套数组
+
+```javascript
+const matrix = [
+  [1, 2],
+  [3, 4],
+]
+const [[a, b], [c, d]] = matrix
+console.log(a, b, c, d) // 1 2 3 4
+
+// 部分解构
+const [[first]] = matrix
+console.log(first) // 1
+```
+
+### 嵌套对象
+
+```javascript
+const user = {
+  name: '张三',
+  address: {
+    city: '北京',
+    district: '朝阳',
+  },
+}
+
+const {
+  address: { city, district },
+} = user
+console.log(city) // '北京'
+console.log(district) // '朝阳'
+// console.log(address); // ReferenceError: address 未定义
+```
+
+🤔 如果同时需要 `address` 和内部属性：
+
+```javascript
+const {
+  address,
+  address: { city },
+} = user
+console.log(address) // { city: '北京', district: '朝阳' }
+console.log(city) // '北京'
+```
+
+### 混合解构
+
+数组和对象混合：
+
+```javascript
+const data = {
+  items: [
+    { id: 1, name: '商品A' },
+    { id: 2, name: '商品B' },
+  ],
+}
+
+const {
+  items: [first, second],
+} = data
+console.log(first) // { id: 1, name: '商品A' }
+
+// 更深一层
+const {
+  items: [{ name: firstName }, { name: secondName }],
+} = data
+console.log(firstName, secondName) // '商品A' '商品B'
+```
+
+## 函数参数解构
+
+### 基本用法
+
+```javascript
+function greet({ name, age }) {
+  console.log(`${name}, ${age}岁`)
+}
+
+greet({ name: '张三', age: 25 }) // 张三, 25岁
+```
+
+### 带默认值的参数解构
+
+```javascript
+function createUser({ name = '匿名', age = 18, role = 'user' } = {}) {
+  return { name, age, role }
+}
+
+createUser({ name: '张三' }) // { name: '张三', age: 18, role: 'user' }
+createUser() // { name: '匿名', age: 18, role: 18 }
+```
+
+🔶 注意最后的 `= {}`，它确保不传参数时也不会报错：
+
+```javascript
+// 没有 = {} 的情况
+function badCreate({ name = '匿名' }) {
+  return name
+}
+// badCreate(); // TypeError: Cannot read properties of undefined
+```
+
+### 混合普通参数和解构
+
+```javascript
+function request(url, { method = 'GET', headers = {}, body } = {}) {
+  console.log(url, method, headers, body)
+}
+
+request('/api/users') // '/api/users' 'GET' {} undefined
+request('/api/users', { method: 'POST', body: '{}' })
+```
+
+### 数组参数解构
+
+```javascript
+function sum([a, b, c = 0]) {
+  return a + b + c
+}
+
+sum([1, 2]) // 3
+sum([1, 2, 3]) // 6
+
+// 实用场景：处理坐标
+function distance([x1, y1], [x2, y2]) {
+  return Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
+}
+
+distance([0, 0], [3, 4]) // 5
+```
+
+## 复杂场景实战
+
+### API 响应处理
+
+```javascript
+// 模拟 API 响应
+const response = {
+  status: 200,
+  data: {
+    user: {
+      id: 1,
+      profile: {
+        name: '张三',
+        avatar: 'avatar.jpg',
+      },
+    },
+    permissions: ['read', 'write'],
+  },
+  meta: {
+    timestamp: 1699000000,
+  },
+}
+
+// 一次性提取所需数据
+const {
+  data: {
+    user: {
+      id: userId,
+      profile: { name: userName },
+    },
+    permissions: [primaryPermission],
+  },
+} = response
+
+console.log(userId) // 1
+console.log(userName) // '张三'
+console.log(primaryPermission) // 'read'
+```
+
+### 配置对象合并
+
+```javascript
+function initApp(options = {}) {
+  const {
+    debug = false,
+    api: { baseUrl = 'https://api.example.com', timeout = 5000 } = {},
+    ui: { theme = 'light', language = 'zh-CN' } = {},
+  } = options
+
+  return { debug, api: { baseUrl, timeout }, ui: { theme, language } }
+}
+
+// 完全使用默认值
+initApp()
+
+// 部分覆盖
+initApp({
+  debug: true,
+  api: { timeout: 10000 },
+})
+```
+
+### 数组操作
+
+```javascript
+// 取首尾
+function getFirstAndLast(arr) {
+  const [first, ...rest] = arr
+  const last = rest.pop()
+  return { first, last }
+}
+
+getFirstAndLast([1, 2, 3, 4]) // { first: 1, last: 4 }
+
+// 递归处理链表结构
+function sum([head, ...tail]) {
+  return head === undefined ? 0 : head + sum(tail)
+}
+
+sum([1, 2, 3, 4]) // 10
+```
+
+### 处理可选属性
+
+```javascript
+// 安全地处理可能不存在的嵌套属性
+const data = {
+  user: {
+    // address 可能不存在
+  },
+}
+
+// 传统写法
+const city1 = data.user && data.user.address && data.user.address.city
+
+// 解构 + 默认值
+const { user: { address: { city } = {} } = {} } = data
+console.log(city) // undefined，不会报错
+
+// 或者用可选链（更推荐）
+const city2 = data.user?.address?.city
+```
+
+## 实用技巧
+
+### 提取对象部分属性
+
+```javascript
+// 只保留需要的属性
+function pick(obj, keys) {
+  return keys.reduce((result, key) => {
+    if (key in obj) {
+      result[key] = obj[key]
+    }
+    return result
+  }, {})
+}
+
+const user = { id: 1, name: '张三', password: '123', email: 'test@test.com' }
+const safeUser = pick(user, ['id', 'name', 'email'])
+// { id: 1, name: '张三', email: 'test@test.com' }
+
+// 用解构实现排除
+const { password, ...publicInfo } = user
+// publicInfo: { id: 1, name: '张三', email: 'test@test.com' }
+```
+
+### 动态属性名解构
+
+```javascript
+const key = 'name'
+const obj = { name: '张三', age: 25 }
+
+const { [key]: value } = obj
+console.log(value) // '张三'
+
+// 实际应用
+function getProperty(obj, propName) {
+  const { [propName]: value } = obj
+  return value
+}
+```
+
+### 解构赋值的连续使用
+
+```javascript
+let a, b, c
+const arr1 = [1, 2]
+const arr2 = [3, 4]
+
+// 连续解构
+;[a, b] = arr1
+;[b, c] = arr2
+console.log(a, b, c) // 1 3 4
+```
+
+### 克隆与合并
+
+```javascript
+// 浅克隆数组
+const original = [1, 2, 3]
+const [...clone] = original
+
+// 浅克隆对象
+const obj = { a: 1, b: 2 }
+const { ...objClone } = obj
+
+// 合并对象（覆盖同名属性）
+const defaults = { theme: 'light', lang: 'en' }
+const userSettings = { lang: 'zh' }
+const settings = { ...defaults, ...userSettings }
+// { theme: 'light', lang: 'zh' }
+```
+
+## 性能考虑
+
+### 🔶 避免过深的解构
+
+```javascript
+// 不推荐：难以阅读和维护
+const {
+  a: {
+    b: {
+      c: {
+        d: { e },
+      },
+    },
+  },
+} = deepObject
+
+// 推荐：分步解构或使用可选链
+const { a } = deepObject
+const e = a?.b?.c?.d?.e
+```
+
+### 🔶 大对象解构
+
+解构会创建新的变量绑定，对于频繁调用的函数要注意：
+
+```javascript
+// 在热路径中避免创建不必要的解构
+function processItem(item) {
+  // 如果只用一次，直接访问更好
+  return item.value * 2
+}
+
+// 多次使用时解构是值得的
+function processItem(item) {
+  const { value, multiplier, offset } = item
+  return value * multiplier + offset
+}
+```
+
+## 常见错误
+
+### 🔶 忘记处理空值
+
+```javascript
+// 错误
+function getName({ user: { name } }) {
+  return name
+}
+getName({ user: null }) // TypeError
+
+// 正确
+function getName({ user: { name } = {} } = {}) {
+  return name
+}
+getName({ user: null }) // undefined
+```
+
+### 🔶 解构声明与赋值混淆
+
+```javascript
+// 声明时解构
+const { a } = obj
+
+// 已有变量赋值
+let b
+;({ b } = obj) // 需要括号
+
+// 同时声明多个不同类型
+const { x } = obj1
+const [y] = arr1
+// 不能写成 const { x } = obj1, [y] = arr1;
+```
+
+## 小结
+
+嵌套解构让我们能够从复杂的数据结构中精确提取需要的部分，但要注意：
+
+1. **可读性优先**：过深的嵌套解构会降低代码可读性
+2. **提供默认值**：防止解构 undefined/null 报错
+3. **合理使用**：不是所有场景都适合解构
+4. **配合可选链**：`?.` 操作符在某些场景更简洁

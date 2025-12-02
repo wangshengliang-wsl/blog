@@ -1,0 +1,515 @@
+---
+title: '装饰器 Decorator'
+description: '全面理解 ES 装饰器提案：类装饰器、方法装饰器、字段装饰器的语法与实践'
+pubDate: 2024-01-27
+toc: true
+ogImage: true
+category: 'ES6+'
+tags: ['装饰器', 'Decorator', '类', '元编程', 'TypeScript']
+---
+
+装饰器（Decorator）是一种特殊的语法，用于修改类和类成员的行为。目前处于 Stage 3 阶段，TypeScript 和 Babel 已支持。
+
+## 基本概念
+
+装饰器本质上是一个函数，可以附加到类、方法、字段等声明上：
+
+```javascript
+// 装饰器语法
+@decorator
+class MyClass {}
+
+class MyClass {
+  @decorator
+  method() {}
+
+  @decorator
+  field = value
+}
+```
+
+## 类装饰器
+
+类装饰器接收类本身作为参数：
+
+```javascript
+function logged(Class) {
+  return class extends Class {
+    constructor(...args) {
+      console.log(`Creating instance of ${Class.name}`)
+      super(...args)
+    }
+  }
+}
+
+@logged
+class Person {
+  constructor(name) {
+    this.name = name
+  }
+}
+
+new Person('张三')
+// 输出: Creating instance of Person
+```
+
+### 添加静态属性
+
+```javascript
+function addVersion(version) {
+  return function (Class) {
+    Class.version = version
+    return Class
+  }
+}
+
+@addVersion('1.0.0')
+class API {
+  // ...
+}
+
+console.log(API.version) // '1.0.0'
+```
+
+### 混入模式
+
+```javascript
+function mixin(...mixins) {
+  return function (Class) {
+    Object.assign(Class.prototype, ...mixins)
+    return Class
+  }
+}
+
+const Serializable = {
+  toJSON() {
+    return JSON.stringify(this)
+  },
+}
+
+const Observable = {
+  on(event, handler) {
+    this._handlers = this._handlers || {}
+    ;(this._handlers[event] = this._handlers[event] || []).push(handler)
+  },
+  emit(event, data) {
+    ;(this._handlers?.[event] || []).forEach((h) => h(data))
+  },
+}
+
+@mixin(Serializable, Observable)
+class User {
+  constructor(name) {
+    this.name = name
+  }
+}
+
+const user = new User('张三')
+console.log(user.toJSON()) // '{"name":"张三"}'
+user.on('change', console.log)
+user.emit('change', 'data')
+```
+
+## 方法装饰器
+
+方法装饰器可以修改或包装方法：
+
+```javascript
+function log(target, name, descriptor) {
+  const original = descriptor.value
+
+  descriptor.value = function (...args) {
+    console.log(`Calling ${name} with`, args)
+    const result = original.apply(this, args)
+    console.log(`${name} returned`, result)
+    return result
+  }
+
+  return descriptor
+}
+
+class Calculator {
+  @log
+  add(a, b) {
+    return a + b
+  }
+}
+
+const calc = new Calculator()
+calc.add(1, 2)
+// Calling add with [1, 2]
+// add returned 3
+```
+
+### 防抖装饰器
+
+```javascript
+function debounce(delay) {
+  return function (target, name, descriptor) {
+    const original = descriptor.value
+    let timer = null
+
+    descriptor.value = function (...args) {
+      clearTimeout(timer)
+      timer = setTimeout(() => {
+        original.apply(this, args)
+      }, delay)
+    }
+
+    return descriptor
+  }
+}
+
+class SearchBox {
+  @debounce(300)
+  search(query) {
+    console.log('Searching for:', query)
+  }
+}
+```
+
+### 节流装饰器
+
+```javascript
+function throttle(delay) {
+  return function (target, name, descriptor) {
+    const original = descriptor.value
+    let lastCall = 0
+
+    descriptor.value = function (...args) {
+      const now = Date.now()
+      if (now - lastCall >= delay) {
+        lastCall = now
+        return original.apply(this, args)
+      }
+    }
+
+    return descriptor
+  }
+}
+
+class ScrollHandler {
+  @throttle(100)
+  handleScroll() {
+    console.log('Scroll handled')
+  }
+}
+```
+
+### 绑定 this
+
+```javascript
+function autobind(target, name, descriptor) {
+  const original = descriptor.value
+
+  return {
+    configurable: true,
+    enumerable: false,
+    get() {
+      const bound = original.bind(this)
+      Object.defineProperty(this, name, {
+        value: bound,
+        configurable: true,
+        writable: true,
+      })
+      return bound
+    },
+  }
+}
+
+class Button {
+  @autobind
+  handleClick() {
+    console.log(this)
+  }
+}
+
+const btn = new Button()
+const { handleClick } = btn
+handleClick() // this 正确指向 btn
+```
+
+### 只读方法
+
+```javascript
+function readonly(target, name, descriptor) {
+  descriptor.writable = false
+  return descriptor
+}
+
+class Config {
+  @readonly
+  getVersion() {
+    return '1.0.0'
+  }
+}
+
+const config = new Config()
+// config.getVersion = () => {}; // TypeError in strict mode
+```
+
+### 废弃警告
+
+```javascript
+function deprecated(message) {
+  return function (target, name, descriptor) {
+    const original = descriptor.value
+
+    descriptor.value = function (...args) {
+      console.warn(`DEPRECATED: ${name} - ${message}`)
+      return original.apply(this, args)
+    }
+
+    return descriptor
+  }
+}
+
+class API {
+  @deprecated('Use newMethod() instead')
+  oldMethod() {
+    // ...
+  }
+}
+```
+
+## 访问器装饰器
+
+装饰 getter/setter：
+
+```javascript
+function validate(validator) {
+  return function (target, name, descriptor) {
+    const original = descriptor.set
+
+    descriptor.set = function (value) {
+      if (!validator(value)) {
+        throw new TypeError(`Invalid value for ${name}`)
+      }
+      original.call(this, value)
+    }
+
+    return descriptor
+  }
+}
+
+class User {
+  #age = 0
+
+  @validate((v) => typeof v === 'number' && v >= 0 && v <= 150)
+  set age(value) {
+    this.#age = value
+  }
+
+  get age() {
+    return this.#age
+  }
+}
+
+const user = new User()
+user.age = 25 // OK
+// user.age = -1; // TypeError
+```
+
+## 字段装饰器
+
+装饰类的字段：
+
+```javascript
+function defaultValue(value) {
+  return function (target, name) {
+    return {
+      get() {
+        return this[`_${name}`] ?? value
+      },
+      set(newValue) {
+        this[`_${name}`] = newValue
+      },
+    }
+  }
+}
+
+class Settings {
+  @defaultValue('light')
+  theme
+
+  @defaultValue('zh-CN')
+  language
+}
+
+const settings = new Settings()
+console.log(settings.theme) // 'light'
+settings.theme = 'dark'
+console.log(settings.theme) // 'dark'
+```
+
+## 装饰器组合
+
+多个装饰器从下到上（从内到外）执行：
+
+```javascript
+function first() {
+  console.log('first factory')
+  return function (target, name, descriptor) {
+    console.log('first decorator')
+  }
+}
+
+function second() {
+  console.log('second factory')
+  return function (target, name, descriptor) {
+    console.log('second decorator')
+  }
+}
+
+class Example {
+  @first()
+  @second()
+  method() {}
+}
+
+// 输出顺序：
+// first factory
+// second factory
+// second decorator
+// first decorator
+```
+
+## 实战：依赖注入
+
+```javascript
+// 简化版依赖注入容器
+const container = new Map()
+
+function injectable(token) {
+  return function (Class) {
+    container.set(token, Class)
+    return Class
+  }
+}
+
+function inject(token) {
+  return function (target, name) {
+    Object.defineProperty(target, name, {
+      get() {
+        const Class = container.get(token)
+        if (!Class) throw new Error(`No provider for ${token}`)
+        return new Class()
+      },
+    })
+  }
+}
+
+@injectable('logger')
+class Logger {
+  log(message) {
+    console.log(`[LOG] ${message}`)
+  }
+}
+
+@injectable('userService')
+class UserService {
+  @inject('logger')
+  logger
+
+  getUsers() {
+    this.logger.log('Getting users...')
+    return [{ name: '张三' }]
+  }
+}
+
+const service = new UserService()
+service.getUsers() // [LOG] Getting users...
+```
+
+## 实战：路由装饰器
+
+```javascript
+const routes = []
+
+function Controller(prefix) {
+  return function (Class) {
+    Class.prefix = prefix
+    return Class
+  }
+}
+
+function Get(path) {
+  return function (target, name, descriptor) {
+    routes.push({
+      method: 'GET',
+      path: target.constructor.prefix + path,
+      handler: descriptor.value,
+    })
+  }
+}
+
+function Post(path) {
+  return function (target, name, descriptor) {
+    routes.push({
+      method: 'POST',
+      path: target.constructor.prefix + path,
+      handler: descriptor.value,
+    })
+  }
+}
+
+@Controller('/api/users')
+class UserController {
+  @Get('/')
+  list() {
+    return { users: [] }
+  }
+
+  @Get('/:id')
+  getById(id) {
+    return { user: { id } }
+  }
+
+  @Post('/')
+  create(data) {
+    return { created: true, data }
+  }
+}
+
+console.log(routes)
+// [
+//   { method: 'GET', path: '/api/users/', handler: [Function] },
+//   { method: 'GET', path: '/api/users/:id', handler: [Function] },
+//   { method: 'POST', path: '/api/users/', handler: [Function] }
+// ]
+```
+
+## Stage 3 新语法
+
+新的装饰器提案语法略有不同：
+
+```javascript
+// 新语法
+function logged(value, context) {
+  // value: 被装饰的值
+  // context: { kind, name, static, private, access, ... }
+
+  if (context.kind === 'method') {
+    return function (...args) {
+      console.log(`Calling ${context.name}`)
+      return value.call(this, ...args)
+    }
+  }
+}
+
+class MyClass {
+  @logged
+  method() {}
+}
+```
+
+## 小结
+
+| 装饰器类型   | 用途                         |
+| ------------ | ---------------------------- |
+| 类装饰器     | 修改类、添加元数据、混入功能 |
+| 方法装饰器   | 包装方法、添加日志、防抖节流 |
+| 访问器装饰器 | 验证 setter、缓存 getter     |
+| 字段装饰器   | 默认值、响应式、依赖注入     |
+
+装饰器是 AOP（面向切面编程）的强大工具，可以优雅地分离关注点，实现可复用的横切逻辑。

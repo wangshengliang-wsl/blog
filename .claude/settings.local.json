@@ -4,7 +4,8 @@
       "Bash(done)",
       "mcp__context7__resolve-library-id",
       "mcp__context7__get-library-docs",
-      "Bash(pnpm check:*)"
+      "Bash(pnpm check:*)",
+      "Bash(for file in /Users/wangshengliang/Desktop/i/blog/src/content/blog/HTML/*.mdx)"
     ],
     "deny": [],
     "ask": []

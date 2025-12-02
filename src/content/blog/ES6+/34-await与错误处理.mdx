@@ -1,0 +1,592 @@
+---
+title: 'await 与错误处理'
+description: '深入掌握 async/await 的错误处理策略、最佳实践与常见模式'
+pubDate: 2024-02-03
+toc: true
+ogImage: true
+category: 'ES6+'
+tags: ['ES2017', 'async', 'await', '错误处理', 'try-catch']
+---
+
+错误处理是异步编程中最容易出错的部分，本文深入探讨 async/await 的各种错误处理模式。
+
+## try/catch 基础
+
+### 基本用法
+
+```javascript
+async function fetchUser(id) {
+  try {
+    const response = await fetch(`/api/users/${id}`)
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`)
+    }
+    return await response.json()
+  } catch (error) {
+    console.error('获取用户失败:', error.message)
+    return null
+  }
+}
+```
+
+### 捕获多个 await
+
+```javascript
+async function fetchUserData(userId) {
+  try {
+    const user = await fetchUser(userId)
+    const posts = await fetchPosts(userId)
+    const followers = await fetchFollowers(userId)
+    return { user, posts, followers }
+  } catch (error) {
+    // 任何一个失败都会进入这里
+    console.error('获取数据失败:', error)
+    throw error
+  }
+}
+```
+
+### finally 块
+
+```javascript
+async function fetchWithLoading() {
+  showLoading()
+  try {
+    const data = await fetchData()
+    return data
+  } catch (error) {
+    showError(error.message)
+    return null
+  } finally {
+    // 无论成功失败都会执行
+    hideLoading()
+  }
+}
+```
+
+## 细粒度错误处理
+
+### 每个 await 单独处理
+
+```javascript
+async function fetchAllData() {
+  let user = null
+  let posts = []
+  let comments = []
+
+  try {
+    user = await fetchUser()
+  } catch (error) {
+    console.error('用户获取失败:', error)
+  }
+
+  try {
+    posts = await fetchPosts()
+  } catch (error) {
+    console.error('文章获取失败:', error)
+  }
+
+  try {
+    comments = await fetchComments()
+  } catch (error) {
+    console.error('评论获取失败:', error)
+  }
+
+  return { user, posts, comments }
+}
+```
+
+### 使用 .catch() 提供默认值
+
+```javascript
+async function fetchAllData() {
+  const user = await fetchUser().catch(() => null)
+  const posts = await fetchPosts().catch(() => [])
+  const settings = await fetchSettings().catch(() => ({}))
+
+  return { user, posts, settings }
+}
+```
+
+### 包装函数简化错误处理
+
+```javascript
+// Go 风格的错误处理
+function to(promise) {
+  return promise.then((data) => [null, data]).catch((err) => [err, null])
+}
+
+async function fetchUserData() {
+  const [err, user] = await to(fetchUser())
+
+  if (err) {
+    console.error('获取用户失败:', err)
+    return null
+  }
+
+  const [postsErr, posts] = await to(fetchPosts(user.id))
+
+  if (postsErr) {
+    console.error('获取文章失败:', postsErr)
+    return { user, posts: [] }
+  }
+
+  return { user, posts }
+}
+```
+
+## 自定义错误类
+
+### 基础错误类
+
+```javascript
+class AppError extends Error {
+  constructor(message, code = 'UNKNOWN') {
+    super(message)
+    this.name = 'AppError'
+    this.code = code
+  }
+}
+
+class NetworkError extends AppError {
+  constructor(message, status) {
+    super(message, 'NETWORK_ERROR')
+    this.name = 'NetworkError'
+    this.status = status
+  }
+}
+
+class ValidationError extends AppError {
+  constructor(message, field) {
+    super(message, 'VALIDATION_ERROR')
+    this.name = 'ValidationError'
+    this.field = field
+  }
+}
+```
+
+### 使用自定义错误
+
+```javascript
+async function fetchUser(id) {
+  if (!id) {
+    throw new ValidationError('用户 ID 不能为空', 'id')
+  }
+
+  const response = await fetch(`/api/users/${id}`)
+
+  if (!response.ok) {
+    throw new NetworkError(`请求失败: ${response.statusText}`, response.status)
+  }
+
+  return response.json()
+}
+
+async function handleUser(id) {
+  try {
+    return await fetchUser(id)
+  } catch (error) {
+    if (error instanceof ValidationError) {
+      console.error(`验证错误 (${error.field}): ${error.message}`)
+    } else if (error instanceof NetworkError) {
+      console.error(`网络错误 (${error.status}): ${error.message}`)
+    } else {
+      console.error('未知错误:', error)
+    }
+    return null
+  }
+}
+```
+
+## 并发错误处理
+
+### Promise.all 的错误
+
+```javascript
+// 一个失败全部失败
+async function fetchAll() {
+  try {
+    const [users, posts] = await Promise.all([fetchUsers(), fetchPosts()])
+    return { users, posts }
+  } catch (error) {
+    // 只能捕获第一个失败的错误
+    console.error('获取数据失败:', error)
+    return null
+  }
+}
+```
+
+### Promise.allSettled 容错
+
+```javascript
+async function fetchAllSettled() {
+  const results = await Promise.allSettled([
+    fetchUsers(),
+    fetchPosts(),
+    fetchComments(),
+  ])
+
+  const data = {}
+  const errors = []
+
+  results.forEach((result, index) => {
+    const keys = ['users', 'posts', 'comments']
+    if (result.status === 'fulfilled') {
+      data[keys[index]] = result.value
+    } else {
+      errors.push({ key: keys[index], error: result.reason })
+      data[keys[index]] = null
+    }
+  })
+
+  if (errors.length > 0) {
+    console.error('部分请求失败:', errors)
+  }
+
+  return data
+}
+```
+
+### 封装 allSettled 结果
+
+```javascript
+function parseSettledResults(results, keys) {
+  return results.reduce(
+    (acc, result, index) => {
+      const key = keys[index]
+      if (result.status === 'fulfilled') {
+        acc.data[key] = result.value
+      } else {
+        acc.errors[key] = result.reason
+        acc.data[key] = null
+      }
+      return acc
+    },
+    { data: {}, errors: {} }
+  )
+}
+
+async function fetchAllData() {
+  const results = await Promise.allSettled([
+    fetchUsers(),
+    fetchPosts(),
+    fetchComments(),
+  ])
+
+  const { data, errors } = parseSettledResults(results, [
+    'users',
+    'posts',
+    'comments',
+  ])
+
+  if (Object.keys(errors).length > 0) {
+    console.error('部分请求失败:', errors)
+  }
+
+  return data
+}
+```
+
+## 重试策略
+
+### 基础重试
+
+```javascript
+async function retry(fn, maxAttempts = 3, delay = 1000) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await fn()
+    } catch (error) {
+      if (attempt === maxAttempts) {
+        throw error
+      }
+      console.log(`第 ${attempt} 次失败，${delay}ms 后重试...`)
+      await new Promise((r) => setTimeout(r, delay))
+    }
+  }
+}
+
+// 使用
+const data = await retry(() => fetch('/api/data').then((r) => r.json()))
+```
+
+### 指数退避重试
+
+```javascript
+async function retryWithBackoff(fn, options = {}) {
+  const {
+    maxAttempts = 5,
+    baseDelay = 1000,
+    maxDelay = 30000,
+    factor = 2,
+  } = options
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await fn()
+    } catch (error) {
+      if (attempt === maxAttempts) {
+        throw error
+      }
+
+      const delay = Math.min(
+        baseDelay * Math.pow(factor, attempt - 1),
+        maxDelay
+      )
+
+      console.log(`第 ${attempt} 次失败，${delay}ms 后重试...`)
+      await new Promise((r) => setTimeout(r, delay))
+    }
+  }
+}
+```
+
+### 条件重试
+
+```javascript
+async function retryOnCondition(fn, shouldRetry, maxAttempts = 3) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await fn()
+    } catch (error) {
+      if (!shouldRetry(error) || attempt === maxAttempts) {
+        throw error
+      }
+      console.log(`重试 ${attempt}/${maxAttempts}`)
+    }
+  }
+}
+
+// 只在网络错误时重试
+const data = await retryOnCondition(
+  () => fetch('/api/data').then((r) => r.json()),
+  (error) => error instanceof NetworkError && error.status >= 500
+)
+```
+
+## 超时处理
+
+### 基础超时
+
+```javascript
+function timeout(promise, ms) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('请求超时')), ms)
+    ),
+  ])
+}
+
+async function fetchWithTimeout(url, ms = 5000) {
+  try {
+    const response = await timeout(fetch(url), ms)
+    return response.json()
+  } catch (error) {
+    if (error.message === '请求超时') {
+      console.error('请求超时，请稍后重试')
+    }
+    throw error
+  }
+}
+```
+
+### AbortController 取消请求
+
+```javascript
+async function fetchWithAbort(url, timeoutMs = 5000) {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+
+  try {
+    const response = await fetch(url, {
+      signal: controller.signal,
+    })
+    clearTimeout(timeoutId)
+    return response.json()
+  } catch (error) {
+    clearTimeout(timeoutId)
+    if (error.name === 'AbortError') {
+      throw new Error('请求被取消或超时')
+    }
+    throw error
+  }
+}
+```
+
+### 可取消的异步操作
+
+```javascript
+function createCancellable(asyncFn) {
+  let cancelled = false
+
+  const wrappedFn = async (...args) => {
+    const result = await asyncFn(...args)
+    if (cancelled) {
+      throw new Error('操作已取消')
+    }
+    return result
+  }
+
+  return {
+    execute: wrappedFn,
+    cancel: () => {
+      cancelled = true
+    },
+  }
+}
+
+// 使用
+const { execute, cancel } = createCancellable(async () => {
+  const response = await fetch('/api/data')
+  return response.json()
+})
+
+// 开始执行
+const promise = execute()
+
+// 可以随时取消
+setTimeout(cancel, 1000)
+```
+
+## 错误边界模式
+
+### 安全执行包装器
+
+```javascript
+function safeAsync(fn, fallback = null) {
+  return async (...args) => {
+    try {
+      return await fn(...args)
+    } catch (error) {
+      console.error('操作失败:', error)
+      return typeof fallback === 'function' ? fallback(error) : fallback
+    }
+  }
+}
+
+const safeFetch = safeAsync(async (url) => {
+  const response = await fetch(url)
+  return response.json()
+}, [])
+
+// 不会抛出错误，失败时返回空数组
+const data = await safeFetch('/api/data')
+```
+
+### 错误收集器
+
+```javascript
+class ErrorCollector {
+  constructor() {
+    this.errors = []
+  }
+
+  async collect(key, fn) {
+    try {
+      return await fn()
+    } catch (error) {
+      this.errors.push({ key, error, time: new Date() })
+      return null
+    }
+  }
+
+  hasErrors() {
+    return this.errors.length > 0
+  }
+
+  getErrors() {
+    return this.errors
+  }
+
+  clear() {
+    this.errors = []
+  }
+}
+
+// 使用
+async function fetchAllData() {
+  const collector = new ErrorCollector()
+
+  const user = await collector.collect('user', fetchUser)
+  const posts = await collector.collect('posts', fetchPosts)
+  const comments = await collector.collect('comments', fetchComments)
+
+  if (collector.hasErrors()) {
+    console.error('部分操作失败:', collector.getErrors())
+  }
+
+  return { user, posts, comments }
+}
+```
+
+## 全局错误处理
+
+### unhandledrejection 事件
+
+```javascript
+// 浏览器
+window.addEventListener('unhandledrejection', (event) => {
+  console.error('未处理的 Promise 拒绝:', event.reason)
+  event.preventDefault() // 阻止默认行为（控制台报错）
+})
+
+// Node.js
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('未处理的 Promise 拒绝:', reason)
+})
+```
+
+### 统一错误处理中间件
+
+```javascript
+// 错误处理装饰器
+function catchErrors(fn) {
+  return async function (...args) {
+    try {
+      return await fn.apply(this, args)
+    } catch (error) {
+      // 统一错误处理逻辑
+      handleError(error)
+      throw error
+    }
+  }
+}
+
+function handleError(error) {
+  if (error instanceof NetworkError) {
+    showNetworkErrorToast(error)
+  } else if (error instanceof ValidationError) {
+    showValidationError(error)
+  } else {
+    showGenericError(error)
+  }
+
+  // 上报错误
+  reportError(error)
+}
+
+// 使用装饰器
+class UserService {
+  @catchErrors
+  async getUser(id) {
+    const response = await fetch(`/api/users/${id}`)
+    return response.json()
+  }
+}
+```
+
+## 小结
+
+| 模式         | 适用场景        |
+| ------------ | --------------- |
+| try/catch    | 基础错误捕获    |
+| .catch() 链  | 提供默认值      |
+| to() 包装    | Go 风格错误处理 |
+| 自定义错误类 | 错误分类处理    |
+| allSettled   | 并发容错        |
+| 重试策略     | 网络不稳定场景  |
+| 超时处理     | 防止请求挂起    |
+| 错误边界     | 隔离错误影响    |
+
+选择合适的错误处理策略，能让异步代码更健壮、更易维护。
