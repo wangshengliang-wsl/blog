@@ -13,18 +13,12 @@ import '~/styles/music.css'
     </div>
     <div class="hint-item">
       <span class="i-ri-drag-move-line"></span>
-      <span>拖拽旋转</span>
+      <span>拖拽旋转视角</span>
     </div>
     <div class="hint-item">
       <span class="i-ri-zoom-in-line"></span>
       <span>滚轮缩放</span>
     </div>
-  </div>
-
-  <!-- 拖拽放置区域指示 -->
-  <div class="drop-zone-indicator" id="drop-zone-indicator">
-    <span class="i-ri-add-circle-line"></span>
-    <p>放置唱片</p>
   </div>
 </div>
 
@@ -83,49 +77,6 @@ import '~/styles/music.css'
     opacity: 0.9;
   }
 
-  .drop-zone-indicator {
-    position: absolute;
-    inset: 0;
-    display: none;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    background: rgba(139, 69, 19, 0.2);
-    border: 3px dashed rgba(139, 69, 19, 0.5);
-    border-radius: 16px;
-    z-index: 20;
-    pointer-events: none;
-  }
-
-  .drop-zone-indicator span {
-    font-size: 4rem;
-    color: rgba(139, 69, 19, 0.7);
-    animation: pulse 1.5s ease infinite;
-  }
-
-  .drop-zone-indicator p {
-    margin-top: 1rem;
-    font-size: 1.125rem;
-    color: rgba(139, 69, 19, 0.8);
-    font-weight: 500;
-  }
-
-  @keyframes pulse {
-    0%,
-    100% {
-      transform: scale(1);
-      opacity: 0.7;
-    }
-    50% {
-      transform: scale(1.1);
-      opacity: 1;
-    }
-  }
-
-  .gramophone-wrapper.drag-over .drop-zone-indicator {
-    display: flex;
-  }
-
   @media (max-width: 768px) {
     .gramophone-wrapper {
       min-height: 400px;
@@ -165,13 +116,10 @@ import '~/styles/music.css'
 
   document.addEventListener('astro:page-load', () => {
     const container = document.getElementById('gramophone-canvas')
-    const wrapper = document.querySelector('.gramophone-wrapper')
-    const playbackHint = document.getElementById('playback-hint')
-    const volumeHint = document.getElementById('volume-hint')
 
     if (!container) return
 
-    // 获取容器尺寸，确保有有效值
+    // Get container size
     const getContainerSize = () => {
       const width = container.clientWidth || 800
       const height = container.clientHeight || 500
@@ -180,557 +128,662 @@ import '~/styles/music.css'
 
     const initialSize = getContainerSize()
 
-    // 场景设置
-    const scene = new THREE.Scene()
-    scene.background = null
+    // Helper function to get theme background color
+    const getThemeBackgroundColor = () => {
+      const isDark = document.documentElement.classList.contains('dark')
+      // Return appropriate background color based on theme
+      return isDark ? 0x1a1a1a : 0xf5f5f5
+    }
 
-    // 相机设置 - 调整角度让留声机更好看
+    // Scene setup
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(getThemeBackgroundColor())
+
+    // Camera - top-down 45 degree view
     const camera = new THREE.PerspectiveCamera(
-      40,
+      45,
       initialSize.width / initialSize.height,
       0.1,
       1000
     )
-    camera.position.set(8, 8, 12)
-    camera.lookAt(0, 1.5, 0)
 
-    // 渲染器设置
+    // Renderer setup
     const renderer = new THREE.WebGLRenderer({
       antialias: true,
-      alpha: true,
+      alpha: false,
     })
     renderer.setSize(initialSize.width, initialSize.height)
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     renderer.shadowMap.enabled = true
     renderer.shadowMap.type = THREE.PCFSoftShadowMap
     renderer.toneMapping = THREE.ACESFilmicToneMapping
-    renderer.toneMappingExposure = 1.2
+    renderer.toneMappingExposure = 1.4
+    renderer.outputColorSpace = THREE.SRGBColorSpace
     container.appendChild(renderer.domElement)
 
-    // 光照设置
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6)
+    // ==================== Lighting ====================
+    // Ambient light - general illumination
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.4)
     scene.add(ambientLight)
 
-    // 添加半球光，提供更自然的环境照明
-    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.6)
-    hemiLight.position.set(0, 20, 0)
-    scene.add(hemiLight)
+    // Main spotlight from above (creates vinyl reflection)
+    const spotLight = new THREE.SpotLight(0xffffff, 60)
+    spotLight.position.set(0, 10, 0)
+    spotLight.angle = Math.PI / 3
+    spotLight.penumbra = 0.4
+    spotLight.decay = 1.5
+    spotLight.distance = 25
+    spotLight.castShadow = true
+    spotLight.shadow.mapSize.width = 2048
+    spotLight.shadow.mapSize.height = 2048
+    spotLight.shadow.camera.near = 1
+    spotLight.shadow.camera.far = 25
+    scene.add(spotLight)
+    scene.add(spotLight.target)
 
-    const mainLight = new THREE.DirectionalLight(0xffffff, 1.0)
-    mainLight.position.set(8, 12, 8)
-    mainLight.castShadow = true
-    mainLight.shadow.mapSize.width = 2048
-    mainLight.shadow.mapSize.height = 2048
-    mainLight.shadow.camera.near = 0.5
-    mainLight.shadow.camera.far = 50
-    scene.add(mainLight)
+    // Front spotlight - illuminates vinyl grooves from front
+    const frontSpotLight = new THREE.SpotLight(0xffffff, 40)
+    frontSpotLight.position.set(0, 6, 8)
+    frontSpotLight.angle = Math.PI / 4
+    frontSpotLight.penumbra = 0.5
+    frontSpotLight.decay = 1.5
+    frontSpotLight.distance = 20
+    frontSpotLight.target.position.set(-0.3, 0.65, 0)
+    scene.add(frontSpotLight)
+    scene.add(frontSpotLight.target)
 
-    const fillLight = new THREE.DirectionalLight(0xffd4a8, 0.4)
-    fillLight.position.set(-5, 5, -5)
+    // Side spotlight - creates vinyl texture highlight
+    const sideSpotLight = new THREE.SpotLight(0xffeedd, 35)
+    sideSpotLight.position.set(-6, 5, 4)
+    sideSpotLight.angle = Math.PI / 5
+    sideSpotLight.penumbra = 0.3
+    sideSpotLight.decay = 1.5
+    sideSpotLight.distance = 18
+    sideSpotLight.target.position.set(-0.3, 0.65, 0)
+    scene.add(sideSpotLight)
+    scene.add(sideSpotLight.target)
+
+    // Back spotlight - rim lighting effect
+    const backSpotLight = new THREE.SpotLight(0xddeeff, 30)
+    backSpotLight.position.set(4, 4, -6)
+    backSpotLight.angle = Math.PI / 5
+    backSpotLight.penumbra = 0.4
+    backSpotLight.decay = 1.5
+    backSpotLight.distance = 18
+    backSpotLight.target.position.set(-0.3, 0.65, 0)
+    scene.add(backSpotLight)
+    scene.add(backSpotLight.target)
+
+    // Rim lights for edge highlights
+    const rimLight1 = new THREE.DirectionalLight(0x4fc3f7, 0.5)
+    rimLight1.position.set(-8, 4, 8)
+    scene.add(rimLight1)
+
+    const rimLight2 = new THREE.DirectionalLight(0xff7043, 0.4)
+    rimLight2.position.set(8, 3, -8)
+    scene.add(rimLight2)
+
+    // Fill light from front
+    const fillLight = new THREE.DirectionalLight(0xffffff, 0.3)
+    fillLight.position.set(0, 5, 10)
     scene.add(fillLight)
 
-    const rimLight = new THREE.DirectionalLight(0xffffff, 0.3)
-    rimLight.position.set(-8, 3, 8)
-    scene.add(rimLight)
+    // Bottom fill light - shows vinyl underside detail
+    const bottomFillLight = new THREE.DirectionalLight(0xffffff, 0.15)
+    bottomFillLight.position.set(0, -2, 5)
+    scene.add(bottomFillLight)
 
-    // 材质定义
-    const woodMaterial = new THREE.MeshStandardMaterial({
-      color: 0x4a2511, // 深桃花心木色
-      roughness: 0.5,
+    // ==================== Materials ====================
+    // Matte black material for turntable body
+    const matteBlackMaterial = new THREE.MeshStandardMaterial({
+      color: 0x1a1a1a,
+      roughness: 0.85,
       metalness: 0.1,
     })
 
-    const darkWoodMaterial = new THREE.MeshStandardMaterial({
-      color: 0x2b1409, // 更深的木纹
-      roughness: 0.6,
-      metalness: 0.1,
+    // Brushed aluminum material
+    const aluminumMaterial = new THREE.MeshStandardMaterial({
+      color: 0xd0d0d0,
+      roughness: 0.35,
+      metalness: 0.85,
     })
 
-    // 银色/镀镍材质 (调整参数以适应无环境贴图场景)
-    const nickelMaterial = new THREE.MeshStandardMaterial({
-      color: 0xe0e0e0,
-      roughness: 0.3,
-      metalness: 0.6, // 降低金属度，避免在无环境贴图时变黑
+    // Chrome/polished metal material
+    const chromeMaterial = new THREE.MeshStandardMaterial({
+      color: 0xfafafa,
+      roughness: 0.1,
+      metalness: 0.95,
     })
 
-    // 做旧的银色
-    const darkNickelMaterial = new THREE.MeshStandardMaterial({
-      color: 0x888888,
-      roughness: 0.5,
-      metalness: 0.5,
-    })
-
-    // 黄铜材质 (保留给少部分装饰)
-    const brassMaterial = new THREE.MeshStandardMaterial({
-      color: 0xc9a227,
-      roughness: 0.3,
-      metalness: 0.8,
-    })
-
-    // 深色黄铜材质 (用于音量旋钮等装饰)
-    const darkBrassMaterial = new THREE.MeshStandardMaterial({
-      color: 0x8b7355,
-      roughness: 0.4,
-      metalness: 0.7,
-    })
-
-    const blackMetalMaterial = new THREE.MeshStandardMaterial({
-      color: 0x111111,
-      roughness: 0.4,
-      metalness: 0.6,
-    })
-
-    const vinylMaterial = new THREE.MeshStandardMaterial({
-      color: 0x0a0a0a,
-      roughness: 0.15,
-      metalness: 0.05,
-    })
-
-    const feltMaterial = new THREE.MeshStandardMaterial({
-      color: 0x6b1c1c,
-      roughness: 0.95,
+    // Rubber mat material
+    const rubberMaterial = new THREE.MeshStandardMaterial({
+      color: 0x2a2a2a,
+      roughness: 0.9,
       metalness: 0,
     })
 
-    // 留声机主体
-    const gramophoneGroup = new THREE.Group()
+    // Vinyl material with reflective properties
+    const vinylMaterial = new THREE.MeshStandardMaterial({
+      color: 0x0a0a0a,
+      roughness: 0.1,
+      metalness: 0.15,
+    })
 
-    // ==================== 1. 两层木质底座 (Victor 风格) ====================
-    // 下层储物柜 (核心盒子)
-    const lowerCabinetGeometry = new THREE.BoxGeometry(4.6, 2.2, 4.0)
-    lowerCabinetGeometry.translate(0, 1.1, 0)
-    const lowerCabinet = new THREE.Mesh(lowerCabinetGeometry, darkWoodMaterial) // 内部颜色更深
-    lowerCabinet.castShadow = true
-    lowerCabinet.receiveShadow = true
-    gramophoneGroup.add(lowerCabinet)
+    // Gold accent material
+    const goldMaterial = new THREE.MeshStandardMaterial({
+      color: 0xd4af37,
+      roughness: 0.3,
+      metalness: 0.9,
+    })
 
-    // 下层底部底座 (Base Plinth) - 更宽更厚
-    const basePlinthGeometry = new THREE.BoxGeometry(5.4, 0.3, 4.8)
-    const basePlinth = new THREE.Mesh(basePlinthGeometry, woodMaterial)
-    basePlinth.position.y = 0.15
-    // 底部边缘倒角效果 (简单的层叠)
-    const basePlinth2Geometry = new THREE.BoxGeometry(5.2, 0.15, 4.6)
-    const basePlinth2 = new THREE.Mesh(basePlinth2Geometry, woodMaterial)
-    basePlinth2.position.y = 0.35
-    gramophoneGroup.add(basePlinth)
-    gramophoneGroup.add(basePlinth2)
+    // Red LED indicator
+    const ledMaterial = new THREE.MeshStandardMaterial({
+      color: 0xff0000,
+      emissive: 0xff0000,
+      emissiveIntensity: 0.5,
+      roughness: 0.3,
+      metalness: 0.1,
+    })
 
-    // 侧面装饰面板 (Recessed Panels)
-    // 前后左右四个面的凸起边框
-    const panelFrameThickness = 0.15
-    const panelDepth = 0.05
-
-    // 创建面板边框的函数
-    const createPanelFrame = (width: number, height: number) => {
-      const shape = new THREE.Shape()
-      shape.moveTo(-width / 2, -height / 2)
-      shape.lineTo(width / 2, -height / 2)
-      shape.lineTo(width / 2, height / 2)
-      shape.lineTo(-width / 2, height / 2)
-      shape.lineTo(-width / 2, -height / 2)
-
-      const hole = new THREE.Path()
-      hole.moveTo(
-        -(width / 2 - panelFrameThickness),
-        -(height / 2 - panelFrameThickness)
-      )
-      hole.lineTo(
-        width / 2 - panelFrameThickness,
-        -(height / 2 - panelFrameThickness)
-      )
-      hole.lineTo(
-        width / 2 - panelFrameThickness,
-        height / 2 - panelFrameThickness
-      )
-      hole.lineTo(
-        -(width / 2 - panelFrameThickness),
-        height / 2 - panelFrameThickness
-      )
-      hole.lineTo(
-        -(width / 2 - panelFrameThickness),
-        -(height / 2 - panelFrameThickness)
-      )
-      shape.holes.push(hole)
-
-      const geometry = new THREE.ExtrudeGeometry(shape, {
-        depth: panelDepth,
-        bevelEnabled: true,
-        bevelSize: 0.02,
-        bevelThickness: 0.02,
-      })
-      return new THREE.Mesh(geometry, woodMaterial)
-    }
-
-    // 前面板框
-    const frontPanel = createPanelFrame(3.0, 1.2)
-    frontPanel.position.set(0, 1.1, 2.0) // 突出于 cabinet
-    gramophoneGroup.add(frontPanel)
-
-    // 后面板框
-    const backPanel = createPanelFrame(3.0, 1.2)
-    backPanel.position.set(0, 1.1, -2.05) // 稍微调整位置避免重叠闪烁
-    backPanel.rotation.y = Math.PI
-    gramophoneGroup.add(backPanel)
-
-    // 左面板框
-    const leftPanel = createPanelFrame(3.0, 1.2)
-    leftPanel.position.set(-2.3, 1.1, 0)
-    leftPanel.rotation.y = -Math.PI / 2
-    gramophoneGroup.add(leftPanel)
-
-    // 右面板框
-    const rightPanel = createPanelFrame(3.0, 1.2)
-    rightPanel.position.set(2.3, 1.1, 0)
-    rightPanel.rotation.y = Math.PI / 2
-    gramophoneGroup.add(rightPanel)
-
-    // 下层顶部装饰线条
-    const midMoldingGeometry = new THREE.BoxGeometry(5.0, 0.15, 4.4)
-    const midMolding = new THREE.Mesh(midMoldingGeometry, woodMaterial)
-    midMolding.position.y = 2.2
-    gramophoneGroup.add(midMolding)
-
-    // 上层平台（放转盘的部分）
-    const upperPlatformGeometry = new THREE.BoxGeometry(4.8, 0.6, 4.2)
-    upperPlatformGeometry.translate(0, 2.6, 0)
-    const upperPlatform = new THREE.Mesh(upperPlatformGeometry, woodMaterial)
-    upperPlatform.castShadow = true
-    gramophoneGroup.add(upperPlatform)
-
-    // 上层顶部边框 (Top Molding)
-    const topMoldingGeometry = new THREE.BoxGeometry(5.1, 0.15, 4.5)
-    const topMolding = new THREE.Mesh(topMoldingGeometry, woodMaterial)
-    topMolding.position.y = 2.9
-    gramophoneGroup.add(topMolding)
-
-    // 四角装饰柱 (Corner Pillars) - 图片中有明显的凹槽细节
-    for (let x = -1; x <= 1; x += 2) {
-      for (let z = -1; z <= 1; z += 2) {
-        const pillarGroup = new THREE.Group()
-        pillarGroup.position.set(x * 2.25, 1.1, z * 1.95)
-
-        const pillarGeo = new THREE.BoxGeometry(0.35, 2.0, 0.35)
-        const pillar = new THREE.Mesh(pillarGeo, woodMaterial)
-        pillarGroup.add(pillar)
-
-        // 柱子上的装饰纹路
-        const detailGeo = new THREE.BoxGeometry(0.4, 0.1, 0.4)
-        const detailTop = new THREE.Mesh(detailGeo, darkWoodMaterial)
-        detailTop.position.y = 0.8
-        pillarGroup.add(detailTop)
-
-        const detailBottom = new THREE.Mesh(detailGeo, darkWoodMaterial)
-        detailBottom.position.y = -0.8
-        pillarGroup.add(detailBottom)
-
-        gramophoneGroup.add(pillarGroup)
-      }
-    }
-
-    // ==================== 2. 转盘 ====================
-    // 转盘基座
-    const turntableBaseGeometry = new THREE.CylinderGeometry(1.9, 1.9, 0.1, 64)
-    const turntableBase = new THREE.Mesh(
-      turntableBaseGeometry,
-      blackMetalMaterial
-    )
-    turntableBase.position.set(0, 3.2, 0)
-    gramophoneGroup.add(turntableBase)
-
-    // 转盘金属边缘
-    const turntableRimGeometry = new THREE.TorusGeometry(1.85, 0.05, 16, 64)
-    const turntableRim = new THREE.Mesh(turntableRimGeometry, brassMaterial)
-    turntableRim.rotation.x = Math.PI / 2
-    turntableRim.position.set(0, 3.28, 0)
-    gramophoneGroup.add(turntableRim)
-
-    // 转盘
+    // Turntable group
     const turntableGroup = new THREE.Group()
-    turntableGroup.position.set(0, 3.28, 0)
 
-    const turntableGeometry = new THREE.CylinderGeometry(1.75, 1.75, 0.06, 64)
-    const turntable = new THREE.Mesh(turntableGeometry, blackMetalMaterial)
-    turntableGroup.add(turntable)
+    // ==================== Base/Plinth ====================
+    // Main base - sleek rectangular with rounded edges
+    const baseShape = new THREE.Shape()
+    const baseWidth = 6
+    const baseDepth = 5
+    const cornerRadius = 0.3
 
-    // 转盘绒布
-    const feltGeometry = new THREE.CylinderGeometry(1.65, 1.65, 0.02, 64)
-    const felt = new THREE.Mesh(feltGeometry, feltMaterial)
-    felt.position.y = 0.04
-    turntableGroup.add(felt)
+    baseShape.moveTo(-baseWidth / 2 + cornerRadius, -baseDepth / 2)
+    baseShape.lineTo(baseWidth / 2 - cornerRadius, -baseDepth / 2)
+    baseShape.quadraticCurveTo(
+      baseWidth / 2,
+      -baseDepth / 2,
+      baseWidth / 2,
+      -baseDepth / 2 + cornerRadius
+    )
+    baseShape.lineTo(baseWidth / 2, baseDepth / 2 - cornerRadius)
+    baseShape.quadraticCurveTo(
+      baseWidth / 2,
+      baseDepth / 2,
+      baseWidth / 2 - cornerRadius,
+      baseDepth / 2
+    )
+    baseShape.lineTo(-baseWidth / 2 + cornerRadius, baseDepth / 2)
+    baseShape.quadraticCurveTo(
+      -baseWidth / 2,
+      baseDepth / 2,
+      -baseWidth / 2,
+      baseDepth / 2 - cornerRadius
+    )
+    baseShape.lineTo(-baseWidth / 2, -baseDepth / 2 + cornerRadius)
+    baseShape.quadraticCurveTo(
+      -baseWidth / 2,
+      -baseDepth / 2,
+      -baseWidth / 2 + cornerRadius,
+      -baseDepth / 2
+    )
 
-    // 中心轴
-    const spindleGeometry = new THREE.CylinderGeometry(0.05, 0.05, 0.3, 16)
-    const spindle = new THREE.Mesh(spindleGeometry, brassMaterial)
-    spindle.position.y = 0.18
-    turntableGroup.add(spindle)
+    const baseExtrudeSettings = {
+      depth: 0.4,
+      bevelEnabled: true,
+      bevelThickness: 0.05,
+      bevelSize: 0.05,
+      bevelSegments: 3,
+    }
 
-    gramophoneGroup.add(turntableGroup)
+    const baseGeometry = new THREE.ExtrudeGeometry(
+      baseShape,
+      baseExtrudeSettings
+    )
+    baseGeometry.rotateX(-Math.PI / 2)
+    const baseMesh = new THREE.Mesh(baseGeometry, matteBlackMaterial)
+    baseMesh.position.y = 0
+    baseMesh.receiveShadow = true
+    baseMesh.castShadow = true
+    turntableGroup.add(baseMesh)
 
-    // ==================== 3. 唱片 ====================
+    // Feet (isolators)
+    const footGeometry = new THREE.CylinderGeometry(0.2, 0.25, 0.15, 24)
+    const footPositions = [
+      [-2.5, -0.075, -2],
+      [2.5, -0.075, -2],
+      [-2.5, -0.075, 2],
+      [2.5, -0.075, 2],
+    ]
+
+    footPositions.forEach((pos) => {
+      const foot = new THREE.Mesh(footGeometry, rubberMaterial)
+      foot.position.set(pos[0], pos[1], pos[2])
+      turntableGroup.add(foot)
+    })
+
+    // ==================== Platter ====================
+    // Platter base ring
+    const platterRingGeometry = new THREE.TorusGeometry(2.1, 0.08, 16, 64)
+    const platterRing = new THREE.Mesh(platterRingGeometry, aluminumMaterial)
+    platterRing.rotation.x = Math.PI / 2
+    platterRing.position.set(-0.3, 0.5, 0)
+    turntableGroup.add(platterRing)
+
+    // Main platter (rotating part)
+    const platterGroup = new THREE.Group()
+    platterGroup.position.set(-0.3, 0.55, 0)
+
+    // Platter disc
+    const platterGeometry = new THREE.CylinderGeometry(2, 2, 0.1, 64)
+    const platter = new THREE.Mesh(platterGeometry, aluminumMaterial)
+    platter.castShadow = true
+    platter.receiveShadow = true
+    platterGroup.add(platter)
+
+    // Rubber mat on platter
+    const matGeometry = new THREE.CylinderGeometry(1.9, 1.9, 0.03, 64)
+    const mat = new THREE.Mesh(matGeometry, rubberMaterial)
+    mat.position.y = 0.065
+    platterGroup.add(mat)
+
+    // Spindle
+    const spindleGeometry = new THREE.CylinderGeometry(0.04, 0.04, 0.3, 16)
+    const spindle = new THREE.Mesh(spindleGeometry, chromeMaterial)
+    spindle.position.y = 0.2
+    platterGroup.add(spindle)
+
+    // Strobe dots around platter edge
+    const strobeDotCount = 60
+    for (let i = 0; i < strobeDotCount; i++) {
+      const angle = (i / strobeDotCount) * Math.PI * 2
+      const dotGeometry = new THREE.CircleGeometry(0.02, 8)
+      const dotMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff })
+      const dot = new THREE.Mesh(dotGeometry, dotMaterial)
+      dot.rotation.x = -Math.PI / 2
+      dot.position.set(Math.cos(angle) * 1.95, 0.06, Math.sin(angle) * 1.95)
+      platterGroup.add(dot)
+    }
+
+    turntableGroup.add(platterGroup)
+
+    // ==================== Vinyl Record ====================
     const vinylGroup = new THREE.Group()
-    vinylGroup.position.set(0, 3.35, 0)
+    vinylGroup.position.set(-0.3, 0.65, 0)
     vinylGroup.visible = false
 
-    const vinylGeometry = new THREE.CylinderGeometry(1.55, 1.55, 0.035, 64)
+    // Main vinyl disc
+    const vinylGeometry = new THREE.CylinderGeometry(1.75, 1.75, 0.025, 128)
     const vinyl = new THREE.Mesh(vinylGeometry, vinylMaterial)
+    vinyl.castShadow = true
+    vinyl.receiveShadow = true
     vinylGroup.add(vinyl)
 
-    // 唱片纹路
-    for (let i = 0; i < 20; i++) {
-      const radius = 0.35 + (1.1 * i) / 20
-      const grooveGeometry = new THREE.TorusGeometry(radius, 0.002, 4, 64)
+    // Vinyl grooves with light reflection - more grooves for better detail
+    for (let i = 0; i < 50; i++) {
+      const radius = 0.45 + (1.2 * i) / 50
+      const grooveGeometry = new THREE.TorusGeometry(radius, 0.0015, 4, 128)
       const grooveMaterial = new THREE.MeshStandardMaterial({
-        color: 0x151515,
-        roughness: 0.4,
-        metalness: 0.1,
+        color: i % 3 === 0 ? 0x1a1a1a : 0x121212,
+        roughness: 0.15,
+        metalness: 0.4,
       })
       const groove = new THREE.Mesh(grooveGeometry, grooveMaterial)
       groove.rotation.x = Math.PI / 2
-      groove.position.y = 0.02
+      groove.position.y = 0.014
       vinylGroup.add(groove)
     }
 
-    // 唱片中心标签 (金色/棕色)
-    const labelGeometry = new THREE.CylinderGeometry(0.32, 0.32, 0.04, 32)
+    // Vinyl highlight ring (catches light)
+    const highlightRingGeometry = new THREE.TorusGeometry(1.1, 0.2, 4, 128)
+    const highlightRingMaterial = new THREE.MeshStandardMaterial({
+      color: 0x1a1a1a,
+      roughness: 0.03,
+      metalness: 0.5,
+      transparent: true,
+      opacity: 0.25,
+    })
+    const highlightRing = new THREE.Mesh(
+      highlightRingGeometry,
+      highlightRingMaterial
+    )
+    highlightRing.rotation.x = Math.PI / 2
+    highlightRing.position.y = 0.015
+    vinylGroup.add(highlightRing)
+
+    // Texture loader for album cover
+    const textureLoader = new THREE.TextureLoader()
+
+    // Center label with cover image
+    const labelGeometry = new THREE.CylinderGeometry(0.42, 0.42, 0.03, 64)
     const labelMaterial = new THREE.MeshStandardMaterial({
       color: 0xcd853f,
       roughness: 0.5,
+      metalness: 0.1,
     })
     const label = new THREE.Mesh(labelGeometry, labelMaterial)
-    label.position.y = 0.02
+    label.position.y = 0.015
     vinylGroup.add(label)
 
-    // 中心孔
-    const holeGeometry = new THREE.CylinderGeometry(0.06, 0.06, 0.05, 16)
+    // Cover image plane on top of label
+    const coverGeometry = new THREE.CircleGeometry(0.38, 64)
+    const coverMaterial = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      roughness: 0.4,
+      metalness: 0.1,
+      transparent: true,
+      opacity: 1,
+    })
+    const coverMesh = new THREE.Mesh(coverGeometry, coverMaterial)
+    coverMesh.rotation.x = -Math.PI / 2
+    coverMesh.position.y = 0.032
+    vinylGroup.add(coverMesh)
+
+    // Function to update cover image
+    function updateCoverImage(coverUrl: string) {
+      textureLoader.load(
+        coverUrl,
+        (texture) => {
+          texture.colorSpace = THREE.SRGBColorSpace
+          coverMaterial.map = texture
+          coverMaterial.needsUpdate = true
+        },
+        undefined,
+        () => {
+          // Error loading texture - use fallback color
+          coverMaterial.map = null
+          coverMaterial.color.setHex(0xcd853f)
+          coverMaterial.needsUpdate = true
+        }
+      )
+    }
+
+    // Label ring decoration
+    const labelRingGeometry = new THREE.TorusGeometry(0.36, 0.015, 8, 32)
+    const labelRing = new THREE.Mesh(
+      labelRingGeometry,
+      new THREE.MeshStandardMaterial({ color: 0x8b6914, roughness: 0.4 })
+    )
+    labelRing.rotation.x = Math.PI / 2
+    labelRing.position.y = 0.033
+    vinylGroup.add(labelRing)
+
+    // Center hole
+    const holeGeometry = new THREE.CylinderGeometry(0.05, 0.05, 0.04, 16)
     const hole = new THREE.Mesh(
       holeGeometry,
       new THREE.MeshStandardMaterial({ color: 0x050505 })
     )
-    hole.position.y = 0.025
+    hole.position.y = 0.02
     vinylGroup.add(hole)
 
-    gramophoneGroup.add(vinylGroup)
+    turntableGroup.add(vinylGroup)
 
-    // ==================== 4. 唱臂系统 ====================
-    // 唱臂支架底座 - 精致的镀镍圆柱（加大）
-    const armPillarGeometry = new THREE.CylinderGeometry(0.18, 0.22, 0.5, 24)
-    const armPillar = new THREE.Mesh(armPillarGeometry, nickelMaterial)
-    armPillar.position.set(1.6, 3.45, -1.0)
-    armPillar.castShadow = true
-    gramophoneGroup.add(armPillar)
+    // ==================== Tonearm ====================
+    // Tonearm base/pivot
+    const armBaseGeometry = new THREE.CylinderGeometry(0.25, 0.3, 0.35, 32)
+    const armBase = new THREE.Mesh(armBaseGeometry, aluminumMaterial)
+    armBase.position.set(2.2, 0.57, -1.5)
+    armBase.castShadow = true
+    turntableGroup.add(armBase)
 
-    // 支架顶部装饰环（加大）
-    const pillarCapGeometry = new THREE.TorusGeometry(0.2, 0.04, 12, 24)
-    const pillarCap = new THREE.Mesh(pillarCapGeometry, brassMaterial)
-    pillarCap.rotation.x = Math.PI / 2
-    pillarCap.position.set(1.6, 3.72, -1.0)
-    gramophoneGroup.add(pillarCap)
+    // Tonearm pivot cap
+    const pivotCapGeometry = new THREE.CylinderGeometry(0.18, 0.2, 0.08, 24)
+    const pivotCap = new THREE.Mesh(pivotCapGeometry, chromeMaterial)
+    pivotCap.position.set(2.2, 0.79, -1.5)
+    turntableGroup.add(pivotCap)
 
-    // 唱臂旋转组
+    // Tonearm rotating group
     const tonearmGroup = new THREE.Group()
-    tonearmGroup.position.set(1.6, 3.75, -1.0)
+    tonearmGroup.position.set(2.2, 0.85, -1.5)
 
-    // 唱臂主杆 - 加粗的S形曲线（管径从0.025增加到0.055）
+    // Tonearm hitbox (invisible, larger for easier clicking)
+    const hitboxGeometry = new THREE.BoxGeometry(2.8, 0.5, 0.6)
+    const hitboxMaterial = new THREE.MeshBasicMaterial({
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+    })
+    const tonearmHitbox = new THREE.Mesh(hitboxGeometry, hitboxMaterial)
+    tonearmHitbox.position.set(-1.1, 0, 0.2)
+    tonearmHitbox.name = 'tonearmHitbox'
+    tonearmGroup.add(tonearmHitbox)
+
+    // Arm rest
+    const armRestGeometry = new THREE.BoxGeometry(0.15, 0.2, 0.08)
+    const armRest = new THREE.Mesh(armRestGeometry, aluminumMaterial)
+    armRest.position.set(0.3, -0.05, 0.5)
+    tonearmGroup.add(armRest)
+
+    // Main arm tube (S-curve design)
     const armCurve = new THREE.CatmullRomCurve3([
       new THREE.Vector3(0, 0, 0),
-      new THREE.Vector3(-0.35, 0.03, 0.12),
-      new THREE.Vector3(-0.7, 0, 0.18),
-      new THREE.Vector3(-1.0, -0.06, 0.25),
+      new THREE.Vector3(-0.5, 0.02, 0.15),
+      new THREE.Vector3(-1.2, 0, 0.25),
+      new THREE.Vector3(-1.8, -0.03, 0.35),
+      new THREE.Vector3(-2.2, -0.08, 0.4),
     ])
-    const armGeometry = new THREE.TubeGeometry(armCurve, 32, 0.055, 16, false)
-    const arm = new THREE.Mesh(armGeometry, nickelMaterial)
-    arm.castShadow = true
-    tonearmGroup.add(arm)
+    const armTubeGeometry = new THREE.TubeGeometry(
+      armCurve,
+      48,
+      0.03,
+      12,
+      false
+    )
+    const armTube = new THREE.Mesh(armTubeGeometry, chromeMaterial)
+    armTube.castShadow = true
+    tonearmGroup.add(armTube)
 
-    // 唱头 - 更大更明显
-    const headshellGeometry = new THREE.BoxGeometry(0.14, 0.05, 0.18)
-    const headshell = new THREE.Mesh(headshellGeometry, nickelMaterial)
-    headshell.position.set(-1.05, -0.1, 0.28)
-    headshell.rotation.z = -0.1
+    // Headshell
+    const headshellGeometry = new THREE.BoxGeometry(0.12, 0.04, 0.15)
+    const headshell = new THREE.Mesh(headshellGeometry, aluminumMaterial)
+    headshell.position.set(-2.3, -0.1, 0.42)
+    headshell.rotation.z = -0.15
     tonearmGroup.add(headshell)
 
-    // 唱针座（加大）
-    const cartridgeGeometry = new THREE.BoxGeometry(0.08, 0.06, 0.1)
-    const cartridge = new THREE.Mesh(cartridgeGeometry, darkNickelMaterial)
-    cartridge.position.set(-1.05, -0.16, 0.28)
+    // Cartridge
+    const cartridgeGeometry = new THREE.BoxGeometry(0.08, 0.05, 0.1)
+    const cartridgeMaterial = new THREE.MeshStandardMaterial({
+      color: 0x2a2a2a,
+      roughness: 0.4,
+      metalness: 0.2,
+    })
+    const cartridge = new THREE.Mesh(cartridgeGeometry, cartridgeMaterial)
+    cartridge.position.set(-2.3, -0.16, 0.42)
     tonearmGroup.add(cartridge)
 
-    // 唱针 - 金色尖端（加粗）
-    const needleGeometry = new THREE.ConeGeometry(0.015, 0.1, 8)
-    const needleMaterial = new THREE.MeshStandardMaterial({
-      color: 0xffd700,
-      roughness: 0.2,
-      metalness: 0.9,
-    })
-    const needle = new THREE.Mesh(needleGeometry, needleMaterial)
+    // Stylus/Needle
+    const needleGeometry = new THREE.ConeGeometry(0.01, 0.08, 8)
+    const needle = new THREE.Mesh(needleGeometry, goldMaterial)
     needle.rotation.x = Math.PI
-    needle.position.set(-1.05, -0.24, 0.28)
+    needle.position.set(-2.3, -0.24, 0.42)
     tonearmGroup.add(needle)
 
-    // 配重块 - 唱臂后端（加大）
-    const counterweightGeometry = new THREE.CylinderGeometry(0.1, 0.1, 0.15, 16)
+    // Counterweight
+    const counterweightGeometry = new THREE.CylinderGeometry(
+      0.12,
+      0.12,
+      0.18,
+      24
+    )
     const counterweight = new THREE.Mesh(
       counterweightGeometry,
-      darkNickelMaterial
+      aluminumMaterial
     )
     counterweight.rotation.z = Math.PI / 2
-    counterweight.position.set(0.2, 0, 0)
+    counterweight.position.set(0.35, 0, 0)
     tonearmGroup.add(counterweight)
 
-    // 设置唱臂初始位置（休息位置，完全移到外侧）
-    tonearmGroup.rotation.y = 1.2
+    // Anti-skate weight
+    const antiSkateGeometry = new THREE.SphereGeometry(0.04, 16, 16)
+    const antiSkate = new THREE.Mesh(antiSkateGeometry, chromeMaterial)
+    antiSkate.position.set(0.15, 0.08, 0.15)
+    tonearmGroup.add(antiSkate)
 
-    gramophoneGroup.add(tonearmGroup)
+    // Set tonearm to rest position
+    tonearmGroup.rotation.y = 0.9
 
-    // ==================== 5. 音量调节（在底座正面） ====================
+    turntableGroup.add(tonearmGroup)
+
+    // ==================== Controls ====================
+    // Start/Stop button
+    const buttonBaseGeometry = new THREE.CylinderGeometry(0.2, 0.22, 0.06, 24)
+    const buttonBase = new THREE.Mesh(buttonBaseGeometry, aluminumMaterial)
+    buttonBase.position.set(2.2, 0.43, 1.8)
+    turntableGroup.add(buttonBase)
+
+    const buttonGeometry = new THREE.CylinderGeometry(0.15, 0.15, 0.04, 24)
+    const buttonMaterial = new THREE.MeshStandardMaterial({
+      color: 0x333333,
+      roughness: 0.3,
+      metalness: 0.2,
+    })
+    const button = new THREE.Mesh(buttonGeometry, buttonMaterial)
+    button.position.set(2.2, 0.48, 1.8)
+    turntableGroup.add(button)
+
+    // Speed selector (33/45 RPM)
+    const speedSelectorGeometry = new THREE.CylinderGeometry(
+      0.15,
+      0.15,
+      0.05,
+      24
+    )
+    const speedSelector = new THREE.Mesh(
+      speedSelectorGeometry,
+      aluminumMaterial
+    )
+    speedSelector.position.set(1.5, 0.45, 1.8)
+    turntableGroup.add(speedSelector)
+
+    // Volume knob
     const volumeKnobGroup = new THREE.Group()
-    volumeKnobGroup.position.set(1.8, 1.1, 2.15)
+    volumeKnobGroup.position.set(2.5, 0.48, 0.8)
     volumeKnobGroup.name = 'volumeKnob'
 
-    // 旋钮底座
-    const knobBaseGeometry = new THREE.CylinderGeometry(0.2, 0.22, 0.08, 24)
-    const knobBase = new THREE.Mesh(knobBaseGeometry, darkBrassMaterial)
-    knobBase.rotation.x = Math.PI / 2
+    const knobBaseGeometry = new THREE.CylinderGeometry(0.18, 0.2, 0.06, 32)
+    const knobBase = new THREE.Mesh(knobBaseGeometry, aluminumMaterial)
     volumeKnobGroup.add(knobBase)
 
-    // 旋钮主体
-    const knobGeometry = new THREE.CylinderGeometry(0.16, 0.16, 0.12, 24)
-    const knob = new THREE.Mesh(knobGeometry, brassMaterial)
-    knob.rotation.x = Math.PI / 2
-    knob.position.z = 0.08
+    const knobGeometry = new THREE.CylinderGeometry(0.14, 0.14, 0.08, 32)
+    const knob = new THREE.Mesh(
+      knobGeometry,
+      new THREE.MeshStandardMaterial({
+        color: 0x1a1a1a,
+        roughness: 0.3,
+        metalness: 0.2,
+      })
+    )
+    knob.position.y = 0.06
     volumeKnobGroup.add(knob)
 
-    // 旋钮指示线
-    const indicatorGeometry = new THREE.BoxGeometry(0.03, 0.12, 0.02)
+    // Knob indicator line
+    const indicatorGeometry = new THREE.BoxGeometry(0.02, 0.08, 0.02)
     const indicatorMaterial = new THREE.MeshStandardMaterial({
-      color: 0x1a1a1a,
+      color: 0xffffff,
     })
     const indicator = new THREE.Mesh(indicatorGeometry, indicatorMaterial)
-    indicator.position.set(0, 0.06, 0.15)
+    indicator.position.set(0, 0.1, 0.1)
     volumeKnobGroup.add(indicator)
 
-    // 旋钮装饰纹路
-    for (let i = 0; i < 12; i++) {
-      const angle = (i / 12) * Math.PI * 2
-      const grooveGeometry = new THREE.BoxGeometry(0.012, 0.1, 0.015)
-      const groove = new THREE.Mesh(grooveGeometry, darkBrassMaterial)
-      groove.position.set(Math.sin(angle) * 0.14, Math.cos(angle) * 0.14, 0.1)
-      volumeKnobGroup.add(groove)
-    }
-
-    gramophoneGroup.add(volumeKnobGroup)
-
-    // 刻度标识 (0-180度)
-    const scaleGroup = new THREE.Group()
-    scaleGroup.position.set(1.8, 1.1, 2.12)
-
-    const scaleRadius = 0.32
-    const majorTicks = 5
-
-    for (let i = 0; i <= majorTicks - 1; i++) {
-      const majorAngle = -Math.PI / 2 + (i / (majorTicks - 1)) * Math.PI
-
-      const majorTickGeometry = new THREE.BoxGeometry(0.06, 0.015, 0.015)
-      const majorTick = new THREE.Mesh(majorTickGeometry, brassMaterial)
-      majorTick.position.set(
-        Math.sin(majorAngle) * scaleRadius,
-        Math.cos(majorAngle) * scaleRadius,
-        0
+    // Knob grip lines
+    for (let i = 0; i < 16; i++) {
+      const angle = (i / 16) * Math.PI * 2
+      const gripGeometry = new THREE.BoxGeometry(0.008, 0.06, 0.01)
+      const grip = new THREE.Mesh(
+        gripGeometry,
+        new THREE.MeshStandardMaterial({ color: 0x2a2a2a })
       )
-      majorTick.rotation.z = majorAngle
-      scaleGroup.add(majorTick)
+      grip.position.set(Math.sin(angle) * 0.12, 0.06, Math.cos(angle) * 0.12)
+      grip.rotation.y = angle
+      volumeKnobGroup.add(grip)
     }
 
-    gramophoneGroup.add(scaleGroup)
+    turntableGroup.add(volumeKnobGroup)
 
-    // ==================== 7. 手摇把手 (侧面) ====================
-    const crankGroup = new THREE.Group()
-    crankGroup.position.set(2.45, 1.1, 0)
+    // LED power indicator
+    const ledGeometry = new THREE.SphereGeometry(0.03, 16, 16)
+    const led = new THREE.Mesh(ledGeometry, ledMaterial)
+    led.position.set(2.5, 0.45, 1.3)
+    turntableGroup.add(led)
 
-    const crankShaftGeometry = new THREE.CylinderGeometry(0.035, 0.035, 0.5, 12)
-    const crankShaft = new THREE.Mesh(crankShaftGeometry, nickelMaterial) // 改为镍材质
-    crankShaft.rotation.z = Math.PI / 2
-    crankGroup.add(crankShaft)
+    // Brand logo area (simple rectangle)
+    const logoGeometry = new THREE.BoxGeometry(0.8, 0.01, 0.15)
+    const logoMaterial = new THREE.MeshStandardMaterial({
+      color: 0x3a3a3a,
+      roughness: 0.5,
+      metalness: 0.3,
+    })
+    const logo = new THREE.Mesh(logoGeometry, logoMaterial)
+    logo.position.set(-2.4, 0.41, 1.8)
+    turntableGroup.add(logo)
 
-    const crankArmGeometry = new THREE.CylinderGeometry(0.025, 0.025, 0.35, 8)
-    const crankArm = new THREE.Mesh(crankArmGeometry, nickelMaterial) // 改为镍材质
-    crankArm.position.set(0.3, 0.17, 0)
-    crankGroup.add(crankArm)
+    scene.add(turntableGroup)
 
-    const crankHandleGeometry = new THREE.SphereGeometry(0.09, 16, 16)
-    const crankHandle = new THREE.Mesh(crankHandleGeometry, woodMaterial) // 改为浅色木材
-    crankHandle.position.set(0.3, 0.38, 0)
-    crankGroup.add(crankHandle)
-
-    gramophoneGroup.add(crankGroup)
-
-    scene.add(gramophoneGroup)
-
-    // ==================== 状态管理 ====================
+    // ==================== State Management ====================
     let isPlaying = false
     let currentAlbum: Album | null = null
     let currentSongIndex = 0
     let audioElement: HTMLAudioElement | null = null
     let volume = 0.7
 
-    // 唱臂角度 - 调整为新的位置
-    // 播放时从外圈(0.15)到内圈(-0.25)移动，休息时完全移到外侧(1.2)
-    let tonearmAngle = 1.2
-    const tonearmPlayStartAngle = 0.15 // 唱片外圈位置
-    const tonearmPlayEndAngle = -0.25 // 唱片内圈位置
-    const tonearmRestAngle = 1.2 // 完全移到留声机外侧
-    let isTonearmDown = false // 唱臂是否放下
-    let playbackProgress = 0 // 播放进度 0-1
+    // Tonearm angles
+    let tonearmAngle = 0.9
+    const tonearmPlayStartAngle = -0.15 // Outer groove position
+    const tonearmPlayEndAngle = -0.55 // Inner groove position
+    const tonearmRestAngle = 0.9 // Rest position
+    let isTonearmDown = false
+    let playbackProgress = 0
 
-    // 动画变量
+    // Animation variables
     let vinylRotation = 0
 
-    // 旋钮拖动状态 - 范围 0-180 度 (即 -π/2 到 π/2)
+    // Knob state - FIXED: reversed direction
     let isDraggingKnob = false
-    let knobRotation = 0.2 * Math.PI // 初始70%音量对应的角度 (0到π/2之间)
+    let knobRotation = -0.7 * Math.PI // Initial 70% volume
+    const knobMinRotation = -Math.PI // 0% volume (full left)
+    const knobMaxRotation = 0 // 100% volume (full right)
 
-    // 3D 视角拖拽状态
+    // 3D view dragging
     let isDraggingScene = false
     let previousMousePosition = { x: 0, y: 0 }
-    let cameraTheta = Math.PI / 4 // 水平角度
-    let cameraPhi = Math.PI / 6 // 垂直角度
-    let cameraRadius = 16 // 相机距离
-    const minZoom = 10
-    const maxZoom = 25
+    let cameraTheta = 0 // Horizontal angle - start facing front
+    let cameraPhi = Math.PI / 4 // Vertical angle - 45 degrees from above
+    let cameraRadius = 12
+    const minZoom = 8
+    const maxZoom = 20
 
-    // ==================== 音量旋钮交互 ====================
+    // ==================== Volume Knob Interaction ====================
     const raycaster = new THREE.Raycaster()
     const mouse = new THREE.Vector2()
     let lastMouseX = 0
 
     function updateVolumeFromKnob() {
-      // 将旋钮角度转换为音量 (0-1)
-      // 旋钮旋转范围: -π/2 到 π/2 (即 0 到 180 度)
-      const normalizedAngle = (knobRotation + Math.PI / 2) / Math.PI
+      // Convert knob rotation to volume (0-1)
+      // knobMinRotation (-π) = 0%, knobMaxRotation (0) = 100%
+      const normalizedAngle =
+        (knobRotation - knobMinRotation) / (knobMaxRotation - knobMinRotation)
       volume = Math.max(0, Math.min(1, normalizedAngle))
 
       if (audioElement) {
         audioElement.volume = volume
       }
 
-      // 旋钮在正面，绕 Z 轴旋转
-      volumeKnobGroup.rotation.z = knobRotation
+      // Rotate the indicator around Y axis
+      volumeKnobGroup.rotation.y = knobRotation
     }
 
-    // 初始化旋钮位置
+    // Initialize knob position
     updateVolumeFromKnob()
 
-    // 更新相机位置的函数
+    // Update camera position
     function updateCameraPosition() {
       camera.position.x =
         cameraRadius * Math.sin(cameraTheta) * Math.cos(cameraPhi)
-      camera.position.y = cameraRadius * Math.sin(cameraPhi) + 2.5
+      camera.position.y = cameraRadius * Math.sin(cameraPhi) + 1
       camera.position.z =
         cameraRadius * Math.cos(cameraTheta) * Math.cos(cameraPhi)
-      camera.lookAt(0, 2, 0) // 看向底座中间偏上的位置
+      camera.lookAt(0, 0.3, 0)
     }
 
-    // 初始化相机位置
+    // Initialize camera position
     updateCameraPosition()
 
     renderer.domElement.addEventListener('mousedown', (event) => {
@@ -740,7 +793,7 @@ import '~/styles/music.css'
 
       raycaster.setFromCamera(mouse, camera)
 
-      // 检查是否点击音量旋钮
+      // Check volume knob click
       const knobIntersects = raycaster.intersectObjects(
         volumeKnobGroup.children,
         true
@@ -748,43 +801,39 @@ import '~/styles/music.css'
       if (knobIntersects.length > 0) {
         isDraggingKnob = true
         lastMouseX = event.clientX
-        if (volumeHint) volumeHint.style.opacity = '0'
         return
       }
 
-      // 检查是否点击唱臂
-      const armIntersects = raycaster.intersectObjects(
-        tonearmGroup.children,
-        true
-      )
+      // Check tonearm click (using hitbox for larger area)
+      const tonearmObjects = tonearmGroup.children
+      const armIntersects = raycaster.intersectObjects(tonearmObjects, true)
       if (armIntersects.length > 0) {
         toggleTonearm()
-        if (playbackHint) playbackHint.style.opacity = '0'
         return
       }
 
-      // 其他区域开始拖拽场景
+      // Start scene dragging
       isDraggingScene = true
       previousMousePosition = { x: event.clientX, y: event.clientY }
       renderer.domElement.style.cursor = 'grabbing'
     })
 
     renderer.domElement.addEventListener('mousemove', (event) => {
-      // 拖动音量旋钮
+      // Drag volume knob
       if (isDraggingKnob) {
         const deltaX = event.clientX - lastMouseX
+        // FIXED: changed sign to fix reversed direction
         knobRotation += deltaX * 0.02
-        // 范围 -π/2 到 π/2 (0-180度)
         knobRotation = Math.max(
-          -Math.PI / 2,
-          Math.min(Math.PI / 2, knobRotation)
+          knobMinRotation,
+          Math.min(knobMaxRotation, knobRotation)
         )
         updateVolumeFromKnob()
         lastMouseX = event.clientX
         return
       }
 
-      // 拖拽 3D 场景视角
+      // Drag 3D scene
       if (isDraggingScene) {
         const deltaX = event.clientX - previousMousePosition.x
         const deltaY = event.clientY - previousMousePosition.y
@@ -792,15 +841,15 @@ import '~/styles/music.css'
         cameraTheta -= deltaX * 0.005
         cameraPhi += deltaY * 0.005
 
-        // 限制垂直角度
-        cameraPhi = Math.max(0.1, Math.min(Math.PI / 2.5, cameraPhi))
+        // Limit vertical angle
+        cameraPhi = Math.max(0.2, Math.min(Math.PI / 2.2, cameraPhi))
 
         updateCameraPosition()
         previousMousePosition = { x: event.clientX, y: event.clientY }
         return
       }
 
-      // 鼠标悬停检测
+      // Hover detection
       const rect = renderer.domElement.getBoundingClientRect()
       mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
       mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
@@ -835,7 +884,7 @@ import '~/styles/music.css'
       renderer.domElement.style.cursor = 'grab'
     })
 
-    // 滚轮缩放
+    // Scroll zoom
     renderer.domElement.addEventListener(
       'wheel',
       (e) => {
@@ -843,14 +892,14 @@ import '~/styles/music.css'
         const delta = e.deltaY > 0 ? 1 : -1
         cameraRadius = Math.max(
           minZoom,
-          Math.min(maxZoom, cameraRadius + delta * 0.8)
+          Math.min(maxZoom, cameraRadius + delta * 0.5)
         )
         updateCameraPosition()
       },
       { passive: false }
     )
 
-    // 触摸屏缩放支持
+    // Touch pinch zoom
     let touchStartDistance = 0
     let initialPinchRadius = cameraRadius
 
@@ -885,35 +934,50 @@ import '~/styles/music.css'
       { passive: true }
     )
 
-    // ==================== 拖拽事件 ====================
-    wrapper?.addEventListener('dragover', (e) => {
-      e.preventDefault()
-      wrapper.classList.add('drag-over')
-    })
-
-    wrapper?.addEventListener('dragleave', () => {
-      wrapper.classList.remove('drag-over')
-    })
-
-    wrapper?.addEventListener('drop', (e) => {
-      e.preventDefault()
-      wrapper.classList.remove('drag-over')
-
-      const event = e as DragEvent
-      const albumData = event.dataTransfer?.getData('application/json')
-      if (albumData) {
-        const album = JSON.parse(albumData)
-        loadAlbum(album)
-      }
-    })
-
-    // ==================== 事件监听 ====================
+    // ==================== Event Listeners ====================
     window.addEventListener('album-selected', ((e: CustomEvent) => {
+      // Check if already playing before loading new album
+      const wasPlaying = isPlaying && isTonearmDown
       loadAlbum(e.detail)
+
+      // If was playing, auto-play the new album's first song after loading
+      if (wasPlaying) {
+        setTimeout(() => {
+          isTonearmDown = true
+          playbackProgress = 0
+          animateTonearm(tonearmPlayStartAngle)
+          // Play the first song of the new album
+          playSong(0)
+        }, 600)
+      }
+    }) as EventListener)
+
+    // Auto-play album when clicked (first time)
+    window.addEventListener('auto-play-album', (() => {
+      if (!currentAlbum) return
+
+      // Wait for vinyl placement animation then auto-play
+      setTimeout(() => {
+        if (!isTonearmDown) {
+          isTonearmDown = true
+          playbackProgress = 0
+          animateTonearm(tonearmPlayStartAngle)
+          // Play the first song
+          playSong(0)
+        }
+      }, 600)
     }) as EventListener)
 
     window.addEventListener('song-selected', ((e: CustomEvent) => {
       const { index } = e.detail
+
+      // If tonearm is not down, lower it first
+      if (!isTonearmDown && currentAlbum) {
+        isTonearmDown = true
+        playbackProgress = 0
+        animateTonearm(tonearmPlayStartAngle)
+      }
+
       playSong(index)
     }) as EventListener)
 
@@ -923,13 +987,19 @@ import '~/styles/music.css'
       }
     }) as EventListener)
 
-    // ==================== 播放控制 ====================
+    // ==================== Playback Control ====================
     function loadAlbum(album: Album) {
       currentAlbum = album
       currentSongIndex = 0
       vinylGroup.visible = true
 
+      // Update label color
       labelMaterial.color.setStyle(album.color || '#8B4513')
+
+      // Load album cover image onto vinyl
+      if (album.cover) {
+        updateCoverImage(album.cover)
+      }
 
       if (isPlaying) {
         stopPlayback()
@@ -944,11 +1014,12 @@ import '~/styles/music.css'
       currentSongIndex = index
       const song = currentAlbum.songs[index]
 
-      // 重置播放进度和唱臂位置到外圈
+      // Reset progress
       playbackProgress = 0
+
+      // Animate tonearm back to outer groove with smooth animation
       if (isTonearmDown) {
-        tonearmAngle = tonearmPlayStartAngle
-        tonearmGroup.rotation.y = tonearmPlayStartAngle
+        animateTonearm(tonearmPlayStartAngle)
       }
 
       if (!audioElement) {
@@ -971,7 +1042,7 @@ import '~/styles/music.css'
       audioElement.src = song.url
       audioElement.volume = volume
 
-      // 只有当唱臂放下时才播放
+      // Only play if tonearm is down
       if (isTonearmDown) {
         audioElement.play()
         isPlaying = true
@@ -1016,18 +1087,18 @@ import '~/styles/music.css'
       )
     }
 
-    // 唱臂放下/抬起控制
+    // Tonearm toggle control
     function toggleTonearm() {
       if (!currentAlbum) return
 
       if (isTonearmDown) {
-        // 抬起唱臂 - 停止播放
+        // Lift tonearm - stop playback
         isTonearmDown = false
         playbackProgress = 0
         animateTonearm(tonearmRestAngle)
         stopPlayback()
       } else {
-        // 放下唱臂 - 开始播放（从外圈开始）
+        // Lower tonearm - start playback from outer groove
         isTonearmDown = true
         playbackProgress = 0
         animateTonearm(tonearmPlayStartAngle)
@@ -1050,11 +1121,11 @@ import '~/styles/music.css'
     function handleTimeUpdate() {
       if (!audioElement) return
 
-      // 更新播放进度
+      // Update playback progress
       if (audioElement.duration > 0) {
         playbackProgress = audioElement.currentTime / audioElement.duration
 
-        // 根据播放进度更新唱臂位置（从外圈到内圈）
+        // Update tonearm position based on progress (outer to inner)
         if (isTonearmDown && isPlaying) {
           const targetAngle =
             tonearmPlayStartAngle +
@@ -1075,27 +1146,27 @@ import '~/styles/music.css'
       )
     }
 
-    // ==================== 动画 ====================
+    // ==================== Animations ====================
     function animateVinylPlacement() {
-      vinylGroup.position.y = 5.5
+      vinylGroup.position.y = 2.5
       vinylGroup.scale.set(0.3, 0.3, 0.3)
-      vinylGroup.rotation.x = 0.3
+      vinylGroup.rotation.x = 0.2
 
       const animate = () => {
-        const targetY = 3.35 // 新的转盘高度
+        const targetY = 0.65
         const diff = vinylGroup.position.y - targetY
 
         if (Math.abs(diff) > 0.01) {
-          vinylGroup.position.y -= diff * 0.08
+          vinylGroup.position.y -= diff * 0.1
 
           const scale = vinylGroup.scale.x
           if (scale < 1) {
-            const newScale = scale + (1 - scale) * 0.08
+            const newScale = scale + (1 - scale) * 0.1
             vinylGroup.scale.set(newScale, newScale, newScale)
           }
 
           if (vinylGroup.rotation.x > 0.01) {
-            vinylGroup.rotation.x *= 0.9
+            vinylGroup.rotation.x *= 0.85
           }
 
           requestAnimationFrame(animate)
@@ -1109,37 +1180,54 @@ import '~/styles/music.css'
     }
 
     function animateTonearm(targetAngle: number) {
-      const animate = () => {
-        const diff = targetAngle - tonearmAngle
-        if (Math.abs(diff) > 0.005) {
-          tonearmAngle += diff * 0.08
-          tonearmGroup.rotation.y = tonearmAngle
+      const startAngle = tonearmAngle
+      const startTime = performance.now()
+      const duration = 800 // Smooth animation duration in ms
+
+      // Easing function - ease out cubic for smooth deceleration
+      const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3)
+
+      const animate = (currentTime: number) => {
+        const elapsed = currentTime - startTime
+        const progress = Math.min(elapsed / duration, 1)
+        const easedProgress = easeOutCubic(progress)
+
+        tonearmAngle = startAngle + (targetAngle - startAngle) * easedProgress
+        tonearmGroup.rotation.y = tonearmAngle
+
+        if (progress < 1) {
           requestAnimationFrame(animate)
         } else {
           tonearmAngle = targetAngle
           tonearmGroup.rotation.y = targetAngle
         }
       }
-      animate()
+
+      requestAnimationFrame(animate)
     }
 
-    // ==================== 渲染循环 ====================
+    // ==================== Render Loop ====================
     function animate() {
       requestAnimationFrame(animate)
 
-      // 唱片旋转 - 只有当唱臂放下并且正在播放时
+      // Vinyl rotation - continuous when playing
       if (isPlaying && isTonearmDown && vinylGroup.visible) {
-        vinylRotation += 0.015
+        vinylRotation += 0.02 // ~33 RPM equivalent
         vinylGroup.rotation.y = vinylRotation
-        turntableGroup.rotation.y = vinylRotation
+        platterGroup.rotation.y = vinylRotation
       }
+
+      // Subtle spotlight animation
+      const time = Date.now() * 0.001
+      spotLight.position.x = Math.sin(time * 0.2) * 0.5
+      spotLight.position.z = Math.cos(time * 0.2) * 0.5
 
       renderer.render(scene, camera)
     }
 
     animate()
 
-    // ==================== 响应式 ====================
+    // ==================== Responsive ====================
     function handleResize() {
       if (!container) return
 
@@ -1151,11 +1239,61 @@ import '~/styles/music.css'
 
     window.addEventListener('resize', handleResize)
 
-    // 延迟执行一次 resize 以确保容器尺寸正确
+    // Delayed resize to ensure correct container size
     setTimeout(handleResize, 100)
 
-    // 清理
+    // ==================== Theme Adaptation ====================
+    const updateThemeColors = () => {
+      const isDark = document.documentElement.classList.contains('dark')
+      const bgColor = getThemeBackgroundColor()
+
+      // Update scene background
+      scene.background = new THREE.Color(bgColor)
+
+      // Adjust lighting based on theme
+      if (isDark) {
+        // Dark theme: brighter lights for contrast
+        ambientLight.intensity = 0.4
+        spotLight.intensity = 60
+        frontSpotLight.intensity = 40
+        sideSpotLight.intensity = 35
+        backSpotLight.intensity = 30
+        rimLight1.intensity = 0.5
+        rimLight2.intensity = 0.4
+        fillLight.intensity = 0.3
+        bottomFillLight.intensity = 0.15
+        renderer.toneMappingExposure = 1.4
+      } else {
+        // Light theme: softer lights to avoid overexposure
+        ambientLight.intensity = 0.5
+        spotLight.intensity = 40
+        frontSpotLight.intensity = 25
+        sideSpotLight.intensity = 20
+        backSpotLight.intensity = 18
+        rimLight1.intensity = 0.35
+        rimLight2.intensity = 0.25
+        fillLight.intensity = 0.3
+        bottomFillLight.intensity = 0.1
+        renderer.toneMappingExposure = 1.1
+      }
+    }
+
+    // Listen for theme changes
+    const themeObserver = new MutationObserver(() => {
+      updateThemeColors()
+    })
+
+    themeObserver.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class'],
+    })
+
+    // Initial theme setup
+    updateThemeColors()
+
+    // Cleanup
     window.addEventListener('beforeunload', () => {
+      themeObserver.disconnect()
       if (audioElement) {
         audioElement.pause()
         audioElement = null

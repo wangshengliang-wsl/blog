@@ -73,6 +73,15 @@ import '~/styles/music.css'
     font-size: 1rem;
     font-weight: 600;
     margin: 0;
+    min-width: 0;
+    flex: 1;
+  }
+
+  .song-list-title #current-album-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 150px;
   }
 
   .song-count {
@@ -82,6 +91,8 @@ import '~/styles/music.css'
     color: rgba(139, 69, 19, 0.8);
     border-radius: 10px;
     font-weight: 500;
+    white-space: nowrap;
+    flex-shrink: 0;
   }
 
   .song-count:empty {

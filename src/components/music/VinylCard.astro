@@ -30,7 +30,6 @@ const { album, index: _index } = Astro.props
   data-name={album.name}
   data-artist={album.artist}
   data-album={JSON.stringify(album)}
-  draggable="true"
 >
   <div class="vinyl-card-inner">
     <!-- 唱片视觉 -->
@@ -64,7 +63,7 @@ const { album, index: _index } = Astro.props
     padding: 0.875rem;
     border-radius: 12px;
     background: rgba(128, 128, 128, 0.05);
-    cursor: grab;
+    cursor: pointer;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     user-select: none;
   }
@@ -76,18 +75,12 @@ const { album, index: _index } = Astro.props
   }
 
   .vinyl-card:active {
-    cursor: grabbing;
     transform: scale(0.98);
   }
 
   .vinyl-card.active {
     background: rgba(139, 69, 19, 0.1);
     box-shadow: 0 0 0 2px rgba(139, 69, 19, 0.3);
-  }
-
-  .vinyl-card.dragging {
-    opacity: 0.6;
-    transform: scale(0.95) rotate(-2deg);
   }
 
   .vinyl-card-inner {
@@ -236,38 +229,30 @@ const { album, index: _index } = Astro.props
     const vinylCards = document.querySelectorAll('.vinyl-card')
 
     vinylCards.forEach((card) => {
-      // 拖拽开始
-      card.addEventListener('dragstart', (e) => {
-        const event = e as DragEvent
-        card.classList.add('dragging')
-
-        const albumData = card.getAttribute('data-album')
-        if (albumData && event.dataTransfer) {
-          event.dataTransfer.setData('application/json', albumData)
-          event.dataTransfer.effectAllowed = 'move'
-        }
-      })
-
-      // 拖拽结束
-      card.addEventListener('dragend', () => {
-        card.classList.remove('dragging')
-      })
-
-      // 点击选中
+      // Click to select album
       card.addEventListener('click', () => {
         const albumData = card.getAttribute('data-album')
         if (albumData) {
-          // 移除其他卡片的激活状态
+          // Remove active state from other cards
           vinylCards.forEach((c) => c.classList.remove('active'))
           card.classList.add('active')
 
-          // 触发自定义事件
+          // Dispatch album selected event
           const album = JSON.parse(albumData)
           window.dispatchEvent(
             new CustomEvent('album-selected', {
               detail: album,
             })
           )
+
+          // Auto-play first song after album is loaded
+          setTimeout(() => {
+            window.dispatchEvent(
+              new CustomEvent('auto-play-album', {
+                detail: { album },
+              })
+            )
+          }, 100)
         }
       })
     })
