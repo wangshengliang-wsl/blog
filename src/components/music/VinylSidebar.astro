@@ -1,0 +1,326 @@
+---
+import VinylCard from './VinylCard.astro'
+import '~/styles/music.css'
+
+interface Song {
+  id: string
+  name: string
+  duration: string
+  url: string
+}
+
+interface Album {
+  id: string
+  name: string
+  description: string
+  artist: string
+  cover: string
+  color: string
+  songs: Song[]
+}
+
+interface Props {
+  albums: Album[]
+}
+
+const { albums } = Astro.props
+---
+
+<aside class="vinyl-sidebar">
+  <div class="sidebar-header">
+    <h2 class="sidebar-title">
+      <span class="i-ri-album-line mr-2"></span>
+      <span class="title-text">唱片库</span>
+    </h2>
+    <button
+      class="collapse-btn"
+      id="sidebar-collapse"
+      aria-label="折叠侧边栏"
+      title="折叠/展开"
+    >
+      <span class="collapse-icon i-ri-menu-fold-line"></span>
+    </button>
+  </div>
+
+  <div class="sidebar-content">
+    <!-- 搜索框 - 带动画效果 -->
+    <div class="vinyl-search" id="vinyl-search">
+      <span class="search-icon i-ri-search-line"></span>
+      <input
+        type="search"
+        id="vinyl-search-input"
+        placeholder="搜索唱片..."
+        autocomplete="off"
+      />
+      <button class="search-clear-btn" id="search-clear" style="display: none;">
+        <span class="i-ri-close-line"></span>
+      </button>
+    </div>
+
+    <!-- 唱片列表 -->
+    <div class="vinyl-list" id="vinyl-list">
+      {albums.map((album, index) => <VinylCard album={album} index={index} />)}
+    </div>
+
+    <!-- 空状态 -->
+    <div class="empty-state" id="empty-state" style="display: none;">
+      <span class="i-ri-search-eye-line text-4xl op-30"></span>
+      <p class="mt-2 op-50 text-sm">未找到匹配的唱片</p>
+    </div>
+  </div>
+</aside>
+
+<style>
+  .vinyl-sidebar {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 8rem);
+    background: rgba(128, 128, 128, 0.03);
+    border-radius: 0 16px 16px 0;
+    overflow: hidden;
+    transition:
+      width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+      transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    margin-left: -1rem;
+    padding-left: 1rem;
+  }
+
+  .vinyl-sidebar.collapsed {
+    width: 60px;
+  }
+
+  .vinyl-sidebar.collapsed .sidebar-content {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .vinyl-sidebar.collapsed .title-text {
+    opacity: 0;
+    width: 0;
+    overflow: hidden;
+  }
+
+  .vinyl-sidebar.collapsed .collapse-icon {
+    transform: rotate(180deg);
+  }
+
+  .sidebar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.25rem 1rem;
+    border-bottom: 1px solid rgba(128, 128, 128, 0.1);
+  }
+
+  .sidebar-title {
+    display: flex;
+    align-items: center;
+    font-size: 1.125rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .title-text {
+    transition:
+      opacity 0.2s ease,
+      width 0.2s ease;
+  }
+
+  .collapse-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: rgba(128, 128, 128, 0.1);
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .collapse-btn:hover {
+    background: rgba(128, 128, 128, 0.2);
+  }
+
+  .collapse-icon {
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .sidebar-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 1rem;
+    gap: 1rem;
+    overflow: hidden;
+    transition: opacity 0.2s ease;
+  }
+
+  /* 搜索框样式 - 带动画 */
+  .vinyl-search {
+    flex-shrink: 0;
+    position: relative;
+  }
+
+  .vinyl-search input {
+    width: 100%;
+    padding: 0.75rem 2.5rem 0.75rem 2.5rem;
+    border: 1px solid rgba(128, 128, 128, 0.2);
+    border-radius: 8px;
+    background: rgba(128, 128, 128, 0.05);
+    font-size: 0.875rem;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    outline: none;
+  }
+
+  .vinyl-search input:focus {
+    border-color: rgba(139, 69, 19, 0.5);
+    background: rgba(128, 128, 128, 0.1);
+    box-shadow: 0 0 0 3px rgba(139, 69, 19, 0.1);
+    transform: scale(1.02);
+  }
+
+  .vinyl-search .search-icon {
+    position: absolute;
+    left: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    opacity: 0.5;
+    transition: all 0.3s ease;
+    pointer-events: none;
+  }
+
+  .vinyl-search input:focus + .search-icon,
+  .vinyl-search:focus-within .search-icon {
+    opacity: 1;
+    color: rgba(139, 69, 19, 0.8);
+  }
+
+  .search-clear-btn {
+    position: absolute;
+    right: 0.5rem;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: rgba(128, 128, 128, 0.1);
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.5;
+    transition: all 0.2s ease;
+  }
+
+  .search-clear-btn:hover {
+    opacity: 1;
+    background: rgba(128, 128, 128, 0.2);
+  }
+
+  .vinyl-list {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding-right: 0.5rem;
+    scrollbar-width: thin;
+  }
+
+  .vinyl-list::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  .vinyl-list::-webkit-scrollbar-thumb {
+    background: rgba(128, 128, 128, 0.3);
+    border-radius: 2px;
+  }
+
+  .empty-state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+  }
+
+  @media (max-width: 768px) {
+    .vinyl-sidebar {
+      height: auto;
+      max-height: calc(100vh - 9rem);
+      margin-left: 0;
+      padding-left: 0;
+      border-radius: 16px;
+    }
+  }
+</style>
+
+<script>
+  document.addEventListener('astro:page-load', () => {
+    const collapseBtn = document.getElementById('sidebar-collapse')
+    const sidebar = document.querySelector('.vinyl-sidebar')
+    const searchInput = document.getElementById(
+      'vinyl-search-input'
+    ) as HTMLInputElement
+    const searchClearBtn = document.getElementById('search-clear')
+    const vinylList = document.getElementById('vinyl-list')
+    const emptyState = document.getElementById('empty-state')
+    const vinylCards = vinylList?.querySelectorAll('.vinyl-card')
+
+    // 折叠功能
+    collapseBtn?.addEventListener('click', () => {
+      sidebar?.classList.toggle('collapsed')
+    })
+
+    // 搜索功能
+    function performSearch() {
+      const query = searchInput?.value.toLowerCase().trim() || ''
+      let hasResults = false
+
+      // 显示/隐藏清除按钮
+      if (searchClearBtn) {
+        searchClearBtn.style.display = query ? 'flex' : 'none'
+      }
+
+      vinylCards?.forEach((card) => {
+        const name = card.getAttribute('data-name')?.toLowerCase() || ''
+        const artist = card.getAttribute('data-artist')?.toLowerCase() || ''
+
+        if (name.includes(query) || artist.includes(query)) {
+          ;(card as HTMLElement).style.display = ''
+          hasResults = true
+        } else {
+          ;(card as HTMLElement).style.display = 'none'
+        }
+      })
+
+      if (emptyState) {
+        emptyState.style.display = hasResults || !query ? 'none' : 'flex'
+      }
+    }
+
+    searchInput?.addEventListener('input', performSearch)
+
+    // 清除搜索
+    searchClearBtn?.addEventListener('click', () => {
+      if (searchInput) {
+        searchInput.value = ''
+        searchInput.focus()
+        performSearch()
+      }
+    })
+
+    // 快捷键支持
+    searchInput?.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        searchInput.value = ''
+        searchInput.blur()
+        performSearch()
+      }
+    })
+  })
+</script>

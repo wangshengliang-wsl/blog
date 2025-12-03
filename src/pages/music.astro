@@ -1,0 +1,184 @@
+---
+import BaseLayout from '~/layouts/BaseLayout.astro'
+import VinylSidebar from '~/components/music/VinylSidebar.astro'
+import Gramophone from '~/components/music/Gramophone.astro'
+import SongList from '~/components/music/SongList.astro'
+
+import albumsData from '~/content/music/data.json'
+
+const title = 'Music Player'
+const description = '复古留声机音乐播放器'
+---
+
+<BaseLayout {title} {description} bgType="plum">
+  <div class="music-player-container">
+    <!-- 左侧唱片列表侧边栏 -->
+    <VinylSidebar albums={albumsData} />
+
+    <!-- 中央留声机 -->
+    <div class="gramophone-section">
+      <Gramophone />
+    </div>
+
+    <!-- 右侧歌曲列表 -->
+    <SongList />
+
+    <!-- 移动端底部控制栏 -->
+    <div class="mobile-controls">
+      <button
+        id="mobile-sidebar-toggle"
+        class="mobile-btn"
+        aria-label="唱片列表"
+      >
+        <span class="i-ri-album-line"></span>
+      </button>
+      <button id="mobile-songs-toggle" class="mobile-btn" aria-label="歌曲列表">
+        <span class="i-ri-list-unordered"></span>
+      </button>
+    </div>
+  </div>
+</BaseLayout>
+
+<style>
+  .music-player-container {
+    display: grid;
+    grid-template-columns: 280px 1fr 280px;
+    gap: 1rem;
+    min-height: calc(100vh - 8rem);
+    max-width: 100%;
+    margin: 0;
+    padding: 1rem 1rem 1rem 0;
+    position: relative;
+  }
+
+  .gramophone-section {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 500px;
+  }
+
+  .mobile-controls {
+    display: none;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--c-bg);
+    border-top: 1px solid rgba(128, 128, 128, 0.2);
+    padding: 0.75rem 1rem;
+    justify-content: space-around;
+    z-index: 100;
+  }
+
+  .mobile-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: rgba(128, 128, 128, 0.1);
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .mobile-btn:hover {
+    background: rgba(128, 128, 128, 0.2);
+  }
+
+  .mobile-btn span {
+    font-size: 1.5rem;
+    opacity: 0.7;
+  }
+
+  /* 平板适配 */
+  @media (max-width: 1024px) {
+    .music-player-container {
+      grid-template-columns: 240px 1fr;
+    }
+
+    .music-player-container :global(.song-list-container) {
+      position: fixed;
+      right: 0;
+      top: 4rem;
+      bottom: 0;
+      width: 280px;
+      transform: translateX(100%);
+      transition: transform 0.3s ease;
+      z-index: 90;
+      background: var(--c-bg);
+      border-left: 1px solid rgba(128, 128, 128, 0.2);
+    }
+
+    .music-player-container :global(.song-list-container.active) {
+      transform: translateX(0);
+    }
+  }
+
+  /* 移动端适配 */
+  @media (max-width: 768px) {
+    .music-player-container {
+      grid-template-columns: 1fr;
+      padding-bottom: 5rem;
+    }
+
+    .music-player-container :global(.vinyl-sidebar) {
+      position: fixed;
+      left: 0;
+      top: 4rem;
+      bottom: 5rem;
+      width: 280px;
+      transform: translateX(-100%);
+      transition: transform 0.3s ease;
+      z-index: 90;
+      background: var(--c-bg);
+      border-right: 1px solid rgba(128, 128, 128, 0.2);
+    }
+
+    .music-player-container :global(.vinyl-sidebar.active) {
+      transform: translateX(0);
+    }
+
+    .mobile-controls {
+      display: flex;
+    }
+
+    .gramophone-section {
+      min-height: 400px;
+    }
+  }
+</style>
+
+<script>
+  document.addEventListener('astro:page-load', () => {
+    const sidebarToggle = document.getElementById('mobile-sidebar-toggle')
+    const songsToggle = document.getElementById('mobile-songs-toggle')
+    const sidebar = document.querySelector('.vinyl-sidebar')
+    const songList = document.querySelector('.song-list-container')
+
+    sidebarToggle?.addEventListener('click', () => {
+      sidebar?.classList.toggle('active')
+      songList?.classList.remove('active')
+    })
+
+    songsToggle?.addEventListener('click', () => {
+      songList?.classList.toggle('active')
+      sidebar?.classList.remove('active')
+    })
+
+    // 点击其他区域关闭面板
+    document.addEventListener('click', (e) => {
+      const target = e.target as HTMLElement
+      if (
+        !target.closest('.vinyl-sidebar') &&
+        !target.closest('.song-list-container') &&
+        !target.closest('.mobile-controls')
+      ) {
+        sidebar?.classList.remove('active')
+        songList?.classList.remove('active')
+      }
+    })
+  })
+</script>

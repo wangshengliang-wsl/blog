@@ -7,7 +7,7 @@
   "scripts": {
     "astro": "astro",
     "sync": "astro sync",
-    "dev": "astro dev --open",
+    "dev": "NODE_OPTIONS=--max-old-space-size=8192 astro dev --open --host",
     "check": "astro check",
     "build": "./scripts/build.sh",
     "preview": "astro preview",
@@ -99,5 +99,9 @@
   },
   "engines": {
     "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@types/three": "^0.181.0",
+    "three": "^0.181.2"
   }
 }

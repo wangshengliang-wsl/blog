@@ -1,0 +1,275 @@
+---
+interface Song {
+  id: string
+  name: string
+  duration: string
+  url: string
+}
+
+interface Album {
+  id: string
+  name: string
+  description: string
+  artist: string
+  cover: string
+  color: string
+  songs: Song[]
+}
+
+interface Props {
+  album: Album
+  index: number
+}
+
+const { album, index: _index } = Astro.props
+---
+
+<div
+  class="vinyl-card"
+  data-album-id={album.id}
+  data-name={album.name}
+  data-artist={album.artist}
+  data-album={JSON.stringify(album)}
+  draggable="true"
+>
+  <div class="vinyl-card-inner">
+    <!-- 唱片视觉 -->
+    <div
+      class="vinyl-disc"
+      style={`--cover-url: url(${album.cover}); --vinyl-color: ${album.color};`}
+    >
+      <div class="grooves"></div>
+      <div class="cover-center" style={`background-image: url(${album.cover})`}>
+      </div>
+      <div class="center-hole"></div>
+    </div>
+
+    <!-- 唱片信息 -->
+    <div class="vinyl-info">
+      <h3 class="vinyl-name">{album.name}</h3>
+      <p class="vinyl-artist">{album.artist}</p>
+      <p class="vinyl-songs-count">{album.songs.length} 首歌曲</p>
+    </div>
+  </div>
+
+  <!-- 播放状态指示器 -->
+  <div class="play-indicator">
+    <span class="i-ri-play-circle-fill"></span>
+  </div>
+</div>
+
+<style>
+  .vinyl-card {
+    position: relative;
+    padding: 0.875rem;
+    border-radius: 12px;
+    background: rgba(128, 128, 128, 0.05);
+    cursor: grab;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    user-select: none;
+  }
+
+  .vinyl-card:hover {
+    background: rgba(128, 128, 128, 0.1);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+  }
+
+  .vinyl-card:active {
+    cursor: grabbing;
+    transform: scale(0.98);
+  }
+
+  .vinyl-card.active {
+    background: rgba(139, 69, 19, 0.1);
+    box-shadow: 0 0 0 2px rgba(139, 69, 19, 0.3);
+  }
+
+  .vinyl-card.dragging {
+    opacity: 0.6;
+    transform: scale(0.95) rotate(-2deg);
+  }
+
+  .vinyl-card-inner {
+    display: flex;
+    gap: 0.875rem;
+    align-items: center;
+  }
+
+  .vinyl-disc {
+    position: relative;
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: radial-gradient(
+      circle at center,
+      var(--vinyl-color, #1a1a1a) 0%,
+      #1a1a1a 100%
+    );
+    box-shadow:
+      inset 0 0 15px rgba(0, 0, 0, 0.5),
+      0 2px 8px rgba(0, 0, 0, 0.2);
+    flex-shrink: 0;
+    transition: transform 0.3s ease;
+  }
+
+  .vinyl-card:hover .vinyl-disc {
+    transform: rotate(15deg);
+  }
+
+  .vinyl-card.active .vinyl-disc {
+    animation: spin 3s linear infinite;
+  }
+
+  @keyframes spin {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  .grooves {
+    position: absolute;
+    inset: 12px;
+    border-radius: 50%;
+    background: repeating-radial-gradient(
+      circle at center,
+      transparent 0px,
+      transparent 1px,
+      rgba(255, 255, 255, 0.05) 1px,
+      rgba(255, 255, 255, 0.05) 2px
+    );
+  }
+
+  .cover-center {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background-size: cover;
+    background-position: center;
+    box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
+  }
+
+  .center-hole {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #222;
+    box-shadow: inset 0 0 2px rgba(0, 0, 0, 0.5);
+  }
+
+  .vinyl-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .vinyl-name {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin: 0 0 0.25rem;
+  }
+
+  .vinyl-artist {
+    font-size: 0.8125rem;
+    opacity: 0.6;
+    margin: 0 0 0.25rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .vinyl-songs-count {
+    font-size: 0.75rem;
+    opacity: 0.4;
+    margin: 0;
+  }
+
+  .play-indicator {
+    position: absolute;
+    top: 50%;
+    right: 0.75rem;
+    transform: translateY(-50%);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    font-size: 1.5rem;
+    color: rgba(139, 69, 19, 0.8);
+  }
+
+  .vinyl-card:hover .play-indicator {
+    opacity: 1;
+  }
+
+  .vinyl-card.active .play-indicator {
+    opacity: 1;
+  }
+
+  .vinyl-card.active .play-indicator span {
+    animation: pulse 1s ease infinite;
+  }
+
+  @keyframes pulse {
+    0%,
+    100% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.1);
+    }
+  }
+</style>
+
+<script>
+  document.addEventListener('astro:page-load', () => {
+    const vinylCards = document.querySelectorAll('.vinyl-card')
+
+    vinylCards.forEach((card) => {
+      // 拖拽开始
+      card.addEventListener('dragstart', (e) => {
+        const event = e as DragEvent
+        card.classList.add('dragging')
+
+        const albumData = card.getAttribute('data-album')
+        if (albumData && event.dataTransfer) {
+          event.dataTransfer.setData('application/json', albumData)
+          event.dataTransfer.effectAllowed = 'move'
+        }
+      })
+
+      // 拖拽结束
+      card.addEventListener('dragend', () => {
+        card.classList.remove('dragging')
+      })
+
+      // 点击选中
+      card.addEventListener('click', () => {
+        const albumData = card.getAttribute('data-album')
+        if (albumData) {
+          // 移除其他卡片的激活状态
+          vinylCards.forEach((c) => c.classList.remove('active'))
+          card.classList.add('active')
+
+          // 触发自定义事件
+          const album = JSON.parse(albumData)
+          window.dispatchEvent(
+            new CustomEvent('album-selected', {
+              detail: album,
+            })
+          )
+        }
+      })
+    })
+  })
+</script>

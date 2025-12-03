@@ -52,6 +52,13 @@ export const UI: Ui = {
       text: 'Shorts',
       icon: 'i-meteor-icons-grid',
     },
+    {
+      path: '/music',
+      title: 'Music Player',
+      displayMode: 'iconToTextOnMobile',
+      text: 'Music',
+      icon: 'i-ri-disc-line',
+    },
     // {
     //   path: '/changelog',
     //   title: 'Changelog',

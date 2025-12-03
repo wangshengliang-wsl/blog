@@ -212,6 +212,22 @@ export default defineConfig({
     'i-ri-menu-2-fill',
     'i-ri-menu-3-fill',
 
+    /* Music Player */
+    'i-ri-disc-line',
+    'i-ri-album-line',
+    'i-ri-music-2-line',
+    'i-ri-search-line',
+    'i-ri-search-eye-line',
+    'i-ri-arrow-left-s-line',
+    'i-ri-play-circle-fill',
+    'i-ri-volume-down-line',
+    'i-ri-volume-up-line',
+    'i-ri-information-line',
+    'i-ri-add-circle-line',
+    'i-ri-list-unordered',
+    'i-ri-hand-coin-line',
+    'i-ri-sound-module-line',
+
     /* btn-* shortcuts - 添加常用的颜色组合到 safelist */
     'hover:text-primary',
     'hover:bg-primary/10',

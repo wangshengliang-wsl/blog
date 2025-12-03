@@ -1,0 +1,80 @@
+[
+  {
+    "id": "classic-jazz",
+    "name": "Classic Jazz Collection",
+    "description": "经典爵士乐精选，带你回到黄金年代",
+    "artist": "Various Artists",
+    "cover": "/img/music/jazz-cover.jpg",
+    "color": "#8B4513",
+    "songs": [
+      {
+        "id": "jazz-1",
+        "name": "Take Five",
+        "duration": "5:24",
+        "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
+      },
+      {
+        "id": "jazz-2",
+        "name": "So What",
+        "duration": "9:22",
+        "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3"
+      },
+      {
+        "id": "jazz-3",
+        "name": "Round Midnight",
+        "duration": "5:55",
+        "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3"
+      }
+    ]
+  },
+  {
+    "id": "vintage-rock",
+    "name": "Vintage Rock Hits",
+    "description": "复古摇滚经典，永恒的旋律",
+    "artist": "Rock Legends",
+    "cover": "/img/music/rock-cover.jpg",
+    "color": "#1a1a2e",
+    "songs": [
+      {
+        "id": "rock-1",
+        "name": "Classic Rock Anthem",
+        "duration": "4:30",
+        "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3"
+      },
+      {
+        "id": "rock-2",
+        "name": "Guitar Solo Dreams",
+        "duration": "6:15",
+        "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3"
+      }
+    ]
+  },
+  {
+    "id": "classical-piano",
+    "name": "Classical Piano",
+    "description": "古典钢琴名曲，心灵的洗礼",
+    "artist": "Piano Masters",
+    "cover": "/img/music/piano-cover.jpg",
+    "color": "#2d3436",
+    "songs": [
+      {
+        "id": "piano-1",
+        "name": "Moonlight Sonata",
+        "duration": "7:30",
+        "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3"
+      },
+      {
+        "id": "piano-2",
+        "name": "Für Elise",
+        "duration": "3:05",
+        "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3"
+      },
+      {
+        "id": "piano-3",
+        "name": "Clair de Lune",
+        "duration": "5:12",
+        "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3"
+      }
+    ]
+  }
+]

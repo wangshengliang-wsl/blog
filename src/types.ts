@@ -341,6 +341,7 @@ type NavBarComponentType =
   | 'searchButton'
   | 'themeButton'
   | 'rssLink'
+  | 'musicButton'
   | 'hr'
 
 export interface NavBarLayout {
