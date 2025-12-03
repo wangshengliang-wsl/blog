@@ -14,7 +14,16 @@ const description = '复古留声机音乐播放器'
   <div class="music-page-wrapper">
     <div class="music-player-container">
       <!-- 左侧唱片列表侧边栏 -->
-      <VinylSidebar albums={albumsData} />
+      <div class="sidebar-wrapper left">
+        <VinylSidebar albums={albumsData} />
+        <button
+          class="sidebar-toggle left-toggle"
+          id="left-sidebar-toggle"
+          aria-label="折叠唱片库"
+        >
+          <span class="i-ri-arrow-left-s-line"></span>
+        </button>
+      </div>
 
       <!-- 中央留声机 -->
       <div class="gramophone-section">
@@ -22,7 +31,16 @@ const description = '复古留声机音乐播放器'
       </div>
 
       <!-- 右侧歌曲列表 -->
-      <SongList />
+      <div class="sidebar-wrapper right">
+        <button
+          class="sidebar-toggle right-toggle"
+          id="right-sidebar-toggle"
+          aria-label="折叠播放列表"
+        >
+          <span class="i-ri-arrow-right-s-line"></span>
+        </button>
+        <SongList />
+      </div>
     </div>
 
     <!-- 移动端底部控制栏 -->
@@ -52,32 +70,114 @@ const description = '复古留声机音乐播放器'
   }
 
   .music-player-container {
-    display: grid;
-    grid-template-columns: 260px 1fr 260px;
-    gap: 0;
     flex: 1;
     width: 100%;
+    height: 100%;
     margin: 0;
     padding: 0;
     position: relative;
     overflow: hidden;
   }
 
+  /* 侧边栏包裹器 - 使用固定定位，不影响布局 */
+  .sidebar-wrapper {
+    position: fixed;
+    top: 4rem;
+    bottom: 0;
+    height: auto;
+    z-index: 50;
+    transition: transform 0.3s ease;
+  }
+
+  .sidebar-wrapper.left {
+    left: 0;
+    width: 260px;
+  }
+
+  .sidebar-wrapper.right {
+    right: 0;
+    width: 260px;
+  }
+
+  .sidebar-wrapper.left.collapsed {
+    transform: translateX(-260px);
+  }
+
+  .sidebar-wrapper.right.collapsed {
+    transform: translateX(260px);
+  }
+
+  /* 折叠按钮 */
+  .sidebar-toggle {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 20px;
+    height: 48px;
+    background: rgba(128, 128, 128, 0.08);
+    border: 1px solid rgba(128, 128, 128, 0.15);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    z-index: 10;
+  }
+
+  .sidebar-toggle:hover {
+    background: rgba(139, 69, 19, 0.1);
+    border-color: rgba(139, 69, 19, 0.3);
+  }
+
+  .sidebar-toggle span {
+    font-size: 1rem;
+    opacity: 0.6;
+    transition: transform 0.3s ease;
+  }
+
+  .sidebar-toggle:hover span {
+    opacity: 1;
+    color: #8b4513;
+  }
+
+  .left-toggle {
+    right: -20px;
+    border-radius: 0 6px 6px 0;
+    border-left: none;
+  }
+
+  .right-toggle {
+    left: -20px;
+    border-radius: 6px 0 0 6px;
+    border-right: none;
+  }
+
+  /* 折叠状态下的按钮图标翻转 */
+  .sidebar-wrapper.left.collapsed .left-toggle span {
+    transform: rotate(180deg);
+  }
+
+  .sidebar-wrapper.right.collapsed .right-toggle span {
+    transform: rotate(180deg);
+  }
+
   .music-player-container :global(.vinyl-sidebar) {
+    width: 260px;
     height: 100%;
     margin: 0;
     padding: 0 0.75rem;
     border-radius: 0;
-    background: rgba(128, 128, 128, 0.03);
+    background: var(--c-bg);
     border-right: 1px solid rgba(128, 128, 128, 0.1);
   }
 
   .music-player-container :global(.song-list-container) {
+    width: 260px;
     height: 100%;
     margin: 0;
     padding: 0 0.75rem;
     border-radius: 0;
-    background: rgba(128, 128, 128, 0.03);
+    background: var(--c-bg);
     border-left: 1px solid rgba(128, 128, 128, 0.1);
   }
 
@@ -135,24 +235,35 @@ const description = '复古留声机音乐播放器'
 
   /* 平板适配 */
   @media (max-width: 1024px) {
-    .music-player-container {
-      grid-template-columns: 200px 1fr;
+    .sidebar-wrapper.left {
+      width: 200px;
+    }
+
+    .sidebar-wrapper.left.collapsed {
+      transform: translateX(-200px);
+    }
+
+    .sidebar-wrapper.right {
+      transform: translateX(260px);
+    }
+
+    .sidebar-toggle {
+      display: none;
+    }
+
+    .music-player-container :global(.vinyl-sidebar) {
+      width: 200px;
     }
 
     .music-player-container :global(.song-list-container) {
-      position: fixed;
-      right: 0;
-      top: 4rem;
-      bottom: 0;
       width: 260px;
-      transform: translateX(100%);
-      transition: transform 0.3s ease;
-      z-index: 90;
-      background: var(--c-bg);
-      border-left: 1px solid rgba(128, 128, 128, 0.2);
     }
 
     .music-player-container :global(.song-list-container.active) {
+      transform: translateX(0);
+    }
+
+    .sidebar-wrapper.right.active {
       transform: translateX(0);
     }
 
@@ -167,21 +278,22 @@ const description = '复古留声机音乐播放器'
       bottom: 4.5rem;
     }
 
-    .music-player-container {
-      grid-template-columns: 1fr;
+    .sidebar-wrapper.left {
+      width: 260px;
+      bottom: 4.5rem;
+      transform: translateX(-260px);
+      z-index: 150;
+    }
+
+    .sidebar-wrapper.right {
+      width: 260px;
+      bottom: 4.5rem;
+      transform: translateX(260px);
+      z-index: 150;
     }
 
     .music-player-container :global(.vinyl-sidebar) {
-      position: fixed;
-      left: 0;
-      top: 4rem;
-      bottom: 4.5rem;
       width: 260px;
-      transform: translateX(-100%);
-      transition: transform 0.3s ease;
-      z-index: 150;
-      background: var(--c-bg);
-      border-right: 1px solid rgba(128, 128, 128, 0.2);
       box-shadow: 4px 0 20px rgba(0, 0, 0, 0.1);
     }
 
@@ -189,10 +301,17 @@ const description = '复古留声机音乐播放器'
       transform: translateX(0);
     }
 
+    .sidebar-wrapper.left.active {
+      transform: translateX(0);
+    }
+
     .music-player-container :global(.song-list-container) {
-      bottom: 4.5rem;
-      z-index: 150;
+      width: 260px;
       box-shadow: -4px 0 20px rgba(0, 0, 0, 0.1);
+    }
+
+    .sidebar-wrapper.right.active {
+      transform: translateX(0);
     }
 
     .gramophone-section {
@@ -246,29 +365,41 @@ const description = '复古留声机音乐播放器'
   document.addEventListener('astro:page-load', () => {
     const sidebarToggle = document.getElementById('mobile-sidebar-toggle')
     const songsToggle = document.getElementById('mobile-songs-toggle')
-    const sidebar = document.querySelector('.vinyl-sidebar')
-    const songList = document.querySelector('.song-list-container')
 
+    // PC 端侧边栏折叠控制
+    const leftSidebarToggle = document.getElementById('left-sidebar-toggle')
+    const rightSidebarToggle = document.getElementById('right-sidebar-toggle')
+    const leftWrapper = document.querySelector('.sidebar-wrapper.left')
+    const rightWrapper = document.querySelector('.sidebar-wrapper.right')
+
+    leftSidebarToggle?.addEventListener('click', () => {
+      leftWrapper?.classList.toggle('collapsed')
+    })
+
+    rightSidebarToggle?.addEventListener('click', () => {
+      rightWrapper?.classList.toggle('collapsed')
+    })
+
+    // 移动端控制 - 控制 wrapper 的 active 类
     sidebarToggle?.addEventListener('click', () => {
-      sidebar?.classList.toggle('active')
-      songList?.classList.remove('active')
+      leftWrapper?.classList.toggle('active')
+      rightWrapper?.classList.remove('active')
     })
 
     songsToggle?.addEventListener('click', () => {
-      songList?.classList.toggle('active')
-      sidebar?.classList.remove('active')
+      rightWrapper?.classList.toggle('active')
+      leftWrapper?.classList.remove('active')
     })
 
     // 点击其他区域关闭面板
     document.addEventListener('click', (e) => {
       const target = e.target as HTMLElement
       if (
-        !target.closest('.vinyl-sidebar') &&
-        !target.closest('.song-list-container') &&
+        !target.closest('.sidebar-wrapper') &&
         !target.closest('.mobile-controls')
       ) {
-        sidebar?.classList.remove('active')
-        songList?.classList.remove('active')
+        leftWrapper?.classList.remove('active')
+        rightWrapper?.classList.remove('active')
       }
     })
   })

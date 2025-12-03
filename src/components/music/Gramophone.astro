@@ -512,51 +512,51 @@ import '~/styles/music.css'
     gramophoneGroup.add(vinylGroup)
 
     // ==================== 4. 唱臂系统 ====================
-    // 唱臂支架底座 - 精致的镀镍圆柱
-    const armPillarGeometry = new THREE.CylinderGeometry(0.12, 0.16, 0.4, 24)
+    // 唱臂支架底座 - 精致的镀镍圆柱（加大）
+    const armPillarGeometry = new THREE.CylinderGeometry(0.18, 0.22, 0.5, 24)
     const armPillar = new THREE.Mesh(armPillarGeometry, nickelMaterial)
-    armPillar.position.set(1.6, 3.4, -1.0)
+    armPillar.position.set(1.6, 3.45, -1.0)
     armPillar.castShadow = true
     gramophoneGroup.add(armPillar)
 
-    // 支架顶部装饰环
-    const pillarCapGeometry = new THREE.TorusGeometry(0.14, 0.025, 12, 24)
+    // 支架顶部装饰环（加大）
+    const pillarCapGeometry = new THREE.TorusGeometry(0.2, 0.04, 12, 24)
     const pillarCap = new THREE.Mesh(pillarCapGeometry, brassMaterial)
     pillarCap.rotation.x = Math.PI / 2
-    pillarCap.position.set(1.6, 3.62, -1.0)
+    pillarCap.position.set(1.6, 3.72, -1.0)
     gramophoneGroup.add(pillarCap)
 
     // 唱臂旋转组
     const tonearmGroup = new THREE.Group()
-    tonearmGroup.position.set(1.6, 3.65, -1.0)
+    tonearmGroup.position.set(1.6, 3.75, -1.0)
 
-    // 唱臂主杆 - 优雅的S形曲线
+    // 唱臂主杆 - 加粗的S形曲线（管径从0.025增加到0.055）
     const armCurve = new THREE.CatmullRomCurve3([
       new THREE.Vector3(0, 0, 0),
-      new THREE.Vector3(-0.3, 0.02, 0.1),
-      new THREE.Vector3(-0.6, 0, 0.15),
-      new THREE.Vector3(-0.85, -0.05, 0.2),
+      new THREE.Vector3(-0.35, 0.03, 0.12),
+      new THREE.Vector3(-0.7, 0, 0.18),
+      new THREE.Vector3(-1.0, -0.06, 0.25),
     ])
-    const armGeometry = new THREE.TubeGeometry(armCurve, 32, 0.025, 16, false)
+    const armGeometry = new THREE.TubeGeometry(armCurve, 32, 0.055, 16, false)
     const arm = new THREE.Mesh(armGeometry, nickelMaterial)
     arm.castShadow = true
     tonearmGroup.add(arm)
 
-    // 唱头 - 更精致的设计
-    const headshellGeometry = new THREE.BoxGeometry(0.08, 0.03, 0.12)
+    // 唱头 - 更大更明显
+    const headshellGeometry = new THREE.BoxGeometry(0.14, 0.05, 0.18)
     const headshell = new THREE.Mesh(headshellGeometry, nickelMaterial)
-    headshell.position.set(-0.9, -0.08, 0.22)
+    headshell.position.set(-1.05, -0.1, 0.28)
     headshell.rotation.z = -0.1
     tonearmGroup.add(headshell)
 
-    // 唱针座
-    const cartridgeGeometry = new THREE.BoxGeometry(0.05, 0.04, 0.06)
+    // 唱针座（加大）
+    const cartridgeGeometry = new THREE.BoxGeometry(0.08, 0.06, 0.1)
     const cartridge = new THREE.Mesh(cartridgeGeometry, darkNickelMaterial)
-    cartridge.position.set(-0.9, -0.12, 0.22)
+    cartridge.position.set(-1.05, -0.16, 0.28)
     tonearmGroup.add(cartridge)
 
-    // 唱针 - 金色尖端
-    const needleGeometry = new THREE.ConeGeometry(0.008, 0.06, 8)
+    // 唱针 - 金色尖端（加粗）
+    const needleGeometry = new THREE.ConeGeometry(0.015, 0.1, 8)
     const needleMaterial = new THREE.MeshStandardMaterial({
       color: 0xffd700,
       roughness: 0.2,
@@ -564,23 +564,21 @@ import '~/styles/music.css'
     })
     const needle = new THREE.Mesh(needleGeometry, needleMaterial)
     needle.rotation.x = Math.PI
-    needle.position.set(-0.9, -0.17, 0.22)
+    needle.position.set(-1.05, -0.24, 0.28)
     tonearmGroup.add(needle)
 
-    // 配重块 - 唱臂后端
-    const counterweightGeometry = new THREE.CylinderGeometry(
-      0.06,
-      0.06,
-      0.1,
-      16
-    )
+    // 配重块 - 唱臂后端（加大）
+    const counterweightGeometry = new THREE.CylinderGeometry(0.1, 0.1, 0.15, 16)
     const counterweight = new THREE.Mesh(
       counterweightGeometry,
       darkNickelMaterial
     )
     counterweight.rotation.z = Math.PI / 2
-    counterweight.position.set(0.15, 0, 0)
+    counterweight.position.set(0.2, 0, 0)
     tonearmGroup.add(counterweight)
+
+    // 设置唱臂初始位置（休息位置，完全移到外侧）
+    tonearmGroup.rotation.y = 1.2
 
     gramophoneGroup.add(tonearmGroup)
 
@@ -676,10 +674,13 @@ import '~/styles/music.css'
     let volume = 0.7
 
     // 唱臂角度 - 调整为新的位置
-    let tonearmAngle = 0.5
-    const tonearmPlayAngle = 0.0
-    const tonearmRestAngle = 0.5
+    // 播放时从外圈(0.15)到内圈(-0.25)移动，休息时完全移到外侧(1.2)
+    let tonearmAngle = 1.2
+    const tonearmPlayStartAngle = 0.15 // 唱片外圈位置
+    const tonearmPlayEndAngle = -0.25 // 唱片内圈位置
+    const tonearmRestAngle = 1.2 // 完全移到留声机外侧
     let isTonearmDown = false // 唱臂是否放下
+    let playbackProgress = 0 // 播放进度 0-1
 
     // 动画变量
     let vinylRotation = 0
@@ -943,6 +944,13 @@ import '~/styles/music.css'
       currentSongIndex = index
       const song = currentAlbum.songs[index]
 
+      // 重置播放进度和唱臂位置到外圈
+      playbackProgress = 0
+      if (isTonearmDown) {
+        tonearmAngle = tonearmPlayStartAngle
+        tonearmGroup.rotation.y = tonearmPlayStartAngle
+      }
+
       if (!audioElement) {
         audioElement = new Audio()
         audioElement.addEventListener('ended', handleSongEnd)
@@ -1015,12 +1023,14 @@ import '~/styles/music.css'
       if (isTonearmDown) {
         // 抬起唱臂 - 停止播放
         isTonearmDown = false
+        playbackProgress = 0
         animateTonearm(tonearmRestAngle)
         stopPlayback()
       } else {
-        // 放下唱臂 - 开始播放
+        // 放下唱臂 - 开始播放（从外圈开始）
         isTonearmDown = true
-        animateTonearm(tonearmPlayAngle)
+        playbackProgress = 0
+        animateTonearm(tonearmPlayStartAngle)
         startPlayback()
       }
     }
@@ -1039,6 +1049,20 @@ import '~/styles/music.css'
 
     function handleTimeUpdate() {
       if (!audioElement) return
+
+      // 更新播放进度
+      if (audioElement.duration > 0) {
+        playbackProgress = audioElement.currentTime / audioElement.duration
+
+        // 根据播放进度更新唱臂位置（从外圈到内圈）
+        if (isTonearmDown && isPlaying) {
+          const targetAngle =
+            tonearmPlayStartAngle +
+            (tonearmPlayEndAngle - tonearmPlayStartAngle) * playbackProgress
+          tonearmAngle = targetAngle
+          tonearmGroup.rotation.y = targetAngle
+        }
+      }
 
       window.dispatchEvent(
         new CustomEvent('playback-progress', {
