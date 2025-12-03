@@ -32,14 +32,6 @@ const { albums } = Astro.props
       <span class="i-ri-album-line mr-2"></span>
       <span class="title-text">唱片库</span>
     </h2>
-    <button
-      class="collapse-btn"
-      id="sidebar-collapse"
-      aria-label="折叠侧边栏"
-      title="折叠/展开"
-    >
-      <span class="collapse-icon i-ri-menu-fold-line"></span>
-    </button>
   </div>
 
   <div class="sidebar-content">
@@ -74,87 +66,35 @@ const { albums } = Astro.props
   .vinyl-sidebar {
     display: flex;
     flex-direction: column;
-    height: calc(100vh - 8rem);
-    background: rgba(128, 128, 128, 0.03);
-    border-radius: 0 16px 16px 0;
+    height: 100%;
     overflow: hidden;
-    transition:
-      width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-      transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    margin-left: -1rem;
-    padding-left: 1rem;
-  }
-
-  .vinyl-sidebar.collapsed {
-    width: 60px;
-  }
-
-  .vinyl-sidebar.collapsed .sidebar-content {
-    opacity: 0;
-    pointer-events: none;
-  }
-
-  .vinyl-sidebar.collapsed .title-text {
-    opacity: 0;
-    width: 0;
-    overflow: hidden;
-  }
-
-  .vinyl-sidebar.collapsed .collapse-icon {
-    transform: rotate(180deg);
   }
 
   .sidebar-header {
+    flex-shrink: 0;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 1.25rem 1rem;
+    padding: 1rem 0.75rem;
     border-bottom: 1px solid rgba(128, 128, 128, 0.1);
   }
 
   .sidebar-title {
     display: flex;
     align-items: center;
-    font-size: 1.125rem;
+    font-size: 1rem;
     font-weight: 600;
     white-space: nowrap;
-  }
-
-  .title-text {
-    transition:
-      opacity 0.2s ease,
-      width 0.2s ease;
-  }
-
-  .collapse-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 32px;
-    border-radius: 8px;
-    background: rgba(128, 128, 128, 0.1);
-    border: none;
-    cursor: pointer;
-    transition: all 0.2s ease;
-  }
-
-  .collapse-btn:hover {
-    background: rgba(128, 128, 128, 0.2);
-  }
-
-  .collapse-icon {
-    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .sidebar-content {
     flex: 1;
     display: flex;
     flex-direction: column;
-    padding: 1rem;
-    gap: 1rem;
+    padding: 0.75rem;
+    gap: 0.75rem;
     overflow: hidden;
-    transition: opacity 0.2s ease;
+    min-height: 0;
   }
 
   /* 搜索框样式 - 带动画 */
@@ -165,11 +105,11 @@ const { albums } = Astro.props
 
   .vinyl-search input {
     width: 100%;
-    padding: 0.75rem 2.5rem 0.75rem 2.5rem;
+    padding: 0.6rem 2rem 0.6rem 2rem;
     border: 1px solid rgba(128, 128, 128, 0.2);
     border-radius: 8px;
     background: rgba(128, 128, 128, 0.05);
-    font-size: 0.875rem;
+    font-size: 0.8rem;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     outline: none;
   }
@@ -261,8 +201,6 @@ const { albums } = Astro.props
 
 <script>
   document.addEventListener('astro:page-load', () => {
-    const collapseBtn = document.getElementById('sidebar-collapse')
-    const sidebar = document.querySelector('.vinyl-sidebar')
     const searchInput = document.getElementById(
       'vinyl-search-input'
     ) as HTMLInputElement
@@ -270,11 +208,6 @@ const { albums } = Astro.props
     const vinylList = document.getElementById('vinyl-list')
     const emptyState = document.getElementById('empty-state')
     const vinylCards = vinylList?.querySelectorAll('.vinyl-card')
-
-    // 折叠功能
-    collapseBtn?.addEventListener('click', () => {
-      sidebar?.classList.toggle('collapsed')
-    })
 
     // 搜索功能
     function performSearch() {

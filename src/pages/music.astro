@@ -11,17 +11,19 @@ const description = '复古留声机音乐播放器'
 ---
 
 <BaseLayout {title} {description} bgType="plum">
-  <div class="music-player-container">
-    <!-- 左侧唱片列表侧边栏 -->
-    <VinylSidebar albums={albumsData} />
+  <div class="music-page-wrapper">
+    <div class="music-player-container">
+      <!-- 左侧唱片列表侧边栏 -->
+      <VinylSidebar albums={albumsData} />
 
-    <!-- 中央留声机 -->
-    <div class="gramophone-section">
-      <Gramophone />
+      <!-- 中央留声机 -->
+      <div class="gramophone-section">
+        <Gramophone />
+      </div>
+
+      <!-- 右侧歌曲列表 -->
+      <SongList />
     </div>
-
-    <!-- 右侧歌曲列表 -->
-    <SongList />
 
     <!-- 移动端底部控制栏 -->
     <div class="mobile-controls">
@@ -40,22 +42,53 @@ const description = '复古留声机音乐播放器'
 </BaseLayout>
 
 <style>
+  .music-page-wrapper {
+    position: fixed;
+    inset: 0;
+    top: 4rem;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
   .music-player-container {
     display: grid;
-    grid-template-columns: 280px 1fr 280px;
-    gap: 1rem;
-    min-height: calc(100vh - 8rem);
-    max-width: 100%;
+    grid-template-columns: 260px 1fr 260px;
+    gap: 0;
+    flex: 1;
+    width: 100%;
     margin: 0;
-    padding: 1rem 1rem 1rem 0;
+    padding: 0;
     position: relative;
+    overflow: hidden;
+  }
+
+  .music-player-container :global(.vinyl-sidebar) {
+    height: 100%;
+    margin: 0;
+    padding: 0 0.75rem;
+    border-radius: 0;
+    background: rgba(128, 128, 128, 0.03);
+    border-right: 1px solid rgba(128, 128, 128, 0.1);
+  }
+
+  .music-player-container :global(.song-list-container) {
+    height: 100%;
+    margin: 0;
+    padding: 0 0.75rem;
+    border-radius: 0;
+    background: rgba(128, 128, 128, 0.03);
+    border-left: 1px solid rgba(128, 128, 128, 0.1);
   }
 
   .gramophone-section {
     display: flex;
     align-items: center;
     justify-content: center;
-    min-height: 500px;
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+    padding: 0.5rem;
   }
 
   .mobile-controls {
@@ -66,8 +99,9 @@ const description = '复古留声机音乐播放器'
     right: 0;
     background: var(--c-bg);
     border-top: 1px solid rgba(128, 128, 128, 0.2);
-    padding: 0.75rem 1rem;
-    justify-content: space-around;
+    padding: 0.5rem 1rem;
+    justify-content: center;
+    gap: 2rem;
     z-index: 100;
   }
 
@@ -75,8 +109,8 @@ const description = '复古留声机音乐播放器'
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 48px;
-    height: 48px;
+    width: 44px;
+    height: 44px;
     border-radius: 50%;
     background: rgba(128, 128, 128, 0.1);
     border: none;
@@ -89,14 +123,14 @@ const description = '复古留声机音乐播放器'
   }
 
   .mobile-btn span {
-    font-size: 1.5rem;
+    font-size: 1.25rem;
     opacity: 0.7;
   }
 
   /* 平板适配 */
   @media (max-width: 1024px) {
     .music-player-container {
-      grid-template-columns: 240px 1fr;
+      grid-template-columns: 200px 1fr;
     }
 
     .music-player-container :global(.song-list-container) {
@@ -104,7 +138,7 @@ const description = '复古留声机音乐播放器'
       right: 0;
       top: 4rem;
       bottom: 0;
-      width: 280px;
+      width: 260px;
       transform: translateX(100%);
       transition: transform 0.3s ease;
       z-index: 90;
@@ -115,21 +149,28 @@ const description = '复古留声机音乐播放器'
     .music-player-container :global(.song-list-container.active) {
       transform: translateX(0);
     }
+
+    .mobile-controls {
+      display: flex;
+    }
   }
 
   /* 移动端适配 */
   @media (max-width: 768px) {
+    .music-page-wrapper {
+      bottom: 3.5rem;
+    }
+
     .music-player-container {
       grid-template-columns: 1fr;
-      padding-bottom: 5rem;
     }
 
     .music-player-container :global(.vinyl-sidebar) {
       position: fixed;
       left: 0;
       top: 4rem;
-      bottom: 5rem;
-      width: 280px;
+      bottom: 3.5rem;
+      width: 260px;
       transform: translateX(-100%);
       transition: transform 0.3s ease;
       z-index: 90;
@@ -141,13 +182,35 @@ const description = '复古留声机音乐播放器'
       transform: translateX(0);
     }
 
-    .mobile-controls {
-      display: flex;
+    .music-player-container :global(.song-list-container) {
+      bottom: 3.5rem;
     }
 
     .gramophone-section {
-      min-height: 400px;
+      padding: 0.25rem;
     }
+
+    .mobile-controls {
+      padding: 0.4rem 1rem;
+    }
+
+    .mobile-btn {
+      width: 40px;
+      height: 40px;
+    }
+  }
+
+  /* 小屏幕手机适配 */
+  @media (max-width: 480px) {
+    .music-player-container :global(.vinyl-sidebar),
+    .music-player-container :global(.song-list-container) {
+      width: 100%;
+    }
+  }
+
+  /* 隐藏 cd .. 模块 */
+  :global(footer .font-mono) {
+    display: none;
   }
 </style>
 
