@@ -68,6 +68,8 @@ jobs:
         run: pnpm lint
 
       - name: 🚀 Build the project
+        env:
+          NODE_OPTIONS: --max-old-space-size=16384
         run: pnpm build
 
       - name: ✅ Verify build output

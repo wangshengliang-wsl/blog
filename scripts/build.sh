@@ -1,5 +1,5 @@
 #!/bin/bash
 # Build script with increased memory limit for Node.js
-export NODE_OPTIONS="--max-old-space-size=8192"
+export NODE_OPTIONS="--max-old-space-size=16384"
 exec astro build "$@"
 
