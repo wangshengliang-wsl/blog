@@ -1,0 +1,541 @@
+---
+title: '类型体操入门'
+description: 'TypeScript 类型体操入门：递归类型、类型编程技巧、常见类型挑战解析'
+pubDate: 2024-02-17
+toc: true
+ogImage: true
+category: 'TypeScript'
+tags: ['TypeScript', '类型体操', '类型编程', '递归类型', '高级类型']
+---
+
+类型体操（Type Gymnastics）是指使用 TypeScript 类型系统进行复杂的类型推导和转换。掌握这些技巧可以创建更精确、更强大的类型。
+
+## 类型编程基础
+
+类型编程的核心工具：
+
+```typescript
+// TypeScript 5.x
+
+// 1. 条件类型 - 类型级别的 if-else
+type IsString<T> = T extends string ? true : false
+
+// 2. 映射类型 - 类型级别的 for-in
+type Readonly<T> = { readonly [K in keyof T]: T[K] }
+
+// 3. 递归类型 - 类型级别的递归
+type DeepReadonly<T> = {
+  readonly [K in keyof T]: T[K] extends object ? DeepReadonly<T[K]> : T[K]
+}
+
+// 4. 模板字面量 - 类型级别的字符串操作
+type EventName<T extends string> = `on${Capitalize<T>}`
+
+// 5. infer - 类型级别的模式匹配
+type UnwrapPromise<T> = T extends Promise<infer U> ? U : T
+```
+
+## 数组操作
+
+### 获取数组长度
+
+```typescript
+type Length<T extends readonly unknown[]> = T['length']
+
+type L1 = Length<[1, 2, 3]> // 3
+type L2 = Length<[]> // 0
+```
+
+### 获取头部和尾部
+
+```typescript
+type Head<T extends unknown[]> = T extends [infer H, ...unknown[]] ? H : never
+
+type Tail<T extends unknown[]> = T extends [unknown, ...infer R] ? R : never
+
+type Last<T extends unknown[]> = T extends [...unknown[], infer L] ? L : never
+
+type H = Head<[1, 2, 3]> // 1
+type T = Tail<[1, 2, 3]> // [2, 3]
+type L = Last<[1, 2, 3]> // 3
+```
+
+### 数组反转
+
+```typescript
+type Reverse<T extends unknown[]> = T extends [infer First, ...infer Rest]
+  ? [...Reverse<Rest>, First]
+  : []
+
+type R = Reverse<[1, 2, 3]> // [3, 2, 1]
+```
+
+### 数组扁平化
+
+```typescript
+type Flatten<T extends unknown[]> = T extends [infer First, ...infer Rest]
+  ? First extends unknown[]
+    ? [...Flatten<First>, ...Flatten<Rest>]
+    : [First, ...Flatten<Rest>]
+  : []
+
+type F = Flatten<[1, [2, [3, 4]], 5]>
+// [1, 2, 3, 4, 5]
+```
+
+### 数组去重
+
+```typescript
+type Includes<T extends unknown[], U> = T extends [infer First, ...infer Rest]
+  ? Equal<First, U> extends true
+    ? true
+    : Includes<Rest, U>
+  : false
+
+type Unique<T extends unknown[], Result extends unknown[] = []> = T extends [
+  infer First,
+  ...infer Rest,
+]
+  ? Includes<Result, First> extends true
+    ? Unique<Rest, Result>
+    : Unique<Rest, [...Result, First]>
+  : Result
+
+// 辅助类型
+type Equal<X, Y> =
+  (<T>() => T extends X ? 1 : 2) extends <T>() => T extends Y ? 1 : 2
+    ? true
+    : false
+
+type U = Unique<[1, 2, 1, 3, 2]>
+// [1, 2, 3]
+```
+
+## 对象操作
+
+### 深度必需
+
+```typescript
+type DeepRequired<T> = T extends object
+  ? {
+      [K in keyof T]-?: DeepRequired<T[K]>
+    }
+  : T
+
+interface User {
+  name?: string
+  address?: {
+    city?: string
+    street?: string
+  }
+}
+
+type RequiredUser = DeepRequired<User>
+// 所有属性都变为必需
+```
+
+### 深度可选
+
+```typescript
+type DeepPartial<T> = T extends object
+  ? {
+      [K in keyof T]?: DeepPartial<T[K]>
+    }
+  : T
+```
+
+### 对象路径类型
+
+```typescript
+type Path<T, K extends keyof T = keyof T> = K extends string | number
+  ? T[K] extends object
+    ? K | `${K}.${Path<T[K]>}`
+    : K
+  : never
+
+interface Config {
+  database: {
+    host: string
+    port: number
+  }
+  server: {
+    port: number
+  }
+}
+
+type ConfigPath = Path<Config>
+// 'database' | 'server' | 'database.host' | 'database.port' | 'server.port'
+```
+
+### 路径取值类型
+
+```typescript
+type PathValue<T, P extends string> = P extends `${infer K}.${infer Rest}`
+  ? K extends keyof T
+    ? PathValue<T[K], Rest>
+    : never
+  : P extends keyof T
+    ? T[P]
+    : never
+
+type DbHost = PathValue<Config, 'database.host'> // string
+type ServerPort = PathValue<Config, 'server.port'> // number
+```
+
+## 字符串操作
+
+### 驼峰转换
+
+```typescript
+type CamelCase<S extends string> = S extends `${infer P}_${infer Q}`
+  ? `${P}${Capitalize<CamelCase<Q>>}`
+  : S extends `${infer P}-${infer Q}`
+    ? `${P}${Capitalize<CamelCase<Q>>}`
+    : S
+
+type C1 = CamelCase<'hello_world'> // 'helloWorld'
+type C2 = CamelCase<'foo-bar-baz'> // 'fooBarBaz'
+```
+
+### 蛇形转换
+
+```typescript
+type SnakeCase<S extends string> = S extends `${infer C}${infer Rest}`
+  ? C extends Uppercase<C>
+    ? C extends Lowercase<C>
+      ? `${C}${SnakeCase<Rest>}`
+      : `_${Lowercase<C>}${SnakeCase<Rest>}`
+    : `${C}${SnakeCase<Rest>}`
+  : S
+
+type S1 = SnakeCase<'helloWorld'> // 'hello_world'
+type S2 = SnakeCase<'fooBarBaz'> // 'foo_bar_baz'
+```
+
+### 字符串替换
+
+```typescript
+type Replace<
+  S extends string,
+  From extends string,
+  To extends string,
+> = From extends ''
+  ? S
+  : S extends `${infer Before}${From}${infer After}`
+    ? `${Before}${To}${After}`
+    : S
+
+type ReplaceAll<
+  S extends string,
+  From extends string,
+  To extends string,
+> = From extends ''
+  ? S
+  : S extends `${infer Before}${From}${infer After}`
+    ? ReplaceAll<`${Before}${To}${After}`, From, To>
+    : S
+
+type R1 = Replace<'hello world', ' ', '-'> // 'hello-world'
+type R2 = ReplaceAll<'a.b.c', '.', '/'> // 'a/b/c'
+```
+
+### 去除空格
+
+```typescript
+type TrimLeft<S extends string> = S extends
+  | ` ${infer Rest}`
+  | `\n${infer Rest}`
+  | `\t${infer Rest}`
+  ? TrimLeft<Rest>
+  : S
+
+type TrimRight<S extends string> = S extends
+  | `${infer Rest} `
+  | `${infer Rest}\n`
+  | `${infer Rest}\t`
+  ? TrimRight<Rest>
+  : S
+
+type Trim<S extends string> = TrimLeft<TrimRight<S>>
+
+type T = Trim<'  hello  '> // 'hello'
+```
+
+## 函数操作
+
+### 柯里化类型
+
+```typescript
+type Curry<F> = F extends (...args: infer A) => infer R
+  ? A extends [infer First, ...infer Rest]
+    ? Rest extends []
+      ? (arg: First) => R
+      : (arg: First) => Curry<(...args: Rest) => R>
+    : () => R
+  : never
+
+type Add = (a: number, b: number, c: number) => number
+type CurriedAdd = Curry<Add>
+// (arg: number) => (arg: number) => (arg: number) => number
+```
+
+### 函数重载提取
+
+```typescript
+// 获取最后一个重载的类型
+type OverloadedReturnType<T> = T extends {
+  (...args: any[]): infer R
+  (...args: any[]): any
+}
+  ? R
+  : T extends (...args: any[]) => infer R
+    ? R
+    : never
+```
+
+## 数学运算
+
+TypeScript 类型系统可以进行有限的数学运算：
+
+### 计数
+
+```typescript
+type BuildTuple<
+  L extends number,
+  T extends unknown[] = [],
+> = T['length'] extends L ? T : BuildTuple<L, [...T, unknown]>
+
+type Add<A extends number, B extends number> = [
+  ...BuildTuple<A>,
+  ...BuildTuple<B>,
+]['length']
+
+type Sum = Add<3, 4> // 7
+```
+
+### 减法
+
+```typescript
+type Subtract<A extends number, B extends number> =
+  BuildTuple<A> extends [...BuildTuple<B>, ...infer Rest]
+    ? Rest['length']
+    : never
+
+type Diff = Subtract<10, 3> // 7
+```
+
+### 比较
+
+```typescript
+type GreaterThan<
+  A extends number,
+  B extends number,
+  Acc extends unknown[] = [],
+> = A extends B
+  ? false
+  : Acc['length'] extends A
+    ? false
+    : Acc['length'] extends B
+      ? true
+      : GreaterThan<A, B, [...Acc, unknown]>
+
+type GT1 = GreaterThan<5, 3> // true
+type GT2 = GreaterThan<3, 5> // false
+```
+
+## 实用类型
+
+### 必需属性
+
+```typescript
+type RequiredKeys<T> = {
+  [K in keyof T]-?: {} extends Pick<T, K> ? never : K
+}[keyof T]
+
+type OptionalKeys<T> = {
+  [K in keyof T]-?: {} extends Pick<T, K> ? K : never
+}[keyof T]
+
+interface User {
+  id: number
+  name: string
+  age?: number
+  email?: string
+}
+
+type Required = RequiredKeys<User> // 'id' | 'name'
+type Optional = OptionalKeys<User> // 'age' | 'email'
+```
+
+### 联合转交叉
+
+```typescript
+type UnionToIntersection<U> = (U extends any ? (k: U) => void : never) extends (
+  k: infer I
+) => void
+  ? I
+  : never
+
+type U = { a: string } | { b: number }
+type I = UnionToIntersection<U>
+// { a: string } & { b: number }
+```
+
+### 联合转元组
+
+```typescript
+type UnionToTuple<T, Last = LastOfUnion<T>> = [T] extends [never]
+  ? []
+  : [...UnionToTuple<Exclude<T, Last>>, Last]
+
+type LastOfUnion<T> =
+  UnionToIntersection<T extends any ? () => T : never> extends () => infer R
+    ? R
+    : never
+
+type Tuple = UnionToTuple<'a' | 'b' | 'c'>
+// ['a', 'b', 'c']
+```
+
+### Promise 值提取
+
+```typescript
+type PromiseValue<T> =
+  T extends Promise<infer V>
+    ? V extends Promise<any>
+      ? PromiseValue<V>
+      : V
+    : T
+
+type P = PromiseValue<Promise<Promise<string>>>
+// string
+```
+
+## 类型挑战示例
+
+### 实现 Pick
+
+```typescript
+type MyPick<T, K extends keyof T> = {
+  [P in K]: T[P]
+}
+
+interface Todo {
+  title: string
+  description: string
+  completed: boolean
+}
+
+type TodoPreview = MyPick<Todo, 'title' | 'completed'>
+// { title: string; completed: boolean }
+```
+
+### 实现 Readonly
+
+```typescript
+type MyReadonly<T> = {
+  readonly [K in keyof T]: T[K]
+}
+```
+
+### 实现 Exclude
+
+```typescript
+type MyExclude<T, U> = T extends U ? never : T
+
+type Result = MyExclude<'a' | 'b' | 'c', 'a'>
+// 'b' | 'c'
+```
+
+### 实现 ReturnType
+
+```typescript
+type MyReturnType<T extends (...args: any) => any> = T extends (
+  ...args: any
+) => infer R
+  ? R
+  : never
+
+function fn() {
+  return { x: 10, y: 20 }
+}
+
+type R = MyReturnType<typeof fn>
+// { x: number; y: number }
+```
+
+## 调试技巧
+
+### 类型展开
+
+```typescript
+// 展开类型以便查看
+type Expand<T> = T extends infer O ? { [K in keyof O]: O[K] } : never
+
+type ExpandRecursive<T> = T extends object
+  ? T extends infer O
+    ? { [K in keyof O]: ExpandRecursive<O[K]> }
+    : never
+  : T
+
+// 使用
+type Complex = { a: string } & { b: number }
+type Expanded = Expand<Complex>
+// { a: string; b: number }
+```
+
+### 类型断言
+
+```typescript
+// 检查类型相等
+type Expect<T extends true> = T
+type Equal<X, Y> =
+  (<T>() => T extends X ? 1 : 2) extends <T>() => T extends Y ? 1 : 2
+    ? true
+    : false
+
+// 测试
+type Test1 = Expect<Equal<MyPick<Todo, 'title'>, { title: string }>>
+type Test2 = Expect<Equal<1, 1>>
+```
+
+## 常见问题
+
+### 🙋 递归深度限制？
+
+```typescript
+// TypeScript 有递归深度限制（约 1000 层）
+// 使用尾递归优化
+type DeepFlat<T, Acc extends unknown[] = []> = T extends [
+  infer First,
+  ...infer Rest,
+]
+  ? First extends unknown[]
+    ? DeepFlat<[...First, ...Rest], Acc>
+    : DeepFlat<Rest, [...Acc, First]>
+  : Acc
+```
+
+### 🙋 如何处理联合类型分发？
+
+```typescript
+// 联合类型会自动分发
+type ToArray<T> = T extends any ? T[] : never
+type Result = ToArray<string | number> // string[] | number[]
+
+// 禁止分发
+type ToArrayNoDistribute<T> = [T] extends [any] ? T[] : never
+type Result2 = ToArrayNoDistribute<string | number> // (string | number)[]
+```
+
+## 总结
+
+| 技巧       | 用途       | 示例                              |
+| ---------- | ---------- | --------------------------------- |
+| 条件类型   | 类型分支   | `T extends U ? X : Y`             |
+| 映射类型   | 遍历属性   | `{ [K in keyof T]: T[K] }`        |
+| 递归类型   | 嵌套处理   | `T extends [infer F, ...infer R]` |
+| 模板字面量 | 字符串操作 | `` `${T}` ``                      |
+| infer      | 模式匹配   | `T extends Promise<infer U>`      |
+
+下一篇我们将学习 TypeScript 最佳实践，了解如何在实际项目中更好地使用 TypeScript。

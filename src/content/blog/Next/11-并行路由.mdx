@@ -1,0 +1,522 @@
+---
+title: 并行路由
+description: 掌握 Next.js 并行路由 @folder 插槽机制，实现模态框、仪表盘多面板与条件渲染
+pubDate: 2025-12-03
+toc: true
+ogImage: true
+category: Next
+tags: ['Next.js', '并行路由', '插槽', '模态框']
+---
+
+🙋 想在同一个页面同时显示多个独立的内容区域？比如仪表盘的多个面板，或者不改变 URL 的模态框？
+
+## 并行路由概念
+
+并行路由使用 `@folder` 语法创建命名插槽，可以在同一布局中同时渲染多个页面：
+
+```
+app/
+├── layout.tsx
+├── page.tsx
+├── @analytics/
+│   └── page.tsx
+└── @team/
+    └── page.tsx
+```
+
+```tsx
+// app/layout.tsx
+// Next.js 15.x
+
+export default function Layout({
+  children,
+  analytics,
+  team,
+}: {
+  children: React.ReactNode
+  analytics: React.ReactNode
+  team: React.ReactNode
+}) {
+  return (
+    <div>
+      <main>{children}</main>
+      <aside>
+        {analytics}
+        {team}
+      </aside>
+    </div>
+  )
+}
+```
+
+🎯 **关键**：`@analytics` 和 `@team` 不会影响 URL，它们是"插槽"。
+
+## 基础用法
+
+### 仪表盘多面板
+
+```
+app/
+└── dashboard/
+    ├── layout.tsx
+    ├── page.tsx           # 主内容
+    ├── @stats/
+    │   └── page.tsx       # 统计面板
+    ├── @activity/
+    │   └── page.tsx       # 活动面板
+    └── @notifications/
+        └── page.tsx       # 通知面板
+```
+
+```tsx
+// app/dashboard/layout.tsx
+// Next.js 15.x
+
+interface LayoutProps {
+  children: React.ReactNode
+  stats: React.ReactNode
+  activity: React.ReactNode
+  notifications: React.ReactNode
+}
+
+export default function DashboardLayout({
+  children,
+  stats,
+  activity,
+  notifications,
+}: LayoutProps) {
+  return (
+    <div className="grid grid-cols-12 gap-4 p-4">
+      {/* 主内容区 */}
+      <main className="col-span-8">{children}</main>
+
+      {/* 侧边栏 */}
+      <aside className="col-span-4 space-y-4">
+        <div className="bg-white rounded-lg p-4">{stats}</div>
+        <div className="bg-white rounded-lg p-4">{activity}</div>
+        <div className="bg-white rounded-lg p-4">{notifications}</div>
+      </aside>
+    </div>
+  )
+}
+```
+
+```tsx
+// app/dashboard/@stats/page.tsx
+// Next.js 15.x
+
+export default async function StatsPanel() {
+  const stats = await getStats()
+
+  return (
+    <div>
+      <h3 className="font-bold mb-2">统计数据</h3>
+      <div className="grid grid-cols-2 gap-2">
+        <div>访问量: {stats.visits}</div>
+        <div>用户数: {stats.users}</div>
+      </div>
+    </div>
+  )
+}
+```
+
+### 独立加载状态
+
+每个插槽可以有独立的 `loading.tsx`：
+
+```
+app/
+└── dashboard/
+    ├── @stats/
+    │   ├── page.tsx
+    │   └── loading.tsx    # 统计面板加载状态
+    ├── @activity/
+    │   ├── page.tsx
+    │   └── loading.tsx    # 活动面板加载状态
+    └── @notifications/
+        ├── page.tsx
+        └── loading.tsx    # 通知面板加载状态
+```
+
+```tsx
+// app/dashboard/@stats/loading.tsx
+// Next.js 15.x
+
+export default function StatsLoading() {
+  return (
+    <div className="animate-pulse">
+      <div className="h-4 bg-gray-200 rounded w-1/2 mb-2"></div>
+      <div className="h-8 bg-gray-200 rounded"></div>
+    </div>
+  )
+}
+```
+
+🎯 **效果**：三个面板独立加载，互不阻塞。
+
+### 独立错误处理
+
+```
+app/
+└── dashboard/
+    └── @stats/
+        ├── page.tsx
+        └── error.tsx      # 统计面板错误边界
+```
+
+```tsx
+// app/dashboard/@stats/error.tsx
+// Next.js 15.x
+'use client'
+
+export default function StatsError({
+  error,
+  reset,
+}: {
+  error: Error
+  reset: () => void
+}) {
+  return (
+    <div className="bg-red-50 p-4 rounded">
+      <p className="text-red-600">统计加载失败</p>
+      <button onClick={reset} className="text-sm underline">
+        重试
+      </button>
+    </div>
+  )
+}
+```
+
+## 条件渲染
+
+### 基于用户角色
+
+```tsx
+// app/dashboard/layout.tsx
+// Next.js 15.x
+import { getSession } from '@/lib/auth'
+
+interface LayoutProps {
+  children: React.ReactNode
+  admin: React.ReactNode
+  user: React.ReactNode
+}
+
+export default async function DashboardLayout({
+  children,
+  admin,
+  user,
+}: LayoutProps) {
+  const session = await getSession()
+  const isAdmin = session?.role === 'admin'
+
+  return (
+    <div className="flex">
+      <main className="flex-1">{children}</main>
+      <aside className="w-80">{isAdmin ? admin : user}</aside>
+    </div>
+  )
+}
+```
+
+### 基于认证状态
+
+```tsx
+// app/layout.tsx
+// Next.js 15.x
+import { getSession } from '@/lib/auth'
+
+interface LayoutProps {
+  children: React.ReactNode
+  auth: React.ReactNode
+  dashboard: React.ReactNode
+}
+
+export default async function RootLayout({
+  children,
+  auth,
+  dashboard,
+}: LayoutProps) {
+  const session = await getSession()
+
+  return (
+    <html>
+      <body>
+        {session ? dashboard : auth}
+        {children}
+      </body>
+    </html>
+  )
+}
+```
+
+## default.tsx 文件
+
+当导航到子路由时，父级插槽需要 `default.tsx` 来定义默认内容：
+
+```
+app/
+├── layout.tsx
+├── page.tsx
+├── @modal/
+│   ├── default.tsx       # 默认不显示模态框
+│   └── login/
+│       └── page.tsx      # /login 时显示登录模态框
+└── settings/
+    └── page.tsx          # /settings
+```
+
+```tsx
+// app/@modal/default.tsx
+// Next.js 15.x
+
+export default function ModalDefault() {
+  return null // 默认不渲染任何内容
+}
+```
+
+🔶 **重要**：没有 `default.tsx` 时，导航到非匹配路由会导致 404。
+
+## 模态框模式
+
+### 基础模态框
+
+```
+app/
+├── layout.tsx
+├── page.tsx
+├── @modal/
+│   ├── default.tsx
+│   └── (.)photo/
+│       └── [id]/
+│           └── page.tsx
+└── photo/
+    └── [id]/
+        └── page.tsx
+```
+
+```tsx
+// app/layout.tsx
+// Next.js 15.x
+
+interface LayoutProps {
+  children: React.ReactNode
+  modal: React.ReactNode
+}
+
+export default function RootLayout({ children, modal }: LayoutProps) {
+  return (
+    <html>
+      <body>
+        {children}
+        {modal}
+      </body>
+    </html>
+  )
+}
+```
+
+```tsx
+// app/@modal/(.)photo/[id]/page.tsx
+// Next.js 15.x
+'use client'
+
+import { useRouter } from 'next/navigation'
+
+interface PageProps {
+  params: Promise<{ id: string }>
+}
+
+export default function PhotoModal({ params }: PageProps) {
+  const router = useRouter()
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/50 flex items-center justify-center"
+      onClick={() => router.back()}
+    >
+      <div
+        className="bg-white p-4 rounded-lg max-w-lg"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <img src={`/photos/${params.id}.jpg`} alt="Photo" />
+        <button onClick={() => router.back()}>关闭</button>
+      </div>
+    </div>
+  )
+}
+```
+
+```tsx
+// app/photo/[id]/page.tsx - 独立页面版本
+// Next.js 15.x
+
+interface PageProps {
+  params: Promise<{ id: string }>
+}
+
+export default async function PhotoPage({ params }: PageProps) {
+  const { id } = await params
+
+  return (
+    <main className="p-8">
+      <img src={`/photos/${id}.jpg`} alt="Photo" className="w-full" />
+    </main>
+  )
+}
+```
+
+🎯 **效果**：
+
+- 点击链接 → 显示模态框（URL 变为 `/photo/1`）
+- 刷新页面 → 显示完整页面
+- 点击遮罩/关闭 → 返回上一页
+
+### 登录模态框
+
+```
+app/
+├── layout.tsx
+├── page.tsx
+└── @auth/
+    ├── default.tsx
+    └── (.)login/
+        └── page.tsx
+```
+
+```tsx
+// app/@auth/(.)login/page.tsx
+// Next.js 15.x
+'use client'
+
+import { useRouter } from 'next/navigation'
+
+export default function LoginModal() {
+  const router = useRouter()
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-white p-8 rounded-lg w-full max-w-md">
+        <h2 className="text-xl font-bold mb-4">登录</h2>
+        <form>
+          <input
+            type="email"
+            placeholder="邮箱"
+            className="w-full p-2 border rounded mb-4"
+          />
+          <input
+            type="password"
+            placeholder="密码"
+            className="w-full p-2 border rounded mb-4"
+          />
+          <button
+            type="submit"
+            className="w-full bg-blue-600 text-white p-2 rounded"
+          >
+            登录
+          </button>
+        </form>
+        <button
+          onClick={() => router.back()}
+          className="mt-4 text-gray-500 text-sm"
+        >
+          取消
+        </button>
+      </div>
+    </div>
+  )
+}
+```
+
+## 插槽与路由匹配
+
+### 软导航
+
+从首页点击链接到 `/settings`：
+
+```
+首页 → /settings
+├── @sidebar 保持当前状态
+├── @modal 保持当前状态
+└── children 更新为 settings 内容
+```
+
+### 硬导航（刷新）
+
+直接访问 `/settings`：
+
+```
+直接访问 /settings
+├── @sidebar 渲染 default.tsx 或 settings/page.tsx
+├── @modal 渲染 default.tsx
+└── children 渲染 settings/page.tsx
+```
+
+## 实战示例
+
+### 可关闭的侧边面板
+
+```
+app/
+└── dashboard/
+    ├── layout.tsx
+    ├── page.tsx
+    └── @panel/
+        ├── default.tsx
+        └── details/
+            └── [id]/
+                └── page.tsx
+```
+
+```tsx
+// app/dashboard/layout.tsx
+// Next.js 15.x
+'use client'
+
+import { usePathname } from 'next/navigation'
+
+interface LayoutProps {
+  children: React.ReactNode
+  panel: React.ReactNode
+}
+
+export default function DashboardLayout({ children, panel }: LayoutProps) {
+  const pathname = usePathname()
+  const showPanel = pathname.includes('/details/')
+
+  return (
+    <div className="flex">
+      <main className={showPanel ? 'w-2/3' : 'w-full'}>{children}</main>
+      {showPanel && <aside className="w-1/3 border-l">{panel}</aside>}
+    </div>
+  )
+}
+```
+
+## 常见问题
+
+🤔 **Q: 插槽会影响 URL 吗？**
+
+不会。`@folder` 只是组织代码的方式，不会出现在 URL 中。
+
+🤔 **Q: 可以嵌套插槽吗？**
+
+可以，但要小心管理 `default.tsx`：
+
+```
+app/
+├── @sidebar/
+│   └── @submenu/
+│       └── default.tsx
+└── layout.tsx
+```
+
+🤔 **Q: 插槽内容可以相互通信吗？**
+
+通过 Context、URL 参数或状态管理库。
+
+---
+
+下一篇将介绍拦截路由，学习 `(.)` 语法实现更复杂的模态框模式。
+
+-EOF-

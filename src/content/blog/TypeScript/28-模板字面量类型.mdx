@@ -1,0 +1,518 @@
+---
+title: '模板字面量类型'
+description: 'TypeScript 模板字面量类型详解：字符串模式匹配、内置字符串工具类型、类型级字符串操作'
+pubDate: 2024-02-11
+toc: true
+ogImage: true
+category: 'TypeScript'
+tags:
+  [
+    'TypeScript',
+    '模板字面量类型',
+    'Template Literal Types',
+    '字符串类型',
+    '高级类型',
+  ]
+---
+
+模板字面量类型（Template Literal Types）让我们能在类型层面操作字符串，类似于 JavaScript 的模板字符串。
+
+## 基本语法
+
+使用反引号创建模板字面量类型：
+
+```typescript
+// TypeScript 5.x
+
+// 简单拼接
+type Greeting = `hello ${string}`
+
+const a: Greeting = 'hello world' // ✅
+const b: Greeting = 'hello there' // ✅
+// const c: Greeting = 'hi world';  // ❌ 错误
+
+// 使用字面量类型
+type World = 'world'
+type HelloWorld = `hello ${World}`
+// 'hello world'
+
+// 联合类型展开
+type Color = 'red' | 'blue' | 'green'
+type Size = 'small' | 'medium' | 'large'
+
+type ColorSize = `${Color}-${Size}`
+// 'red-small' | 'red-medium' | 'red-large'
+// | 'blue-small' | 'blue-medium' | 'blue-large'
+// | 'green-small' | 'green-medium' | 'green-large'
+
+// 数字类型
+type Pixel = `${number}px`
+
+const width: Pixel = '100px' // ✅
+// const height: Pixel = '100';  // ❌ 错误
+```
+
+## 内置字符串工具类型
+
+TypeScript 提供了四个内置的字符串操作类型：
+
+```typescript
+// Uppercase - 转大写
+type Upper = Uppercase<'hello'>
+// 'HELLO'
+
+type UpperUnion = Uppercase<'hello' | 'world'>
+// 'HELLO' | 'WORLD'
+
+// Lowercase - 转小写
+type Lower = Lowercase<'HELLO'>
+// 'hello'
+
+// Capitalize - 首字母大写
+type Cap = Capitalize<'hello'>
+// 'Hello'
+
+type CapUnion = Capitalize<'hello' | 'world'>
+// 'Hello' | 'World'
+
+// Uncapitalize - 首字母小写
+type Uncap = Uncapitalize<'Hello'>
+// 'hello'
+
+// 组合使用
+type EventName<T extends string> = `on${Capitalize<T>}`
+
+type ClickEvent = EventName<'click'>
+// 'onClick'
+
+type FocusEvent = EventName<'focus'>
+// 'onFocus'
+```
+
+## 字符串模式匹配
+
+使用 `infer` 进行字符串模式匹配：
+
+```typescript
+// 提取前缀后的部分
+type RemovePrefix<
+  T extends string,
+  P extends string,
+> = T extends `${P}${infer Rest}` ? Rest : T
+
+type Without = RemovePrefix<'hello_world', 'hello_'>
+// 'world'
+
+type NoMatch = RemovePrefix<'hello_world', 'hi_'>
+// 'hello_world'
+
+// 提取后缀前的部分
+type RemoveSuffix<
+  T extends string,
+  S extends string,
+> = T extends `${infer Rest}${S}` ? Rest : T
+
+type WithoutSuffix = RemoveSuffix<'hello.ts', '.ts'>
+// 'hello'
+
+// 替换字符串
+type Replace<
+  T extends string,
+  S extends string,
+  R extends string,
+> = T extends `${infer Before}${S}${infer After}` ? `${Before}${R}${After}` : T
+
+type Replaced = Replace<'hello world', ' ', '-'>
+// 'hello-world'
+
+// 全部替换
+type ReplaceAll<
+  T extends string,
+  S extends string,
+  R extends string,
+> = T extends `${infer Before}${S}${infer After}`
+  ? ReplaceAll<`${Before}${R}${After}`, S, R>
+  : T
+
+type ReplacedAll = ReplaceAll<'a.b.c', '.', '/'>
+// 'a/b/c'
+```
+
+## 字符串分割
+
+```typescript
+// 分割字符串为元组
+type Split<
+  S extends string,
+  D extends string,
+> = S extends `${infer Head}${D}${infer Tail}`
+  ? [Head, ...Split<Tail, D>]
+  : S extends ''
+    ? []
+    : [S]
+
+type Parts = Split<'a-b-c', '-'>
+// ['a', 'b', 'c']
+
+type Words = Split<'hello world', ' '>
+// ['hello', 'world']
+
+// 连接字符串数组
+type Join<T extends string[], D extends string> = T extends [
+  infer First extends string,
+]
+  ? First
+  : T extends [infer First extends string, ...infer Rest extends string[]]
+    ? `${First}${D}${Join<Rest, D>}`
+    : ''
+
+type Joined = Join<['a', 'b', 'c'], '-'>
+// 'a-b-c'
+```
+
+## 命名转换
+
+```typescript
+// 驼峰转短横线
+type CamelToKebab<S extends string> = S extends `${infer First}${infer Rest}`
+  ? First extends Uppercase<First>
+    ? `-${Lowercase<First>}${CamelToKebab<Rest>}`
+    : `${First}${CamelToKebab<Rest>}`
+  : S
+
+type Kebab = CamelToKebab<'backgroundColor'>
+// 'background-color'
+
+// 短横线转驼峰
+type KebabToCamel<S extends string> = S extends `${infer First}-${infer Rest}`
+  ? `${First}${Capitalize<KebabToCamel<Rest>>}`
+  : S
+
+type Camel = KebabToCamel<'background-color'>
+// 'backgroundColor'
+
+// 蛇形转驼峰
+type SnakeToCamel<S extends string> = S extends `${infer First}_${infer Rest}`
+  ? `${First}${Capitalize<SnakeToCamel<Rest>>}`
+  : S
+
+type FromSnake = SnakeToCamel<'user_first_name'>
+// 'userFirstName'
+
+// 驼峰转蛇形
+type CamelToSnake<S extends string> = S extends `${infer First}${infer Rest}`
+  ? First extends Uppercase<First>
+    ? `_${Lowercase<First>}${CamelToSnake<Rest>}`
+    : `${First}${CamelToSnake<Rest>}`
+  : S
+
+type ToSnake = CamelToSnake<'userFirstName'>
+// 'user_first_name'
+```
+
+## 实际应用
+
+### 类型安全的事件系统
+
+```typescript
+type Events = {
+  click: { x: number; y: number }
+  focus: { target: HTMLElement }
+  blur: { target: HTMLElement }
+}
+
+type EventHandler<T extends keyof Events> = `on${Capitalize<T>}`
+
+type AllHandlers = {
+  [K in keyof Events as EventHandler<K>]: (event: Events[K]) => void
+}
+// {
+//   onClick: (event: { x: number; y: number }) => void
+//   onFocus: (event: { target: HTMLElement }) => void
+//   onBlur: (event: { target: HTMLElement }) => void
+// }
+```
+
+### Getter/Setter 生成
+
+```typescript
+type Getters<T> = {
+  [K in keyof T as `get${Capitalize<K & string>}`]: () => T[K]
+}
+
+type Setters<T> = {
+  [K in keyof T as `set${Capitalize<K & string>}`]: (value: T[K]) => void
+}
+
+interface State {
+  name: string
+  count: number
+  loading: boolean
+}
+
+type StateGetters = Getters<State>
+// {
+//   getName: () => string
+//   getCount: () => number
+//   getLoading: () => boolean
+// }
+
+type StateSetters = Setters<State>
+// {
+//   setName: (value: string) => void
+//   setCount: (value: number) => void
+//   setLoading: (value: boolean) => void
+// }
+
+type StateWithMethods = State & Getters<State> & Setters<State>
+```
+
+### CSS 属性类型
+
+```typescript
+type CSSUnit = 'px' | 'em' | 'rem' | '%' | 'vh' | 'vw'
+type CSSValue = `${number}${CSSUnit}`
+
+type Spacing = CSSValue | 'auto'
+
+interface CSSProperties {
+  margin?: Spacing
+  padding?: Spacing
+  width?: CSSValue | 'auto' | '100%'
+  height?: CSSValue | 'auto' | '100%'
+}
+
+const styles: CSSProperties = {
+  margin: '10px',
+  padding: '1.5rem',
+  width: '100%',
+  height: 'auto',
+}
+
+// 颜色类型
+type HexColor = `#${string}`
+type RGBColor = `rgb(${number}, ${number}, ${number})`
+type RGBAColor = `rgba(${number}, ${number}, ${number}, ${number})`
+
+type Color = HexColor | RGBColor | RGBAColor | 'transparent'
+
+const color1: Color = '#ff0000'
+const color2: Color = 'rgb(255, 0, 0)'
+const color3: Color = 'rgba(255, 0, 0, 0.5)'
+```
+
+### 路由类型
+
+```typescript
+type PathParams<Path extends string> =
+  Path extends `${string}:${infer Param}/${infer Rest}`
+    ? Param | PathParams<`/${Rest}`>
+    : Path extends `${string}:${infer Param}`
+      ? Param
+      : never
+
+type UserParams = PathParams<'/users/:id'>
+// 'id'
+
+type PostParams = PathParams<'/users/:userId/posts/:postId'>
+// 'userId' | 'postId'
+
+// 构建参数对象
+type ParamsObject<Path extends string> = {
+  [K in PathParams<Path>]: string
+}
+
+type UserParamsObj = ParamsObject<'/users/:id'>
+// { id: string }
+
+type PostParamsObj = ParamsObject<'/users/:userId/posts/:postId'>
+// { userId: string; postId: string }
+
+// 路由配置
+interface Route<Path extends string> {
+  path: Path
+  handler: (params: ParamsObject<Path>) => void
+}
+
+const userRoute: Route<'/users/:id'> = {
+  path: '/users/:id',
+  handler: (params) => {
+    console.log(params.id) // 类型安全
+  },
+}
+```
+
+### 数据库查询构建器
+
+```typescript
+type Operator = 'eq' | 'ne' | 'gt' | 'lt' | 'gte' | 'lte'
+
+type WhereClause<T, K extends keyof T> = `${K & string}_${Operator}`
+
+interface User {
+  id: number
+  name: string
+  age: number
+  email: string
+}
+
+type UserWhere = {
+  [K in keyof User as WhereClause<User, K>]?: User[K]
+}
+// {
+//   id_eq?: number; id_ne?: number; id_gt?: number; ...
+//   name_eq?: string; name_ne?: string; ...
+//   age_eq?: number; ...
+//   email_eq?: string; ...
+// }
+
+const query: UserWhere = {
+  age_gte: 18,
+  name_eq: '张三',
+}
+```
+
+### 国际化键
+
+```typescript
+type I18nKey<T extends string> = `i18n.${T}`
+
+type Namespace = 'common' | 'auth' | 'dashboard'
+type Key = 'title' | 'description' | 'button'
+
+type AllKeys = I18nKey<`${Namespace}.${Key}`>
+// 'i18n.common.title' | 'i18n.common.description' | ...
+
+// 嵌套键
+type NestedKey<T, Prefix extends string = ''> = T extends object
+  ? {
+      [K in keyof T]: K extends string
+        ? T[K] extends object
+          ? NestedKey<T[K], `${Prefix}${K}.`>
+          : `${Prefix}${K}`
+        : never
+    }[keyof T]
+  : never
+
+interface Translations {
+  common: {
+    title: string
+    button: {
+      submit: string
+      cancel: string
+    }
+  }
+  auth: {
+    login: string
+    logout: string
+  }
+}
+
+type TranslationKeys = NestedKey<Translations>
+// 'common.title' | 'common.button.submit' | 'common.button.cancel' | 'auth.login' | 'auth.logout'
+```
+
+## 高级技巧
+
+### 字符串长度
+
+```typescript
+type StringLength<
+  S extends string,
+  Acc extends any[] = [],
+> = S extends `${infer _}${infer Rest}`
+  ? StringLength<Rest, [...Acc, any]>
+  : Acc['length']
+
+type Len1 = StringLength<'hello'>
+// 5
+
+type Len2 = StringLength<''>
+// 0
+```
+
+### 字符串反转
+
+```typescript
+type Reverse<S extends string> = S extends `${infer First}${infer Rest}`
+  ? `${Reverse<Rest>}${First}`
+  : ''
+
+type Rev = Reverse<'hello'>
+// 'olleh'
+```
+
+### 去除空格
+
+```typescript
+type TrimLeft<S extends string> = S extends ` ${infer Rest}`
+  ? TrimLeft<Rest>
+  : S
+
+type TrimRight<S extends string> = S extends `${infer Rest} `
+  ? TrimRight<Rest>
+  : S
+
+type Trim<S extends string> = TrimLeft<TrimRight<S>>
+
+type Trimmed = Trim<'  hello  '>
+// 'hello'
+```
+
+## 常见问题
+
+### 🙋 模板字面量有性能限制吗？
+
+```typescript
+// 联合类型会产生笛卡尔积
+type Many = `${1 | 2 | 3}${1 | 2 | 3}${1 | 2 | 3}`
+// 产生 27 种组合
+
+// 过多组合会导致编译变慢
+// 避免过度复杂的模板字面量类型
+```
+
+### 🙋 如何处理动态字符串？
+
+```typescript
+// 使用 string 类型匹配任意字符串
+type HasPrefix<T extends string, P extends string> = T extends `${P}${string}`
+  ? true
+  : false
+
+type Test1 = HasPrefix<'hello-world', 'hello'>
+// true
+
+type Test2 = HasPrefix<'hello-world', 'world'>
+// false
+```
+
+### 🙋 模板字面量可以用于运行时吗？
+
+```typescript
+// 模板字面量类型只存在于编译时
+// 运行时需要使用类型守卫验证
+
+function isValidEvent(event: string): event is `on${Capitalize<string>}` {
+  return event.startsWith('on') && event.length > 2
+}
+
+const event = 'onClick'
+if (isValidEvent(event)) {
+  console.log(event) // 类型为 `on${Capitalize<string>}`
+}
+```
+
+## 总结
+
+| 特性         | 语法                  | 用途           |
+| ------------ | --------------------- | -------------- |
+| 基本拼接     | `` `${A}${B}` ``      | 组合字符串类型 |
+| 联合展开     | `` `${A \| B}` ``     | 生成所有组合   |
+| Uppercase    | `Uppercase<T>`        | 转大写         |
+| Lowercase    | `Lowercase<T>`        | 转小写         |
+| Capitalize   | `Capitalize<T>`       | 首字母大写     |
+| Uncapitalize | `Uncapitalize<T>`     | 首字母小写     |
+| 模式匹配     | `` `${infer X}...` `` | 提取字符串部分 |
+
+下一篇我们将学习模块系统，了解 TypeScript 的模块化方案。

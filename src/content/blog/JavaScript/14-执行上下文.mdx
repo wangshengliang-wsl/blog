@@ -1,0 +1,567 @@
+---
+title: '执行上下文'
+description: '深入理解 JavaScript 执行���下文、调用栈与变量对象的工作原理'
+pubDate: 2025-12-03
+toc: true
+ogImage: true
+category: 'JavaScript'
+tags: ['JavaScript', '执行上下文', '调用栈', '变量提升']
+---
+
+执行上下文是 JavaScript 代码执行时的环境。理解执行上下文，能帮你深入理解作用域、闭包和 this 的行为。
+
+## 🎯 什么是执行上下文
+
+执行上下文是 JavaScript 引擎在执行代码时创建的内部数据结构，包含了代码执行所需的所有信息。
+
+```javascript
+// 全局执行上下文
+const global = '全局变量'
+
+function outer() {
+  // outer 函数执行上下文
+  const outerVar = '外层变量'
+
+  function inner() {
+    // inner 函数执行上下文
+    const innerVar = '内层变量'
+    console.log(global, outerVar, innerVar)
+  }
+
+  inner()
+}
+
+outer()
+```
+
+## 执行上下文类型
+
+### 1. 全局执行上下文
+
+```javascript
+// 程序启动时创建
+// 只有一个
+// 浏览器中 this 指向 window
+
+console.log(this) // window（浏览器）
+
+var globalVar = '全局'
+function globalFn() {}
+
+// 全局变量和函数成为全局对象的属性
+console.log(window.globalVar) // "全局"
+console.log(window.globalFn) // ƒ globalFn()
+```
+
+### 2. 函数执行上下文
+
+```javascript
+// 每次调用函数都会创建新的执行上下文
+function greet(name) {
+  const greeting = '你好'
+  console.log(`${greeting}，${name}`)
+}
+
+greet('张三') // 创建执行上下文1
+greet('李四') // 创建执行上下文2（不同的上下文）
+```
+
+### 3. eval 执行上下文
+
+```javascript
+// eval 创建独立的执行上下文（不推荐使用）
+eval('var x = 1')
+```
+
+## 调用栈
+
+调用栈（Call Stack）管理执行上下文的创建和销毁。
+
+### 栈的工作原理
+
+```javascript
+function first() {
+  console.log('first 开始')
+  second()
+  console.log('first 结束')
+}
+
+function second() {
+  console.log('second 开始')
+  third()
+  console.log('second 结束')
+}
+
+function third() {
+  console.log('third')
+}
+
+first()
+
+// 调用栈变化：
+// 1. [Global]
+// 2. [Global, first]
+// 3. [Global, first, second]
+// 4. [Global, first, second, third]
+// 5. [Global, first, second]（third 出栈）
+// 6. [Global, first]（second 出栈）
+// 7. [Global]（first 出栈）
+
+// 输出顺序：
+// first 开始
+// second 开始
+// third
+// second 结束
+// first 结束
+```
+
+### 栈溢出
+
+```javascript
+// 递归过深会导致栈溢出
+function recursive() {
+  recursive() // 无限递归
+}
+
+// recursive()  // RangeError: Maximum call stack size exceeded
+
+// 解决方案：使用迭代或尾递归
+function factorial(n, acc = 1) {
+  if (n <= 1) return acc
+  return factorial(n - 1, n * acc) // 尾递归
+}
+```
+
+### 浏览器中查看调用栈
+
+```javascript
+function a() {
+  b()
+}
+
+function b() {
+  c()
+}
+
+function c() {
+  console.trace() // 打印调用栈
+  debugger // 在开发者工具中暂停
+}
+
+a()
+
+// Console 输出：
+// c @ script.js:10
+// b @ script.js:6
+// a @ script.js:2
+```
+
+## 执行上下文的组成
+
+### 变量环境（Variable Environment）
+
+存储 var 声明和函数声明：
+
+```javascript
+// 创建阶段
+function example() {
+  console.log(a) // undefined（已声明但未赋值）
+  console.log(fn) // ƒ fn()（函数声明完整提升）
+  // console.log(b)  // ReferenceError
+
+  var a = 1
+  let b = 2
+  function fn() {}
+}
+
+// 变量环境：
+// {
+//   a: undefined,
+//   fn: <function>
+// }
+```
+
+### 词法环境（Lexical Environment）
+
+存储 let、const 声明和块级作用域：
+
+```javascript
+function example() {
+  let x = 1
+  const y = 2
+
+  {
+    let x = 10 // 新的词法环境
+    const z = 20
+    console.log(x, y, z) // 10, 2, 20
+  }
+
+  console.log(x) // 1
+  // console.log(z)  // ReferenceError
+}
+```
+
+### this 绑定
+
+```javascript
+// 全局上下文
+console.log(this) // window
+
+// 函数上下文
+function fn() {
+  console.log(this)
+}
+fn() // window（非严格模式）
+
+const obj = {
+  method() {
+    console.log(this)
+  },
+}
+obj.method() // obj
+```
+
+## 执行上下文的生命周期
+
+### 1. 创建阶段
+
+```javascript
+function example(a, b) {
+  var c = 3
+  function inner() {}
+  var d = function () {}
+}
+
+example(1, 2)
+
+// 创建阶段的执行上下文：
+// {
+//   VariableEnvironment: {
+//     a: 1,          // 参数
+//     b: 2,          // 参数
+//     c: undefined,  // var 声明
+//     inner: <func>, // 函数声明
+//     d: undefined   // var 声明
+//   },
+//   LexicalEnvironment: { ... },
+//   ThisBinding: window
+// }
+```
+
+### 2. 执行阶段
+
+```javascript
+function example(a, b) {
+  console.log(a) // 1
+  console.log(c) // undefined
+  var c = 3
+  console.log(c) // 3
+
+  function inner() {}
+  var d = function () {}
+}
+
+example(1, 2)
+
+// 执行阶段：逐行执行代码，更新变量值
+```
+
+### 3. 回收阶段
+
+```javascript
+function outer() {
+  const data = new Array(10000)
+
+  function inner() {
+    // 使用 data
+  }
+
+  // 执行完毕，如果 inner 没有被引用
+  // outer 的执行上下文会被销毁，data 被回收
+}
+
+outer()
+
+// 如果返回 inner，形成闭包
+function outerWithClosure() {
+  const data = new Array(10000)
+
+  return function inner() {
+    return data.length
+  }
+}
+
+const fn = outerWithClosure()
+// outer 的执行上下文中的 data 不会被回收
+```
+
+## 变量提升详解
+
+### var 的提升
+
+```javascript
+console.log(a) // undefined
+var a = 1
+console.log(a) // 1
+
+// 相当于
+var a
+console.log(a) // undefined
+a = 1
+console.log(a) // 1
+
+// 函数内部
+function fn() {
+  console.log(x) // undefined
+  var x = 10
+
+  if (false) {
+    var y = 20 // 虽然不执行，但声明会提升
+  }
+  console.log(y) // undefined
+}
+```
+
+### 函数提升
+
+```javascript
+// 函数声明完整提升
+fn() // "fn"
+
+function fn() {
+  console.log('fn')
+}
+
+// 函数表达式只提升变量声明
+// expr()  // TypeError: expr is not a function
+var expr = function () {
+  console.log('expr')
+}
+expr() // "expr"
+
+// 同名时，函数优先
+console.log(typeof foo) // "function"
+var foo = 'variable'
+function foo() {}
+console.log(typeof foo) // "string"
+```
+
+### let/const 的 TDZ
+
+```javascript
+// let/const 有"暂时性死区"
+// console.log(x)  // ReferenceError
+let x = 1
+
+// TDZ 从块的开始到声明语句
+{
+  // TDZ 开始
+  // console.log(y)  // ReferenceError
+  let y = 2 // TDZ 结束
+  console.log(y) // 2
+}
+```
+
+## 作用域链
+
+### 作用域链的形成
+
+```javascript
+const global = 'global'
+
+function outer() {
+  const outerVar = 'outer'
+
+  function inner() {
+    const innerVar = 'inner'
+
+    // 作用域链：inner -> outer -> global
+    console.log(innerVar) // 当前作用域
+    console.log(outerVar) // 外层作用域
+    console.log(global) // 全局作用域
+  }
+
+  inner()
+}
+
+outer()
+```
+
+### 作用域链查找
+
+```javascript
+const x = 'global x'
+
+function outer() {
+  const y = 'outer y'
+
+  function inner() {
+    const z = 'inner z'
+
+    // 查找顺序：inner -> outer -> global
+    console.log(z) // 找到 inner 中的 z
+    console.log(y) // 找到 outer 中的 y
+    console.log(x) // 找到 global 中的 x
+    console.log(w) // 抛出 ReferenceError
+  }
+
+  inner()
+}
+```
+
+### 词法作用域 vs 动态作用域
+
+```javascript
+const x = 'global'
+
+function foo() {
+  console.log(x)
+}
+
+function bar() {
+  const x = 'bar'
+  foo() // JavaScript 是词法作用域，输出 "global"
+}
+
+bar()
+
+// 词法作用域：由代码定义位置决定
+// 动态作用域：由调用位置决定（JavaScript 不是）
+```
+
+## 实际应用
+
+### 理解闭包的原理
+
+```javascript
+function createCounter() {
+  let count = 0
+
+  return function () {
+    return ++count
+  }
+}
+
+const counter = createCounter()
+
+// createCounter 执行完毕，但其执行上下文中的 count
+// 被返回的函数引用，因此不会被销毁
+
+console.log(counter()) // 1
+console.log(counter()) // 2
+```
+
+### 理解 this 的行为
+
+```javascript
+const obj = {
+  name: '对象',
+  method: function () {
+    console.log(this.name) // "对象"
+
+    // 嵌套函数
+    function nested() {
+      console.log(this.name) // undefined（新的执行上下文）
+    }
+    nested()
+
+    // 箭头函数没有自己的 this
+    const arrow = () => {
+      console.log(this.name) // "对象"（继承外层）
+    }
+    arrow()
+  },
+}
+
+obj.method()
+```
+
+### 理解变量覆盖
+
+```javascript
+var x = 1
+
+function foo() {
+  console.log(x) // undefined（不是1！）
+  var x = 2
+  console.log(x) // 2
+}
+
+foo()
+
+// 因为 var x 被提升到函数顶部
+// 相当于：
+function foo() {
+  var x // 提升，遮蔽外层 x
+  console.log(x) // undefined
+  x = 2
+  console.log(x) // 2
+}
+```
+
+## 常见面试题
+
+### 🙋 输出什么？
+
+```javascript
+var a = 1
+function fn() {
+  console.log(a) // undefined
+  var a = 2
+  console.log(a) // 2
+}
+fn()
+console.log(a) // 1
+```
+
+### 🙋 函数和变量同名
+
+```javascript
+console.log(foo) // ƒ foo()
+var foo = 1
+function foo() {}
+console.log(foo) // 1
+
+// 创建阶段：
+// 1. foo = undefined（var）
+// 2. foo = function（函数声明覆盖）
+// 执行阶段：
+// 3. foo = 1
+```
+
+### 🙋 复杂提升
+
+```javascript
+function example() {
+  console.log(typeof fn) // "function"
+  console.log(typeof bar) // "undefined"
+
+  var fn = 'variable'
+  function fn() {}
+
+  var bar = function () {}
+
+  console.log(typeof fn) // "string"
+  console.log(typeof bar) // "function"
+}
+```
+
+## 总结
+
+| 概念       | 说明                           |
+| ---------- | ------------------------------ |
+| 执行上下文 | 代码执行时的环境               |
+| 调用栈     | 管理执行上下文的 LIFO 结构     |
+| 变量环境   | 存储 var 和函数声明            |
+| 词法环境   | 存储 let/const 和块级作用域    |
+| 作用域链   | 变量查找的链式结构             |
+| 变量提升   | var/function 声明移到顶部      |
+| TDZ        | let/const 声明前的不可访问区域 |
+
+**核心要点**：
+
+- 代码执行前会创建执行上下文
+- 每次函数调用创建新的执行上下文
+- 作用域链在函数定义时确定（词法作用域）
+- var 会提升，let/const 有暂时性死区
+- 理解执行上下文有助于理解闭包和 this

@@ -1,0 +1,262 @@
+---
+title: Next.js 简介
+description: 深入了解 Next.js 15 框架的核心特性、设计理念与适用场景，帮助全栈工程师快速掌握这个 React 全栈框架
+pubDate: 2025-12-03
+toc: true
+ogImage: true
+category: Next
+tags: ['Next.js', 'React', 'SSR', '全栈开发']
+---
+
+🙋 你是否遇到过这样的问题：用 React 构建的单页应用首屏加载太慢，SEO 效果差，想做服务端渲染却不知从何下手？
+
+Next.js 正是为解决这些问题而生的 React 全栈框架。
+
+## 什么是 Next.js
+
+Next.js 是由 Vercel 开发维护的 React 全栈框架。它在 React 的基础上提供了一系列开箱即用的功能：服务端渲染、静态站点生成、API 路由、文件系统路由等。
+
+🎯 **核心定位**：让开发者专注于产品开发，而不是底层工具链配置。
+
+```bash
+# 环境要求：Node.js 20+, pnpm 9+
+# Next.js 15.x
+
+# 一行命令创建项目
+pnpm create next-app@latest my-app
+```
+
+运行后会看到交互式提示，选择 TypeScript、ESLint、Tailwind CSS 等配置项。整个过程不到一分钟就能启动一个完整的项目。
+
+## 核心特性一览
+
+Next.js 15 带来了多项重要更新，以下是最值得关注的特性：
+
+### 1. App Router（推荐）
+
+Next.js 13 引入的 App Router 已经成为默认推荐方案。它基于 React Server Components 构建，支持：
+
+- **嵌套布局**：共享 UI 无需重复渲染
+- **服务端组件**：默认在服务端执行，减少客户端 JS 体积
+- **流式渲染**：逐步发送 HTML，提升首屏速度
+
+```tsx
+// app/layout.tsx - 根布局
+// Next.js 15.x
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="zh-CN">
+      <body>{children}</body>
+    </html>
+  )
+}
+```
+
+```tsx
+// app/page.tsx - 首页
+// Next.js 15.x
+export default function Home() {
+  return <h1>欢迎使用 Next.js 15</h1>
+}
+```
+
+这两个文件就构成了一个可运行的页面。`layout.tsx` 定义共享布局，`page.tsx` 定义页面内容。
+
+### 2. Turbopack 默认启用
+
+Next.js 15 将 Turbopack 设为默认打包器（开发模式）。相比 Webpack，Turbopack 使用 Rust 编写，启动速度和热更新速度都有显著提升。
+
+```json
+// package.json
+{
+  "scripts": {
+    "dev": "next dev" // 自动使用 Turbopack
+  }
+}
+```
+
+🔶 **注意**：如果项目有自定义 Webpack 配置，需要手动迁移到 Turbopack 或使用 `--webpack` 标志回退。
+
+### 3. Server Components 与 Client Components
+
+Next.js 的组件默认为 Server Components，在服务端执行：
+
+```tsx
+// app/users/page.tsx - Server Component（默认）
+// Next.js 15.x
+async function getUsers() {
+  const res = await fetch('https://api.example.com/users')
+  return res.json()
+}
+
+export default async function UsersPage() {
+  const users = await getUsers()
+
+  return (
+    <ul>
+      {users.map((user: { id: number; name: string }) => (
+        <li key={user.id}>{user.name}</li>
+      ))}
+    </ul>
+  )
+}
+```
+
+需要交互能力时，使用 `"use client"` 指令：
+
+```tsx
+// components/Counter.tsx - Client Component
+// Next.js 15.x
+'use client'
+
+import { useState } from 'react'
+
+export default function Counter() {
+  const [count, setCount] = useState(0)
+
+  return <button onClick={() => setCount(count + 1)}>点击次数：{count}</button>
+}
+```
+
+### 4. Server Actions
+
+Server Actions 允许在客户端直接调用服务端函数，无需手动创建 API 端点：
+
+```tsx
+// app/actions.ts
+// Next.js 15.x
+'use server'
+
+export async function createUser(formData: FormData) {
+  const name = formData.get('name')
+  // 直接操作数据库
+  // await db.user.create({ data: { name } })
+  return { success: true }
+}
+```
+
+```tsx
+// app/form/page.tsx
+// Next.js 15.x
+import { createUser } from '../actions'
+
+export default function FormPage() {
+  return (
+    <form action={createUser}>
+      <input name="name" placeholder="用户名" />
+      <button type="submit">提交</button>
+    </form>
+  )
+}
+```
+
+表单提交自动调用服务端函数，代码简洁且类型安全。
+
+## Next.js vs 纯 React vs Nuxt
+
+| 特性     | 纯 React (Vite) | Next.js         | Nuxt (Vue)      |
+| -------- | --------------- | --------------- | --------------- |
+| 渲染模式 | CSR             | SSR/SSG/ISR/CSR | SSR/SSG/ISR/CSR |
+| 路由     | 需配置          | 文件系统路由    | 文件系统路由    |
+| API 路由 | 无              | 内置            | 内置            |
+| 部署     | 静态托管        | Vercel/自托管   | Vercel/自托管   |
+| 学习曲线 | 低              | 中              | 中              |
+
+✅ **选择 Next.js 的理由**：
+
+- 需要 SEO 友好的 React 应用
+- 希望前后端代码放在同一项目
+- 追求开箱即用的开发体验
+- 团队熟悉 React 生态
+
+🔶 **不适合的场景**：
+
+- 纯静态官网（可考虑 Astro）
+- 对 bundle 体积极度敏感的移动端 H5
+- 团队更熟悉 Vue（应选 Nuxt）
+
+## 快速体验
+
+创建一个带有数据获取的完整示例：
+
+```bash
+# 创建项目
+pnpm create next-app@latest nextjs-demo --typescript --tailwind --eslint --app
+
+cd nextjs-demo
+```
+
+```tsx
+// app/posts/page.tsx
+// Next.js 15.x, TypeScript 5.x
+
+interface Post {
+  id: number
+  title: string
+  body: string
+}
+
+async function getPosts(): Promise<Post[]> {
+  const res = await fetch(
+    'https://jsonplaceholder.typicode.com/posts?_limit=5',
+    { next: { revalidate: 60 } } // 60秒后重新验证
+  )
+  return res.json()
+}
+
+export default async function PostsPage() {
+  const posts = await getPosts()
+
+  return (
+    <main className="p-8">
+      <h1 className="text-2xl font-bold mb-4">文章列表</h1>
+      <ul className="space-y-4">
+        {posts.map((post) => (
+          <li key={post.id} className="p-4 border rounded">
+            <h2 className="font-semibold">{post.title}</h2>
+            <p className="text-gray-600 mt-2">{post.body}</p>
+          </li>
+        ))}
+      </ul>
+    </main>
+  )
+}
+```
+
+```bash
+# 启动开发服务器
+pnpm dev
+
+# 访问 http://localhost:3000/posts
+```
+
+这个示例展示了：
+
+- 服务端数据获取（async 组件）
+- ISR 缓存策略（revalidate: 60）
+- TypeScript 类型定义
+- Tailwind CSS 样式
+
+## 常见问题
+
+🤔 **Q: Pages Router 还能用吗？**
+
+可以。Pages Router 仍受支持，App Router 和 Pages Router 可以共存。但新项目推荐使用 App Router，它代表了 Next.js 的未来方向。
+
+🤔 **Q: 必须部署到 Vercel 吗？**
+
+不是。Next.js 支持自托管，可以部署到任何支持 Node.js 的平台，也支持导出为纯静态站点。
+
+🤔 **Q: 和 Remix 比怎么选？**
+
+两者都是优秀的 React 全栈框架。Next.js 生态更成熟，社区资源更丰富；Remix 在表单处理和嵌套路由方面有独特设计。如果没有特殊偏好，Next.js 是更稳妥的选择。
+
+---
+
+下一篇将详细介绍项目创建与配置，包括目录结构解析和 `next.config.js` 常用配置。
+
+-EOF-

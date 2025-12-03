@@ -1,0 +1,392 @@
+---
+title: '基础类型'
+description: 'TypeScript 基础类型详解：string、number、boolean、null、undefined、any、unknown、never 的用法与区别'
+pubDate: 2024-01-16
+toc: true
+ogImage: true
+category: 'TypeScript'
+tags: ['TypeScript', '类型系统', '基础类型', 'any', 'unknown']
+---
+
+TypeScript 提供了丰富的类型系统，从 JavaScript 熟悉的原始类型到 TypeScript 特有的 `unknown`、`never` 等类型。理解这些基础类型是掌握 TypeScript 的第一步。
+
+## 原始类型
+
+### string、number、boolean
+
+这三个是最常用的原始类型，与 JavaScript 的基本类型一一对应：
+
+```typescript
+// TypeScript 5.x
+
+// 字符串
+const username: string = '张三'
+const greeting: string = `你好，${username}`
+
+// 数字（整数和浮点数都是 number）
+const age: number = 25
+const price: number = 99.99
+const hex: number = 0xff
+const binary: number = 0b1010
+const octal: number = 0o744
+
+// 布尔值
+const isActive: boolean = true
+const hasPermission: boolean = false
+```
+
+🔶 注意：使用小写的 `string`、`number`、`boolean`，而不是大写的 `String`、`Number`、`Boolean`。大写版本是 JavaScript 的包装对象类型，几乎不应该使用。
+
+```typescript
+// ❌ 错误写法
+const name: String = '张三' // 不推荐
+const count: Number = 10 // 不推荐
+
+// ✅ 正确写法
+const name: string = '张三'
+const count: number = 10
+```
+
+### null 和 undefined
+
+在 TypeScript 中，`null` 和 `undefined` 既是值也是类型：
+
+```typescript
+let u: undefined = undefined
+let n: null = null
+
+// 默认情况下，null 和 undefined 可以赋值给任何类型
+let str: string = 'hello'
+str = null // 默认允许，但不推荐
+str = undefined // 默认允许，但不推荐
+```
+
+🎯 开启 `strictNullChecks`（推荐）后，`null` 和 `undefined` 只能赋值给自身类型或 `void`：
+
+```typescript
+// tsconfig.json: "strictNullChecks": true
+
+let str: string = 'hello'
+// str = null;      // ❌ 错误
+// str = undefined; // ❌ 错误
+
+// 需要显式声明可空类型
+let nullableStr: string | null = 'hello'
+nullableStr = null // ✅ 正确
+
+let optionalStr: string | undefined = 'hello'
+optionalStr = undefined // ✅ 正确
+```
+
+## 特殊类型
+
+### any：任意类型
+
+`any` 类型可以接受任何值，相当于关闭了类型检查：
+
+```typescript
+let value: any = 42
+value = 'hello' // ✅ 允许
+value = true // ✅ 允许
+value = { name: '张三' } // ✅ 允许
+
+// any 类型可以访问任意属性和方法（不检查）
+value.foo()
+value.bar.baz
+value[0]
+```
+
+🔶 警告：`any` 会让 TypeScript 失去类型安全性，应尽量避免使用。常见的合理使用场景：
+
+```typescript
+// 场景1：迁移旧代码时临时使用
+const legacyData: any = getLegacyData()
+
+// 场景2：处理动态内容
+function handleDynamicData(data: any) {
+  // 复杂的运行时数据处理
+}
+
+// 场景3：类型定义困难时的临时方案
+const complexConfig: any = {
+  // 暂时无法精确定义的配置
+}
+```
+
+### unknown：安全的任意类型
+
+`unknown` 是 TypeScript 3.0 引入的类型安全版 `any`。它可以接受任何值，但使用前必须进行类型检查：
+
+```typescript
+let value: unknown = 42
+value = 'hello' // ✅ 允许赋值
+value = true // ✅ 允许赋值
+
+// ❌ 但不能直接使用
+// value.foo();           // 错误
+// value.length;          // 错误
+// const n: number = value; // 错误
+
+// ✅ 必须先进行类型检查或断言
+if (typeof value === 'string') {
+  console.log(value.length) // 现在可以访问 string 的属性
+}
+
+if (typeof value === 'number') {
+  console.log(value.toFixed(2)) // 现在可以调用 number 的方法
+}
+```
+
+🤔 `any` vs `unknown` 的关键区别：
+
+| 特性           | any | unknown                    |
+| -------------- | --- | -------------------------- |
+| 可赋任何值     | ✅  | ✅                         |
+| 可赋给任何类型 | ✅  | ❌（只能赋给 any/unknown） |
+| 可访问任意属性 | ✅  | ❌（需要类型收窄）         |
+| 类型安全       | ❌  | ✅                         |
+
+```typescript
+// unknown 只能赋给 any 和 unknown
+let u: unknown = 'hello'
+let a: any = u // ✅
+let b: unknown = u // ✅
+// let c: string = u;    // ❌ 错误
+```
+
+### never：永不存在的值
+
+`never` 表示永远不会发生的类型，主要用于：
+
+**1. 函数永远不会正常返回**
+
+```typescript
+// 抛出异常的函数
+function throwError(message: string): never {
+  throw new Error(message)
+}
+
+// 无限循环的函数
+function infiniteLoop(): never {
+  while (true) {
+    // 永远不会退出
+  }
+}
+
+// 使用示例
+function fail(): never {
+  return throwError('操作失败')
+}
+```
+
+**2. 穷尽检查（Exhaustive Check）**
+
+```typescript
+type Status = 'pending' | 'success' | 'error'
+
+function handleStatus(status: Status) {
+  switch (status) {
+    case 'pending':
+      return '等待中...'
+    case 'success':
+      return '成功！'
+    case 'error':
+      return '失败！'
+    default:
+      // 如果所有情况都处理了，status 的类型是 never
+      const _exhaustiveCheck: never = status
+      return _exhaustiveCheck
+  }
+}
+
+// 如果新增了状态但忘记处理，TypeScript 会报错
+type Status2 = 'pending' | 'success' | 'error' | 'cancelled'
+
+function handleStatus2(status: Status2) {
+  switch (status) {
+    case 'pending':
+      return '等待中...'
+    case 'success':
+      return '成功！'
+    case 'error':
+      return '失败！'
+    default:
+      // ❌ 错误：类型 "cancelled" 不能赋值给类型 "never"
+      const _exhaustiveCheck: never = status
+      return _exhaustiveCheck
+  }
+}
+```
+
+### void：无返回值
+
+`void` 表示函数没有返回值（或返回 `undefined`）：
+
+```typescript
+function logMessage(message: string): void {
+  console.log(message)
+  // 没有 return 语句，或 return undefined
+}
+
+function greet(name: string): void {
+  console.log(`Hello, ${name}!`)
+  return // 返回 undefined
+}
+
+// void 类型的变量只能赋值 undefined
+let result: void = undefined
+// result = null;  // strictNullChecks 开启时错误
+```
+
+🤔 `void` vs `never`：
+
+```typescript
+// void：函数正常结束，但不返回有意义的值
+function log(): void {
+  console.log('done')
+}
+
+// never：函数永远不会正常结束
+function crash(): never {
+  throw new Error('crash')
+}
+```
+
+## 类型推断
+
+TypeScript 有强大的类型推断能力，很多时候不需要手动标注：
+
+```typescript
+// 自动推断为 string
+let name = '张三'
+
+// 自动推断为 number
+let age = 25
+
+// 自动推断为 boolean
+let isActive = true
+
+// 自动推断为 string[]
+let names = ['张三', '李四']
+
+// 自动推断为 { name: string; age: number }
+let user = {
+  name: '张三',
+  age: 25,
+}
+```
+
+🔶 何时需要显式标注类型：
+
+```typescript
+// 1. 变量声明时没有初始化
+let count: number
+count = 10
+
+// 2. 函数参数（必须标注）
+function greet(name: string) {
+  console.log(`Hello, ${name}`)
+}
+
+// 3. 希望类型比推断结果更宽泛
+let id: string | number = 123
+id = 'abc' // 后续可能是字符串
+
+// 4. 空数组需要指定元素类型
+const items: string[] = []
+items.push('hello')
+```
+
+## 类型断言
+
+当你比 TypeScript 更了解某个值的类型时，可以使用类型断言：
+
+```typescript
+// 方式一：as 语法（推荐）
+const input = document.getElementById('myInput') as HTMLInputElement
+input.value = 'hello'
+
+// 方式二：尖括号语法（不能在 JSX 中使用）
+const input2 = <HTMLInputElement>document.getElementById('myInput')
+```
+
+🔶 类型断言不是类型转换，它只是告诉编译器"相信我"：
+
+```typescript
+// 断言只在编译时生效，不改变运行时的值
+const str = '123' as any as number
+console.log(typeof str) // 仍然是 "string"
+
+// 双重断言：通过 any 或 unknown 绕过类型检查（谨慎使用）
+const value = 'hello' as unknown as number
+```
+
+## 常见问题
+
+### 🙋 什么时候用 any，什么时候用 unknown？
+
+优先使用 `unknown`。只有在以下情况考虑 `any`：
+
+- 快速原型开发
+- 迁移旧 JavaScript 代码
+- 第三方库类型定义不完善
+
+```typescript
+// 处理外部 API 数据的推荐方式
+async function fetchData(): Promise<unknown> {
+  const response = await fetch('/api/data')
+  return response.json()
+}
+
+// 使用时进行类型检查
+const data = await fetchData()
+if (isValidUser(data)) {
+  console.log(data.name) // 类型安全
+}
+
+function isValidUser(data: unknown): data is { name: string } {
+  return typeof data === 'object' && data !== null && 'name' in data
+}
+```
+
+### 🙋 null 和 undefined 有什么区别？
+
+- `undefined`：变量已声明但未赋值
+- `null`：明确表示"无值"
+
+```typescript
+// 实践中的惯例
+interface User {
+  name: string
+  nickname?: string // 可选属性，可能是 undefined
+  deletedAt: Date | null // 明确可能为 null
+}
+```
+
+### 🙋 strictNullChecks 应该开启吗？
+
+✅ 强烈建议开启。它能帮你捕获大量潜在的 null/undefined 错误：
+
+```typescript
+// 开启 strictNullChecks
+function getLength(str: string | null): number {
+  // return str.length;  // ❌ 错误：str 可能为 null
+  return str?.length ?? 0 // ✅ 安全处理
+}
+```
+
+## 总结
+
+| 类型        | 用途               | 示例               |
+| ----------- | ------------------ | ------------------ |
+| `string`    | 字符串             | `'hello'`          |
+| `number`    | 数字               | `42`, `3.14`       |
+| `boolean`   | 布尔值             | `true`, `false`    |
+| `null`      | 空值               | `null`             |
+| `undefined` | 未定义             | `undefined`        |
+| `any`       | 任意类型（不安全） | 谨慎使用           |
+| `unknown`   | 任意类型（安全）   | 需要类型检查后使用 |
+| `never`     | 永不存在           | 抛出异常、无限循环 |
+| `void`      | 无返回值           | 函数不返回值       |
+
+下一篇我们将学习数组与元组类型，了解如何在 TypeScript 中处理集合数据。

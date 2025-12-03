@@ -1,0 +1,448 @@
+---
+title: 层叠层
+description: 理解 CSS @layer 规则，掌握样式优先级的组织和管理方法
+pubDate: 2025-12-03
+toc: true
+ogImage: true
+category: CSS
+---
+
+CSS 层叠层（Cascade Layers）是管理样式优先级的新方法。通过 `@layer` 规则，你可以明确定义样式的层级顺序，让样式覆盖关系更加可控。
+
+## 为什么需要层叠层
+
+传统 CSS 的优先级问题：
+
+```css
+/* 第三方组件库 */
+.button {
+  background: gray;
+}
+
+/* 你的自定义样式 - 需要更高的选择器权重才能覆盖 */
+.my-app .button {
+  background: blue;
+}
+
+/* 或者使用 !important（不推荐） */
+.button {
+  background: blue !important;
+}
+```
+
+使用层叠层，你可以控制整个层的优先级，而不是逐个选择器较量：
+
+```css
+@layer base, components, utilities;
+
+@layer components {
+  .button {
+    background: gray;
+  }
+}
+
+@layer utilities {
+  .button {
+    background: blue; /* 优先级更高，因为 utilities 层后声明 */
+  }
+}
+```
+
+## 基本语法
+
+### 定义层
+
+```css
+/* 方式 1：声明层顺序 */
+@layer reset, base, components, utilities;
+
+/* 方式 2：声明同时添加样式 */
+@layer reset {
+  * {
+    margin: 0;
+    padding: 0;
+  }
+}
+
+/* 方式 3：匿名层 */
+@layer {
+  .anonymous {
+    color: red;
+  }
+}
+```
+
+### 层的顺序
+
+层按声明顺序排列，**后声明的层优先级更高**：
+
+```css
+@layer first, second, third;
+
+@layer first {
+  p {
+    color: red;
+  }
+}
+
+@layer third {
+  p {
+    color: blue;
+  } /* 胜出！ */
+}
+
+@layer second {
+  p {
+    color: green;
+  }
+}
+```
+
+### 向已有层添加样式
+
+```css
+@layer base {
+  a {
+    color: blue;
+  }
+}
+
+/* 后续可以继续向 base 层添加 */
+@layer base {
+  a:hover {
+    text-decoration: underline;
+  }
+}
+```
+
+## 嵌套层
+
+层可以嵌套：
+
+```css
+@layer framework {
+  @layer reset {
+    * {
+      margin: 0;
+    }
+  }
+
+  @layer base {
+    body {
+      line-height: 1.5;
+    }
+  }
+}
+
+/* 等效写法 */
+@layer framework.reset {
+  * {
+    margin: 0;
+  }
+}
+```
+
+嵌套层的优先级规则：
+
+1. 外层先于内层解析
+2. 同级层按声明顺序
+
+## 未分层样式
+
+未放入任何层的样式优先级**高于**所有层内样式：
+
+```css
+@layer base {
+  p {
+    color: blue;
+  }
+}
+
+/* 未分层样式 - 优先级更高 */
+p {
+  color: red; /* 胜出！ */
+}
+```
+
+这意味着你可以把第三方库放入层中，确保自己的样式能轻松覆盖。
+
+## 导入与层
+
+### 将导入放入层
+
+```css
+/* 将整个 CSS 文件放入层 */
+@import url('reset.css') layer(reset);
+@import url('framework.css') layer(framework);
+
+/* 你的样式（未分层，优先级最高） */
+.my-style {
+  color: blue;
+}
+```
+
+### 层顺序声明
+
+```css
+/* 先声明层顺序，确保导入顺序不影响优先级 */
+@layer reset, framework, custom;
+
+@import url('framework.css') layer(framework);
+@import url('reset.css') layer(reset);
+
+@layer custom {
+  /* 自定义样式 */
+}
+```
+
+## 与选择器优先级的关系
+
+🎯 层优先级 > 选择器优先级
+
+```css
+@layer low, high;
+
+@layer low {
+  #very-specific-id.with-class[and-attribute] {
+    color: red;
+  }
+}
+
+@layer high {
+  p {
+    color: blue;
+  } /* 胜出！即使选择器权重低 */
+}
+```
+
+层内的选择器优先级仍然正常工作：
+
+```css
+@layer components {
+  .button {
+    color: gray;
+  }
+
+  .button.primary {
+    color: blue;
+  } /* 在同一层内，优先级更高 */
+}
+```
+
+## 与 !important 的关系
+
+`!important` 在层叠层中有特殊行为——**顺序反转**：
+
+```css
+@layer first, second;
+
+@layer first {
+  p {
+    color: red !important;
+  } /* 胜出！ */
+}
+
+@layer second {
+  p {
+    color: blue !important;
+  }
+}
+```
+
+对于 `!important` 声明，先声明的层优先级更高。这与正常声明相反。
+
+## 实战案例
+
+### 样式架构
+
+```css
+/* 定义层级结构 */
+@layer reset, base, layout, components, utilities, overrides;
+
+/* Reset 层：重置浏览器默认样式 */
+@layer reset {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+}
+
+/* Base 层：基础元素样式 */
+@layer base {
+  body {
+    font-family: system-ui, sans-serif;
+    line-height: 1.5;
+  }
+
+  a {
+    color: var(--color-primary);
+  }
+}
+
+/* Layout 层：布局相关 */
+@layer layout {
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 1rem;
+  }
+
+  .grid {
+    display: grid;
+    gap: 1rem;
+  }
+}
+
+/* Components 层：组件样式 */
+@layer components {
+  .button {
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+  }
+
+  .card {
+    padding: 1rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
+}
+
+/* Utilities 层：工具类 */
+@layer utilities {
+  .text-center {
+    text-align: center;
+  }
+
+  .hidden {
+    display: none;
+  }
+}
+
+/* Overrides 层：覆盖和例外 */
+@layer overrides {
+  .no-margin {
+    margin: 0 !important;
+  }
+}
+```
+
+### 集成第三方库
+
+```css
+/* 将第三方库放入低优先级层 */
+@layer vendor, custom;
+
+@import url('bootstrap.css') layer(vendor);
+@import url('some-library.css') layer(vendor);
+
+/* 你的自定义样式自动优先 */
+@layer custom {
+  .button {
+    /* 轻松覆盖 Bootstrap 的 .button */
+  }
+}
+
+/* 或者不放入层，优先级更高 */
+.button {
+  /* 即使没有更高的选择器权重也能覆盖 */
+}
+```
+
+### 主题系统
+
+```css
+@layer theme.tokens, theme.base, theme.components;
+
+@layer theme.tokens {
+  :root {
+    --color-primary: #3b82f6;
+    --color-secondary: #10b981;
+    --spacing: 1rem;
+  }
+
+  [data-theme='dark'] {
+    --color-primary: #60a5fa;
+    --color-secondary: #34d399;
+  }
+}
+
+@layer theme.base {
+  body {
+    color: var(--color-text);
+    background: var(--color-bg);
+  }
+}
+
+@layer theme.components {
+  .button {
+    background: var(--color-primary);
+  }
+}
+```
+
+### 响应式覆盖
+
+```css
+@layer base, responsive;
+
+@layer base {
+  .sidebar {
+    width: 250px;
+  }
+}
+
+@layer responsive {
+  @media (max-width: 768px) {
+    .sidebar {
+      width: 100%;
+    }
+  }
+}
+```
+
+## 最佳实践
+
+### 层命名规范
+
+```css
+/* 推荐：语义化、层次分明 */
+@layer reset, base, layout, components, utilities;
+
+/* 嵌套层用于组件库 */
+@layer framework {
+  @layer reset, base, components;
+}
+
+/* 避免：过于细碎的层 */
+@layer buttons, cards, modals, inputs; /* 不推荐 */
+```
+
+### 什么时候使用层
+
+✅ 适合使用层的场景：
+
+- 集成第三方 CSS 库
+- 大型项目的样式架构
+- 组件库开发
+- 需要清晰的样式覆盖规则
+
+❌ 可能不需要层的场景：
+
+- 小型项目
+- 样式冲突不是主要问题
+- 团队对层叠层不熟悉
+
+### 调试技巧
+
+Chrome DevTools 支持查看元素样式所属的层：
+
+1. 打开 Elements 面板
+2. 查看 Styles 面板
+3. 每条规则会显示其所属的层（如 `@layer components`）
+
+---
+
+层叠层为 CSS 优先级管理提供了新的维度。结合传统的选择器优先级，你可以构建更可维护的样式架构。下一篇我们将学习 CSS 过渡效果，为页面添加平滑的动画。

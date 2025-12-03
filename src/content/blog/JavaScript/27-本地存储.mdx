@@ -1,0 +1,614 @@
+---
+title: '本地存储'
+description: '掌握浏览器本地存储方案，理解 localStorage、sessionStorage 和 Cookie'
+pubDate: 2025-12-03
+toc: true
+ogImage: true
+category: 'JavaScript'
+tags: ['JavaScript', 'localStorage', 'sessionStorage', 'Cookie']
+---
+
+浏览器提供了多种本地存储方案，用于在客户端保存数据。了解它们的特点和使用场景，才能选择合适的存储方式。
+
+## 🎯 存储方案对比
+
+| 特性     | localStorage | sessionStorage | Cookie         |
+| -------- | ------------ | -------------- | -------------- |
+| 容量     | 约 5MB       | 约 5MB         | 约 4KB         |
+| 生命周期 | 永久         | 标签页关闭     | 可设置过期时间 |
+| 请求携带 | 否           | 否             | 自动携带       |
+| 作用域   | 同源共享     | 仅当前标签页   | 可设置路径和域 |
+| API      | 简单         | 简单           | 较复杂         |
+
+## localStorage
+
+### 基本操作
+
+```javascript
+// 存储数据
+localStorage.setItem('username', '张三')
+
+// 读取数据
+const username = localStorage.getItem('username')
+console.log(username) // '张三'
+
+// 删除数据
+localStorage.removeItem('username')
+
+// 清空所有数据
+localStorage.clear()
+
+// 获取存储项数量
+console.log(localStorage.length)
+
+// 获取第 n 个键名
+console.log(localStorage.key(0))
+```
+
+### 存储对象
+
+```javascript
+// 🔶 localStorage 只能存储字符串
+localStorage.setItem('user', { name: '张三' })
+localStorage.getItem('user') // '[object Object]'（错误）
+
+// ✅ 使用 JSON 序列化
+const user = { name: '张三', age: 25 }
+localStorage.setItem('user', JSON.stringify(user))
+
+const stored = localStorage.getItem('user')
+const parsedUser = JSON.parse(stored)
+console.log(parsedUser.name) // '张三'
+```
+
+### 封装工具类
+
+```javascript
+const storage = {
+  set(key, value, expires) {
+    const data = {
+      value,
+      expires: expires ? Date.now() + expires : null,
+    }
+    localStorage.setItem(key, JSON.stringify(data))
+  },
+
+  get(key, defaultValue = null) {
+    const item = localStorage.getItem(key)
+    if (!item) return defaultValue
+
+    try {
+      const data = JSON.parse(item)
+
+      // 检查是否过期
+      if (data.expires && Date.now() > data.expires) {
+        localStorage.removeItem(key)
+        return defaultValue
+      }
+
+      return data.value
+    } catch {
+      return defaultValue
+    }
+  },
+
+  remove(key) {
+    localStorage.removeItem(key)
+  },
+
+  clear() {
+    localStorage.clear()
+  },
+
+  has(key) {
+    return localStorage.getItem(key) !== null
+  },
+}
+
+// 使用
+storage.set('token', 'abc123', 3600000) // 1小时后过期
+storage.get('token') // 'abc123'
+```
+
+### 监听存储变化
+
+```javascript
+// 监听其��标签页的存储变化
+window.addEventListener('storage', (event) => {
+  console.log('键:', event.key)
+  console.log('旧值:', event.oldValue)
+  console.log('新值:', event.newValue)
+  console.log('来源:', event.url)
+})
+
+// 🔶 注意：同一标签页的变化不会触发
+// 只有其他标签页修改时才触发
+
+// 实现跨标签页通信
+function broadcast(type, data) {
+  localStorage.setItem(
+    'broadcast',
+    JSON.stringify({
+      type,
+      data,
+      timestamp: Date.now(),
+    })
+  )
+  localStorage.removeItem('broadcast')
+}
+
+window.addEventListener('storage', (event) => {
+  if (event.key === 'broadcast' && event.newValue) {
+    const { type, data } = JSON.parse(event.newValue)
+    handleBroadcast(type, data)
+  }
+})
+```
+
+## sessionStorage
+
+### 基本用法
+
+```javascript
+// API 与 localStorage 相同
+sessionStorage.setItem('tempData', 'value')
+sessionStorage.getItem('tempData')
+sessionStorage.removeItem('tempData')
+sessionStorage.clear()
+
+// 区别：关闭标签页后数据消失
+// 刷新页面数据保留
+```
+
+### 使用场景
+
+```javascript
+// 1. 表单数据临时保存
+const form = document.getElementById('myForm')
+
+// 保存表单状态
+form.addEventListener('input', () => {
+  const formData = new FormData(form)
+  const data = Object.fromEntries(formData)
+  sessionStorage.setItem('formDraft', JSON.stringify(data))
+})
+
+// 恢复表单状态
+const draft = sessionStorage.getItem('formDraft')
+if (draft) {
+  const data = JSON.parse(draft)
+  Object.entries(data).forEach(([name, value]) => {
+    const input = form.elements[name]
+    if (input) input.value = value
+  })
+}
+
+// 提交后清除
+form.addEventListener('submit', () => {
+  sessionStorage.removeItem('formDraft')
+})
+
+// 2. 页面间传递��据
+// 页面 A
+sessionStorage.setItem('selectedItem', JSON.stringify({ id: 1, name: '商品' }))
+location.href = '/detail'
+
+// 页面 B
+const item = JSON.parse(sessionStorage.getItem('selectedItem'))
+console.log(item.name)
+
+// 3. 一次性提示
+if (!sessionStorage.getItem('welcomeShown')) {
+  showWelcomeMessage()
+  sessionStorage.setItem('welcomeShown', 'true')
+}
+```
+
+## Cookie
+
+### 读取 Cookie
+
+```javascript
+// 获取所有 Cookie（字符串）
+document.cookie
+// 'name=张三; token=abc123; theme=dark'
+
+// 解析 Cookie
+function getCookie(name) {
+  const cookies = document.cookie.split('; ')
+  for (const cookie of cookies) {
+    const [key, value] = cookie.split('=')
+    if (key === name) {
+      return decodeURIComponent(value)
+    }
+  }
+  return null
+}
+
+getCookie('name') // '张三'
+
+// 获取所有 Cookie 为对象
+function getAllCookies() {
+  return document.cookie.split('; ').reduce((obj, cookie) => {
+    const [key, value] = cookie.split('=')
+    obj[key] = decodeURIComponent(value)
+    return obj
+  }, {})
+}
+```
+
+### 设置 Cookie
+
+```javascript
+// 基本设置
+document.cookie = 'name=张三'
+
+// 设置过期时间
+const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7天后
+document.cookie = `name=张三; expires=${expires.toUTCString()}`
+
+// 使用 max-age（秒）
+document.cookie = 'name=张三; max-age=604800' // 7天
+
+// 设置路径
+document.cookie = 'name=张三; path=/'
+
+// 设置域
+document.cookie = 'name=张三; domain=.example.com'
+
+// 安全标志
+document.cookie = 'token=abc; secure' // 仅 HTTPS
+document.cookie = 'token=abc; httpOnly' // 仅服务器可访问（JS 无法设置）
+document.cookie = 'token=abc; samesite=strict' // 防止 CSRF
+
+// 完整示例
+function setCookie(name, value, options = {}) {
+  const {
+    expires,
+    maxAge,
+    path = '/',
+    domain,
+    secure,
+    sameSite = 'lax',
+  } = options
+
+  let cookie = `${encodeURIComponent(name)}=${encodeURIComponent(value)}`
+
+  if (expires) {
+    cookie += `; expires=${expires.toUTCString()}`
+  }
+  if (maxAge !== undefined) {
+    cookie += `; max-age=${maxAge}`
+  }
+  cookie += `; path=${path}`
+  if (domain) {
+    cookie += `; domain=${domain}`
+  }
+  if (secure) {
+    cookie += '; secure'
+  }
+  cookie += `; samesite=${sameSite}`
+
+  document.cookie = cookie
+}
+
+setCookie('user', 'zhangsan', { maxAge: 86400 }) // 1天
+```
+
+### 删除 Cookie
+
+```javascript
+// 设置过期时间为过去
+function deleteCookie(name, path = '/') {
+  document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=${path}`
+}
+
+deleteCookie('name')
+
+// 或使用 max-age=0
+document.cookie = 'name=; max-age=0; path=/'
+```
+
+### Cookie 工具类
+
+```javascript
+const cookie = {
+  get(name) {
+    const cookies = document.cookie.split('; ')
+    for (const c of cookies) {
+      const [key, value] = c.split('=')
+      if (key === name) {
+        return decodeURIComponent(value)
+      }
+    }
+    return null
+  },
+
+  set(name, value, days = 7) {
+    const maxAge = days * 24 * 60 * 60
+    document.cookie = `${encodeURIComponent(name)}=${encodeURIComponent(value)}; max-age=${maxAge}; path=/; samesite=lax`
+  },
+
+  remove(name) {
+    document.cookie = `${name}=; max-age=0; path=/`
+  },
+
+  has(name) {
+    return this.get(name) !== null
+  },
+}
+
+cookie.set('theme', 'dark', 30) // 30天
+cookie.get('theme') // 'dark'
+cookie.remove('theme')
+```
+
+## IndexedDB（简介）
+
+```javascript
+// IndexedDB 适合存储大量结构化数据
+
+// 打开数据库
+const request = indexedDB.open('MyDatabase', 1)
+
+request.onerror = () => console.error('数据库打开失败')
+
+request.onupgradeneeded = (event) => {
+  const db = event.target.result
+  // 创建对象存储（表）
+  if (!db.objectStoreNames.contains('users')) {
+    db.createObjectStore('users', { keyPath: 'id' })
+  }
+}
+
+request.onsuccess = (event) => {
+  const db = event.target.result
+
+  // 添加数据
+  const transaction = db.transaction(['users'], 'readwrite')
+  const store = transaction.objectStore('users')
+  store.add({ id: 1, name: '张三', age: 25 })
+
+  // 读取数据
+  const getRequest = store.get(1)
+  getRequest.onsuccess = () => {
+    console.log(getRequest.result)
+  }
+}
+
+// 更推荐使用封装库如 idb、Dexie.js
+```
+
+## 实际应用
+
+### 用户偏好设置
+
+```javascript
+const preferences = {
+  defaults: {
+    theme: 'light',
+    fontSize: 16,
+    language: 'zh-CN',
+  },
+
+  load() {
+    const stored = localStorage.getItem('preferences')
+    return stored ? { ...this.defaults, ...JSON.parse(stored) } : this.defaults
+  },
+
+  save(prefs) {
+    localStorage.setItem('preferences', JSON.stringify(prefs))
+  },
+
+  get(key) {
+    return this.load()[key]
+  },
+
+  set(key, value) {
+    const current = this.load()
+    current[key] = value
+    this.save(current)
+  },
+
+  reset() {
+    localStorage.removeItem('preferences')
+  },
+}
+
+// ��用
+preferences.set('theme', 'dark')
+preferences.get('theme') // 'dark'
+```
+
+### 登录状态管理
+
+```javascript
+const auth = {
+  setToken(token, remember = false) {
+    if (remember) {
+      // 记住登录，使用 localStorage
+      localStorage.setItem('authToken', token)
+    } else {
+      // 不记住，使用 sessionStorage
+      sessionStorage.setItem('authToken', token)
+    }
+  },
+
+  getToken() {
+    return (
+      localStorage.getItem('authToken') || sessionStorage.getItem('authToken')
+    )
+  },
+
+  isLoggedIn() {
+    return !!this.getToken()
+  },
+
+  logout() {
+    localStorage.removeItem('authToken')
+    sessionStorage.removeItem('authToken')
+    // 清除 Cookie
+    document.cookie = 'authToken=; max-age=0; path=/'
+  },
+}
+```
+
+### 缓存 API 数据
+
+```javascript
+const apiCache = {
+  get(key) {
+    const item = localStorage.getItem(`cache_${key}`)
+    if (!item) return null
+
+    const { data, timestamp, maxAge } = JSON.parse(item)
+    if (Date.now() - timestamp > maxAge) {
+      localStorage.removeItem(`cache_${key}`)
+      return null
+    }
+
+    return data
+  },
+
+  set(key, data, maxAge = 300000) {
+    // 默认 5 分钟
+    localStorage.setItem(
+      `cache_${key}`,
+      JSON.stringify({
+        data,
+        timestamp: Date.now(),
+        maxAge,
+      })
+    )
+  },
+
+  async fetch(url, options = {}) {
+    const cacheKey = url
+
+    // 检查缓存
+    const cached = this.get(cacheKey)
+    if (cached) {
+      return cached
+    }
+
+    // 请求 API
+    const response = await fetch(url)
+    const data = await response.json()
+
+    // 存入缓存
+    this.set(cacheKey, data, options.maxAge)
+
+    return data
+  },
+
+  clear() {
+    Object.keys(localStorage)
+      .filter((key) => key.startsWith('cache_'))
+      .forEach((key) => localStorage.removeItem(key))
+  },
+}
+
+// 使用
+const users = await apiCache.fetch('/api/users', { maxAge: 60000 })
+```
+
+### 存储容量检测
+
+```javascript
+function getStorageSize() {
+  let total = 0
+  for (const key in localStorage) {
+    if (localStorage.hasOwnProperty(key)) {
+      total += localStorage.getItem(key).length * 2 // UTF-16
+    }
+  }
+  return {
+    used: total,
+    usedMB: (total / 1024 / 1024).toFixed(2),
+    available: 5 * 1024 * 1024 - total, // 假设 5MB 限制
+  }
+}
+
+// 存储前检查空间
+function safeSetItem(key, value) {
+  try {
+    localStorage.setItem(key, value)
+    return true
+  } catch (e) {
+    if (e.name === 'QuotaExceededError') {
+      console.error('存储空间已满')
+      // 可以尝试清理旧数据
+      cleanOldCache()
+      return false
+    }
+    throw e
+  }
+}
+```
+
+## 安全注意事项
+
+```javascript
+// 🔶 不要存储敏感数据
+// 密码、信用卡号等不应存��在 localStorage
+
+// 🔶 XSS 攻击风险
+// localStorage 可被 JavaScript 访问
+// 如果网站有 XSS 漏洞，攻击者可以读取存储数据
+
+// ✅ Token 存储建议
+// - 短期 token：sessionStorage
+// - 长期 token：httpOnly Cookie（更安全）
+
+// ✅ 数据验证
+function getStoredData(key, validate) {
+  const data = localStorage.getItem(key)
+  if (!data) return null
+
+  try {
+    const parsed = JSON.parse(data)
+    // 验证数据结构
+    if (validate && !validate(parsed)) {
+      localStorage.removeItem(key)
+      return null
+    }
+    return parsed
+  } catch {
+    localStorage.removeItem(key)
+    return null
+  }
+}
+
+// 使用
+const user = getStoredData('user', (data) => {
+  return data && typeof data.id === 'number' && typeof data.name === 'string'
+})
+```
+
+## 总结
+
+| 场景               | 推荐方案                   |
+| ------------------ | -------------------------- |
+| 用户偏好设置       | localStorage               |
+| 登录状态（记住我） | localStorage + Cookie      |
+| 登录状态（不记住） | sessionStorage             |
+| 表单临时数据       | sessionStorage             |
+| API 缓存           | localStorage（带过期时间） |
+| 敏感数据           | httpOnly Cookie            |
+| 大量结构化数据     | IndexedDB                  |
+
+| 方法 | localStorage / sessionStorage |
+| ---- | ----------------------------- |
+| 存储 | `setItem(key, value)`         |
+| 读取 | `getItem(key)`                |
+| 删除 | `removeItem(key)`             |
+| 清空 | `clear()`                     |
+| 数量 | `length`                      |
+
+**核心要点**：
+
+- localStorage 数据永久保存，sessionStorage 关闭标签页清除
+- 只能存储字符串，对象需要 JSON 序列化
+- Cookie 会随请求自动发送，适合身份验证
+- 注意存储容量限制和安全问题
+- 敏感数据使用 httpOnly Cookie

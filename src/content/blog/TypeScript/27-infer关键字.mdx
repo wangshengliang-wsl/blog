@@ -1,0 +1,472 @@
+---
+title: 'infer 关键字'
+description: 'TypeScript infer 关键字详解：类型推断、提取函数返回值、提取数组元素、提取 Promise 类型'
+pubDate: 2024-02-10
+toc: true
+ogImage: true
+category: 'TypeScript'
+tags: ['TypeScript', 'infer', '类型推断', '条件类型', '高级类型']
+---
+
+`infer` 关键字用于在条件类型中推断类型，它可以捕获类型的某个部分供后续使用。
+
+## 基本语法
+
+`infer` 只能在条件类型的 `extends` 子句中使用：
+
+```typescript
+// TypeScript 5.x
+
+// 基本语法：在 extends 子句中使用 infer 声明类型变量
+type GetReturnType<T> = T extends (...args: any[]) => infer R ? R : never
+
+// 使用
+function greet(): string {
+  return 'hello'
+}
+
+type GreetReturn = GetReturnType<typeof greet>
+// string
+
+function add(a: number, b: number): number {
+  return a + b
+}
+
+type AddReturn = GetReturnType<typeof add>
+// number
+
+// 非函数类型返回 never
+type NotFunction = GetReturnType<string>
+// never
+```
+
+## 提取函数类型
+
+### 返回值类型
+
+```typescript
+// 提取返回值（内置 ReturnType 的实现）
+type MyReturnType<T extends (...args: any) => any> = T extends (
+  ...args: any
+) => infer R
+  ? R
+  : any
+
+type R1 = MyReturnType<() => string> // string
+type R2 = MyReturnType<(x: number) => boolean> // boolean
+type R3 = MyReturnType<typeof Math.random> // number
+
+// 处理异步函数
+type AsyncReturnType<T extends (...args: any) => Promise<any>> = T extends (
+  ...args: any
+) => Promise<infer R>
+  ? R
+  : never
+
+async function fetchData() {
+  return { id: 1, name: '张三' }
+}
+
+type Data = AsyncReturnType<typeof fetchData>
+// { id: number; name: string }
+```
+
+### 参数类型
+
+```typescript
+// 提取参数类型（内置 Parameters 的实现）
+type MyParameters<T extends (...args: any) => any> = T extends (
+  ...args: infer P
+) => any
+  ? P
+  : never
+
+function example(name: string, age: number, active: boolean) {}
+
+type Params = MyParameters<typeof example>
+// [name: string, age: number, active: boolean]
+
+// 提取第一个参数
+type FirstParam<T extends (...args: any) => any> = T extends (
+  first: infer F,
+  ...rest: any
+) => any
+  ? F
+  : never
+
+type First = FirstParam<typeof example>
+// string
+
+// 提取剩余参数
+type RestParams<T extends (...args: any) => any> = T extends (
+  first: any,
+  ...rest: infer R
+) => any
+  ? R
+  : never
+
+type Rest = RestParams<typeof example>
+// [age: number, active: boolean]
+
+// 提取最后一个参数
+type LastParam<T extends any[]> = T extends [...any, infer L] ? L : never
+
+type Last = LastParam<Parameters<typeof example>>
+// boolean
+```
+
+### this 参数
+
+```typescript
+// 提取 this 参数类型
+type ThisParameterType<T> = T extends (this: infer U, ...args: any[]) => any
+  ? U
+  : unknown
+
+function greet(this: { name: string }) {
+  console.log(`Hello, ${this.name}`)
+}
+
+type GreetThis = ThisParameterType<typeof greet>
+// { name: string }
+
+// 移除 this 参数
+type OmitThisParameter<T> = T extends (this: any, ...args: infer A) => infer R
+  ? (...args: A) => R
+  : T
+
+type GreetWithoutThis = OmitThisParameter<typeof greet>
+// () => void
+```
+
+## 提取数组类型
+
+```typescript
+// 提取数组元素类型
+type ElementType<T> = T extends (infer E)[] ? E : never
+
+type E1 = ElementType<string[]> // string
+type E2 = ElementType<number[]> // number
+type E3 = ElementType<(string | number)[]> // string | number
+
+// 提取元组第一个元素
+type Head<T extends any[]> = T extends [infer H, ...any[]] ? H : never
+
+type H1 = Head<[string, number, boolean]> // string
+type H2 = Head<[]> // never
+
+// 提取元组最后一个元素
+type Tail<T extends any[]> = T extends [...any[], infer L] ? L : never
+
+type T1 = Tail<[string, number, boolean]> // boolean
+
+// 提取除第一个外的元素
+type Rest<T extends any[]> = T extends [any, ...infer R] ? R : never
+
+type R1 = Rest<[1, 2, 3]> // [2, 3]
+type R2 = Rest<[1]> // []
+
+// 提取除最后一个外的元素
+type Init<T extends any[]> = T extends [...infer I, any] ? I : never
+
+type I1 = Init<[1, 2, 3]> // [1, 2]
+```
+
+## 提取 Promise 类型
+
+```typescript
+// 提取 Promise 内部类型
+type UnwrapPromise<T> = T extends Promise<infer U> ? U : T
+
+type P1 = UnwrapPromise<Promise<string>> // string
+type P2 = UnwrapPromise<Promise<number[]>> // number[]
+type P3 = UnwrapPromise<string> // string（非 Promise 返回原类型）
+
+// 深度解包（内置 Awaited 的实现）
+type DeepAwaited<T> = T extends Promise<infer U> ? DeepAwaited<U> : T
+
+type D1 = DeepAwaited<Promise<Promise<string>>> // string
+type D2 = DeepAwaited<Promise<Promise<Promise<number>>>> // number
+
+// 提取 PromiseLike
+type UnwrapPromiseLike<T> = T extends PromiseLike<infer U> ? U : T
+
+const thenable = {
+  then: (resolve: (value: string) => void) => resolve('hello'),
+}
+
+type Thenable = UnwrapPromiseLike<typeof thenable>
+// string
+```
+
+## 提取对象类型
+
+```typescript
+// 提取对象属性类型
+type PropertyType<T, K extends keyof T> = T extends { [P in K]: infer V }
+  ? V
+  : never
+
+interface User {
+  id: number
+  name: string
+  email: string
+}
+
+type IdType = PropertyType<User, 'id'> // number
+
+// 提取构造函数实例类型
+type InstanceType<T extends new (...args: any) => any> = T extends new (
+  ...args: any
+) => infer R
+  ? R
+  : any
+
+class User {
+  constructor(public name: string) {}
+}
+
+type UserInstance = InstanceType<typeof User>
+// User
+
+// 提取构造函数参数
+type ConstructorParameters<T extends new (...args: any) => any> =
+  T extends new (...args: infer P) => any ? P : never
+
+type UserParams = ConstructorParameters<typeof User>
+// [name: string]
+```
+
+## 多个 infer
+
+在同一个条件中可以使用多个 `infer`：
+
+```typescript
+// 同时提取键和值
+type KeyValue<T> = T extends { key: infer K; value: infer V } ? [K, V] : never
+
+type KV = KeyValue<{ key: 'name'; value: string }>
+// ['name', string]
+
+// 提取函数的参数和返回值
+type FunctionParts<T> = T extends (...args: infer P) => infer R
+  ? { params: P; return: R }
+  : never
+
+type Parts = FunctionParts<(a: string, b: number) => boolean>
+// { params: [a: string, b: number]; return: boolean }
+
+// 提取元组的头尾
+type HeadAndTail<T extends any[]> = T extends [infer H, ...infer T]
+  ? { head: H; tail: T }
+  : never
+
+type HT = HeadAndTail<[1, 2, 3, 4]>
+// { head: 1; tail: [2, 3, 4] }
+```
+
+## 条件推断
+
+结合条件类型进行复杂推断：
+
+```typescript
+// 根据类型选择推断方式
+type Unpacked<T> = T extends (infer U)[]
+  ? U
+  : T extends (...args: any[]) => infer U
+    ? U
+    : T extends Promise<infer U>
+      ? U
+      : T
+
+type T0 = Unpacked<string> // string
+type T1 = Unpacked<string[]> // string
+type T2 = Unpacked<() => string> // string
+type T3 = Unpacked<Promise<string>> // string
+
+// 嵌套解包
+type DeepUnpacked<T> = T extends (infer U)[]
+  ? DeepUnpacked<U>
+  : T extends (...args: any[]) => infer U
+    ? DeepUnpacked<U>
+    : T extends Promise<infer U>
+      ? DeepUnpacked<U>
+      : T
+
+type D0 = DeepUnpacked<Promise<string[]>> // string
+type D1 = DeepUnpacked<() => Promise<number[]>> // number
+```
+
+## 实际应用
+
+### 类型转换工具
+
+```typescript
+// 将对象方法转换为异步版本
+type AsyncMethods<T> = {
+  [K in keyof T]: T[K] extends (...args: infer A) => infer R
+    ? (...args: A) => Promise<R>
+    : T[K]
+}
+
+interface UserService {
+  getUser(id: number): User
+  updateUser(user: User): void
+  deleteUser(id: number): boolean
+}
+
+type AsyncUserService = AsyncMethods<UserService>
+// {
+//   getUser: (id: number) => Promise<User>
+//   updateUser: (user: User) => Promise<void>
+//   deleteUser: (id: number) => Promise<boolean>
+// }
+```
+
+### 路由参数提取
+
+```typescript
+// 从路由路径提取参数
+type ExtractRouteParams<T extends string> =
+  T extends `${infer Start}:${infer Param}/${infer Rest}`
+    ? { [K in Param | keyof ExtractRouteParams<Rest>]: string }
+    : T extends `${infer Start}:${infer Param}`
+      ? { [K in Param]: string }
+      : {}
+
+type Params1 = ExtractRouteParams<'/users/:id'>
+// { id: string }
+
+type Params2 = ExtractRouteParams<'/users/:userId/posts/:postId'>
+// { userId: string; postId: string }
+
+type Params3 = ExtractRouteParams<'/home'>
+// {}
+```
+
+### 事件处理器提取
+
+```typescript
+// 从组件类型提取事件处理器
+type ExtractEventHandlers<T> = {
+  [K in keyof T as K extends `on${infer Event}` ? Event : never]: T[K] extends (
+    ...args: infer A
+  ) => any
+    ? A
+    : never
+}
+
+interface ButtonProps {
+  onClick: (e: MouseEvent) => void
+  onHover: (e: MouseEvent) => void
+  onFocus: (e: FocusEvent) => void
+  disabled: boolean
+  label: string
+}
+
+type ButtonEvents = ExtractEventHandlers<ButtonProps>
+// {
+//   Click: [e: MouseEvent]
+//   Hover: [e: MouseEvent]
+//   Focus: [e: FocusEvent]
+// }
+```
+
+### Vue 组件 Props 推断
+
+```typescript
+// 模拟 Vue 组件 props 推断
+type ExtractProps<T> = T extends { props: infer P } ? P : {}
+
+type ExtractEmits<T> = T extends { emits: infer E } ? E : {}
+
+const component = {
+  props: {
+    title: String,
+    count: Number,
+  },
+  emits: ['update', 'delete'],
+}
+
+type Props = ExtractProps<typeof component>
+// { title: StringConstructor; count: NumberConstructor }
+```
+
+### 柯里化类型
+
+```typescript
+// 函数柯里化类型
+type Curry<F> = F extends (...args: infer A) => infer R
+  ? A extends [infer First, ...infer Rest]
+    ? (arg: First) => Curry<(...args: Rest) => R>
+    : R
+  : never
+
+function add(a: number, b: number, c: number): number {
+  return a + b + c
+}
+
+type CurriedAdd = Curry<typeof add>
+// (arg: number) => (arg: number) => (arg: number) => number
+```
+
+## 常见问题
+
+### 🙋 infer 可以在 extends 之外使用吗？
+
+```typescript
+// ❌ 错误：infer 只能在条件类型的 extends 子句中使用
+// type Wrong<T> = infer U;
+
+// ✅ 正确
+type Right<T> = T extends infer U ? U : never
+```
+
+### 🙋 多个 infer 同名会怎样？
+
+```typescript
+// 同名 infer 会被推断为联合类型
+type Foo<T> = T extends { a: infer U; b: infer U } ? U : never
+
+type Result = Foo<{ a: string; b: number }>
+// string | number
+
+// 协变位置：联合
+type Bar<T> = T extends { a: (x: infer U) => void; b: (x: infer U) => void }
+  ? U
+  : never
+
+type Result2 = Bar<{ a: (x: string) => void; b: (x: number) => void }>
+// string & number = never（逆变位置）
+```
+
+### 🙋 如何推断字面量类型？
+
+```typescript
+// 使用 const 断言保留字面量类型
+function createConfig<T extends string>(key: T) {
+  return { key }
+}
+
+const config = createConfig('api-key' as const)
+// { key: 'api-key' }
+
+// 在 infer 中推断字面量
+type ExtractLiteral<T> = T extends `${infer L}` ? L : never
+
+type Lit = ExtractLiteral<'hello'>
+// 'hello'
+```
+
+## 总结
+
+| 用途         | 语法                        | 示例                 |
+| ------------ | --------------------------- | -------------------- |
+| 提取返回值   | `(...args) => infer R`      | `ReturnType<T>`      |
+| 提取参数     | `(...args: infer P) => any` | `Parameters<T>`      |
+| 提取数组元素 | `(infer E)[]`               | `ElementType<T>`     |
+| 提取 Promise | `Promise<infer U>`          | `Awaited<T>`         |
+| 提取实例     | `new (...args) => infer R`  | `InstanceType<T>`    |
+| 提取元组     | `[infer H, ...infer T]`     | `Head<T>`, `Tail<T>` |
+
+下一篇我们将学习模板字面量类型，了解如何在类型层面操作字符串。

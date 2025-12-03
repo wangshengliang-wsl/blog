@@ -1,0 +1,551 @@
+---
+title: '泛型接口与泛型类'
+description: 'TypeScript 泛型接口与泛型类详解：泛型接口定义、泛型类实现、默认类型参数的使用方法'
+pubDate: 2024-01-31
+toc: true
+ogImage: true
+category: 'TypeScript'
+tags: ['TypeScript', '泛型接口', '泛型类', 'Generics']
+---
+
+泛型不仅可以用于函数，还可以用于接口和类。这让我们能够创建更加灵活和可复用的数据结构。
+
+## 泛型接口
+
+### 基本定义
+
+```typescript
+// TypeScript 5.x
+
+// 泛型接口
+interface Container<T> {
+  value: T
+  getValue(): T
+  setValue(value: T): void
+}
+
+// 实现泛型接口
+const stringContainer: Container<string> = {
+  value: 'hello',
+  getValue() {
+    return this.value
+  },
+  setValue(value) {
+    this.value = value
+  },
+}
+
+const numberContainer: Container<number> = {
+  value: 42,
+  getValue() {
+    return this.value
+  },
+  setValue(value) {
+    this.value = value
+  },
+}
+```
+
+### 多类型参数
+
+```typescript
+// 键值对接口
+interface KeyValuePair<K, V> {
+  key: K
+  value: V
+}
+
+const pair1: KeyValuePair<string, number> = {
+  key: 'age',
+  value: 25,
+}
+
+const pair2: KeyValuePair<number, string> = {
+  key: 1,
+  value: 'first',
+}
+
+// 字典接口
+interface Dictionary<K extends string | number, V> {
+  get(key: K): V | undefined
+  set(key: K, value: V): void
+  has(key: K): boolean
+}
+```
+
+### 函数类型接口
+
+```typescript
+// 函数类型的泛型接口
+interface Transformer<T, U> {
+  (input: T): U
+}
+
+const stringToNumber: Transformer<string, number> = (s) => parseInt(s)
+const numberToString: Transformer<number, string> = (n) => n.toString()
+
+// 带方法的函数接口
+interface Parser<T> {
+  (input: string): T
+  validate(input: string): boolean
+}
+
+const jsonParser: Parser<object> = Object.assign(
+  (input: string) => JSON.parse(input),
+  {
+    validate: (input: string) => {
+      try {
+        JSON.parse(input)
+        return true
+      } catch {
+        return false
+      }
+    },
+  }
+)
+```
+
+### 继承泛型接口
+
+```typescript
+// 基础仓储接口
+interface Repository<T> {
+  findById(id: string): Promise<T | null>
+  findAll(): Promise<T[]>
+  save(entity: T): Promise<T>
+  delete(id: string): Promise<void>
+}
+
+// 扩展接口
+interface SortableRepository<T> extends Repository<T> {
+  findAllSorted(field: keyof T, order: 'asc' | 'desc'): Promise<T[]>
+}
+
+// 带分页的接口
+interface PaginatedRepository<T> extends Repository<T> {
+  findPaginated(
+    page: number,
+    size: number
+  ): Promise<{
+    items: T[]
+    total: number
+    page: number
+    pageSize: number
+  }>
+}
+
+// 组合接口
+interface AdvancedRepository<T>
+  extends SortableRepository<T>,
+    PaginatedRepository<T> {
+  search(query: Partial<T>): Promise<T[]>
+}
+```
+
+## 泛型类
+
+### 基本定义
+
+```typescript
+class Box<T> {
+  private content: T
+
+  constructor(initial: T) {
+    this.content = initial
+  }
+
+  get(): T {
+    return this.content
+  }
+
+  set(value: T): void {
+    this.content = value
+  }
+}
+
+const stringBox = new Box<string>('hello')
+console.log(stringBox.get()) // "hello"
+stringBox.set('world')
+
+const numberBox = new Box(42) // 类型推断为 Box<number>
+console.log(numberBox.get()) // 42
+```
+
+### 多类型参数
+
+```typescript
+class Pair<T, U> {
+  constructor(
+    public first: T,
+    public second: U
+  ) {}
+
+  swap(): Pair<U, T> {
+    return new Pair(this.second, this.first)
+  }
+
+  map<V, W>(fn1: (value: T) => V, fn2: (value: U) => W): Pair<V, W> {
+    return new Pair(fn1(this.first), fn2(this.second))
+  }
+}
+
+const pair = new Pair('hello', 42)
+const swapped = pair.swap() // Pair<number, string>
+const mapped = pair.map(
+  (s) => s.length,
+  (n) => n.toString()
+)
+// Pair<number, string>
+```
+
+### 泛型类实现泛型接口
+
+```typescript
+interface Stack<T> {
+  push(item: T): void
+  pop(): T | undefined
+  peek(): T | undefined
+  isEmpty(): boolean
+  size(): number
+}
+
+class ArrayStack<T> implements Stack<T> {
+  private items: T[] = []
+
+  push(item: T): void {
+    this.items.push(item)
+  }
+
+  pop(): T | undefined {
+    return this.items.pop()
+  }
+
+  peek(): T | undefined {
+    return this.items[this.items.length - 1]
+  }
+
+  isEmpty(): boolean {
+    return this.items.length === 0
+  }
+
+  size(): number {
+    return this.items.length
+  }
+}
+
+const numberStack = new ArrayStack<number>()
+numberStack.push(1)
+numberStack.push(2)
+console.log(numberStack.pop()) // 2
+```
+
+### 静态成员与泛型
+
+静态成员不能使用类的类型参数：
+
+```typescript
+class Container<T> {
+  // ❌ 静态成员不能引用类型参数
+  // static defaultValue: T;
+
+  // ✅ 可以有自己的泛型
+  static create<U>(value: U): Container<U> {
+    return new Container(value)
+  }
+
+  constructor(public value: T) {}
+}
+
+const container = Container.create('hello') // Container<string>
+```
+
+### 泛型类继承
+
+```typescript
+// 基类
+class Collection<T> {
+  protected items: T[] = []
+
+  add(item: T): void {
+    this.items.push(item)
+  }
+
+  remove(item: T): boolean {
+    const index = this.items.indexOf(item)
+    if (index > -1) {
+      this.items.splice(index, 1)
+      return true
+    }
+    return false
+  }
+
+  toArray(): T[] {
+    return [...this.items]
+  }
+}
+
+// 保持泛型继承
+class SortableCollection<T> extends Collection<T> {
+  sort(compareFn: (a: T, b: T) => number): void {
+    this.items.sort(compareFn)
+  }
+}
+
+// 固定类型继承
+class StringCollection extends Collection<string> {
+  join(separator: string): string {
+    return this.items.join(separator)
+  }
+}
+
+// 添加新类型参数
+class MappedCollection<T, K> extends Collection<T> {
+  private keyFn: (item: T) => K
+
+  constructor(keyFn: (item: T) => K) {
+    super()
+    this.keyFn = keyFn
+  }
+
+  findByKey(key: K): T | undefined {
+    return this.items.find((item) => this.keyFn(item) === key)
+  }
+}
+```
+
+## 默认类型参数
+
+```typescript
+// 接口默认类型
+interface Response<T = any> {
+  data: T
+  status: number
+  message: string
+}
+
+const res1: Response = { data: 'anything', status: 200, message: 'OK' }
+const res2: Response<string[]> = {
+  data: ['a', 'b'],
+  status: 200,
+  message: 'OK',
+}
+
+// 类默认类型
+class EventEmitter<T = Record<string, unknown>> {
+  private handlers = new Map<keyof T, Function[]>()
+
+  on<K extends keyof T>(event: K, handler: (payload: T[K]) => void): void {
+    const list = this.handlers.get(event) || []
+    list.push(handler)
+    this.handlers.set(event, list)
+  }
+
+  emit<K extends keyof T>(event: K, payload: T[K]): void {
+    const handlers = this.handlers.get(event) || []
+    handlers.forEach((h) => h(payload))
+  }
+}
+
+// 使用默认类型
+const emitter1 = new EventEmitter()
+emitter1.on('anyEvent', (data) => console.log(data))
+
+// 指定事件类型
+interface AppEvents {
+  login: { userId: string }
+  logout: undefined
+  error: Error
+}
+
+const emitter2 = new EventEmitter<AppEvents>()
+emitter2.on('login', (payload) => console.log(payload.userId))
+emitter2.emit('login', { userId: '123' })
+```
+
+## 实际应用
+
+### 通用数据结构
+
+```typescript
+// 链表节点
+class ListNode<T> {
+  constructor(
+    public value: T,
+    public next: ListNode<T> | null = null
+  ) {}
+}
+
+// 链表
+class LinkedList<T> {
+  private head: ListNode<T> | null = null
+  private tail: ListNode<T> | null = null
+  private _size = 0
+
+  get size(): number {
+    return this._size
+  }
+
+  append(value: T): void {
+    const node = new ListNode(value)
+    if (!this.tail) {
+      this.head = this.tail = node
+    } else {
+      this.tail.next = node
+      this.tail = node
+    }
+    this._size++
+  }
+
+  prepend(value: T): void {
+    const node = new ListNode(value, this.head)
+    this.head = node
+    if (!this.tail) {
+      this.tail = node
+    }
+    this._size++
+  }
+
+  *[Symbol.iterator](): Iterator<T> {
+    let current = this.head
+    while (current) {
+      yield current.value
+      current = current.next
+    }
+  }
+
+  toArray(): T[] {
+    return [...this]
+  }
+}
+
+const list = new LinkedList<number>()
+list.append(1)
+list.append(2)
+list.prepend(0)
+console.log(list.toArray()) // [0, 1, 2]
+```
+
+### 状态管理
+
+```typescript
+interface State {
+  [key: string]: unknown
+}
+
+class Store<S extends State> {
+  private state: S
+  private listeners: ((state: S) => void)[] = []
+
+  constructor(initialState: S) {
+    this.state = initialState
+  }
+
+  getState(): S {
+    return this.state
+  }
+
+  setState(partial: Partial<S>): void {
+    this.state = { ...this.state, ...partial }
+    this.notify()
+  }
+
+  subscribe(listener: (state: S) => void): () => void {
+    this.listeners.push(listener)
+    return () => {
+      this.listeners = this.listeners.filter((l) => l !== listener)
+    }
+  }
+
+  private notify(): void {
+    this.listeners.forEach((l) => l(this.state))
+  }
+}
+
+interface AppState {
+  user: { name: string } | null
+  count: number
+  loading: boolean
+}
+
+const store = new Store<AppState>({
+  user: null,
+  count: 0,
+  loading: false,
+})
+
+store.subscribe((state) => console.log('State changed:', state))
+store.setState({ count: 1 })
+store.setState({ user: { name: '张三' } })
+```
+
+## 常见问题
+
+### 🙋 泛型类的类型参数可以用于静态成员吗？
+
+不能。静态成员属于类本身，而类型参数是实例级别的：
+
+```typescript
+class Example<T> {
+  // ❌ 错误
+  // static value: T;
+
+  // ✅ 静态方法可以有自己的类型参数
+  static of<U>(value: U): Example<U> {
+    return new Example()
+  }
+}
+```
+
+### 🙋 泛型接口和泛型类型别名有什么区别？
+
+主要区别在于接口可以合并声明：
+
+```typescript
+// 接口可以合并
+interface Box<T> {
+  value: T
+}
+interface Box<T> {
+  isEmpty(): boolean
+}
+
+// type 不能合并
+type BoxType<T> = {
+  value: T
+}
+// type BoxType<T> = { isEmpty(): boolean }  // ❌ 错误
+```
+
+### 🙋 如何约束泛型类的类型参数？
+
+使用 `extends` 关键字：
+
+```typescript
+interface Identifiable {
+  id: string
+}
+
+class Repository<T extends Identifiable> {
+  private items = new Map<string, T>()
+
+  save(item: T): void {
+    this.items.set(item.id, item)
+  }
+
+  findById(id: string): T | undefined {
+    return this.items.get(id)
+  }
+}
+```
+
+## 总结
+
+| 特性     | 语法                          | 用途             |
+| -------- | ----------------------------- | ---------------- |
+| 泛型接口 | `interface Box<T> { }`        | 定义通用契约     |
+| 泛型类   | `class Box<T> { }`            | 创建通用数据结构 |
+| 默认类型 | `<T = string>`                | 提供类型默认值   |
+| 接口继承 | `extends GenericInterface<T>` | 扩展泛型接口     |
+| 类继承   | `extends GenericClass<T>`     | 继承泛型类       |
+
+下一篇我们将学习泛型约束，了解如何限制类型参数的范围。

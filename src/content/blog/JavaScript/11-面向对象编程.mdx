@@ -1,0 +1,665 @@
+---
+title: '面向对象编程'
+description: '掌握 JavaScript 面向对象编程，理解构造函数、原型继承与 ES6 Class 语法'
+pubDate: 2025-12-03
+toc: true
+ogImage: true
+category: 'JavaScript'
+tags: ['JavaScript', '面向对象', 'Class', '继承']
+---
+
+JavaScript 使用原型实现面向对象编程。ES6 的 Class 语法让代码更清晰，但本质仍是原型继承。
+
+## 🎯 构造函数
+
+### 基本用法
+
+```javascript
+// 构造函数（首字母大写）
+function Person(name, age) {
+  this.name = name
+  this.age = age
+}
+
+// 原型方法
+Person.prototype.greet = function () {
+  return `你好，我是${this.name}，今年${this.age}岁`
+}
+
+// 创建实例
+const p1 = new Person('张三', 25)
+const p2 = new Person('李四', 30)
+
+console.log(p1.greet()) // "你好，我是张三，今年25岁"
+console.log(p1.greet === p2.greet) // true（共享方法）
+```
+
+### 实例属性 vs 原型属性
+
+```javascript
+function Car(brand) {
+  // 实例属性：每个实例独立
+  this.brand = brand
+  this.mileage = 0
+}
+
+// 原型属性：所有实例共享
+Car.prototype.wheels = 4
+Car.prototype.drive = function (km) {
+  this.mileage += km
+}
+
+const car1 = new Car('Toyota')
+const car2 = new Car('Honda')
+
+car1.drive(100)
+console.log(car1.mileage) // 100
+console.log(car2.mileage) // 0（独立）
+console.log(car1.wheels === car2.wheels) // true（共享）
+```
+
+### 静态方法
+
+```javascript
+function MathHelper() {}
+
+// 静态方法：直接挂在构造函数上
+MathHelper.add = function (a, b) {
+  return a + b
+}
+
+MathHelper.multiply = function (a, b) {
+  return a * b
+}
+
+// 调用静态方法
+console.log(MathHelper.add(1, 2)) // 3
+console.log(MathHelper.multiply(3, 4)) // 12
+
+// 实例无法访问静态方法
+const helper = new MathHelper()
+// helper.add(1, 2)  // TypeError
+```
+
+## ES6 Class
+
+### 基本语法
+
+```javascript
+class Person {
+  // 构造函数
+  constructor(name, age) {
+    this.name = name
+    this.age = age
+  }
+
+  // 实例方法（在原型上）
+  greet() {
+    return `你好，我是${this.name}`
+  }
+
+  // getter
+  get info() {
+    return `${this.name}, ${this.age}岁`
+  }
+
+  // setter
+  set info(value) {
+    const [name, age] = value.split(',')
+    this.name = name
+    this.age = parseInt(age)
+  }
+
+  // 静态方法
+  static create(name, age) {
+    return new Person(name, age)
+  }
+
+  // 静态属性
+  static species = 'Homo sapiens'
+}
+
+const p = new Person('张三', 25)
+console.log(p.greet()) // "你好，我是张三"
+console.log(p.info) // "张三, 25岁"
+console.log(Person.species) // "Homo sapiens"
+console.log(Person.create('李四', 30)) // Person { name: "李四", age: 30 }
+```
+
+### 类字段
+
+```javascript
+class Counter {
+  // 公共字段
+  count = 0
+  name = 'counter'
+
+  // 私有字段（ES2022）
+  #privateCount = 0
+
+  increment() {
+    this.count++
+    this.#privateCount++
+  }
+
+  getPrivateCount() {
+    return this.#privateCount
+  }
+}
+
+const counter = new Counter()
+counter.increment()
+console.log(counter.count) // 1
+console.log(counter.getPrivateCount()) // 1
+// console.log(counter.#privateCount)  // SyntaxError
+```
+
+### 私有方法
+
+```javascript
+class BankAccount {
+  #balance = 0
+
+  constructor(initialBalance) {
+    this.#balance = initialBalance
+  }
+
+  // 私有方法
+  #validate(amount) {
+    if (amount <= 0) throw new Error('金额必须大于0')
+  }
+
+  deposit(amount) {
+    this.#validate(amount)
+    this.#balance += amount
+  }
+
+  withdraw(amount) {
+    this.#validate(amount)
+    if (amount > this.#balance) throw new Error('余额不足')
+    this.#balance -= amount
+  }
+
+  get balance() {
+    return this.#balance
+  }
+}
+
+const account = new BankAccount(1000)
+account.deposit(500)
+console.log(account.balance) // 1500
+```
+
+## 继承
+
+### ES6 extends
+
+```javascript
+class Animal {
+  constructor(name) {
+    this.name = name
+  }
+
+  eat() {
+    return `${this.name}在吃东西`
+  }
+
+  sleep() {
+    return `${this.name}在睡觉`
+  }
+}
+
+class Dog extends Animal {
+  constructor(name, breed) {
+    super(name) // 必须先调用 super
+    this.breed = breed
+  }
+
+  // 新增方法
+  bark() {
+    return '汪汪！'
+  }
+
+  // 重写方法
+  eat() {
+    return `${this.name}在吃狗粮`
+  }
+
+  // 调用父类方法
+  sleep() {
+    return super.sleep() + '，做着美梦'
+  }
+}
+
+const dog = new Dog('小黑', '拉布拉多')
+console.log(dog.eat()) // "小黑在吃狗粮"
+console.log(dog.sleep()) // "小黑在睡觉，做着美梦"
+console.log(dog.bark()) // "汪汪！"
+console.log(dog instanceof Dog) // true
+console.log(dog instanceof Animal) // true
+```
+
+### super 关键字
+
+```javascript
+class Parent {
+  constructor(x) {
+    this.x = x
+  }
+
+  static staticMethod() {
+    return 'parent static'
+  }
+
+  instanceMethod() {
+    return 'parent instance'
+  }
+}
+
+class Child extends Parent {
+  constructor(x, y) {
+    // 构造函数中，super 必须在使用 this 之前调用
+    super(x)
+    this.y = y
+  }
+
+  static staticMethod() {
+    // 静态方法中调用父类静态方法
+    return super.staticMethod() + ' -> child static'
+  }
+
+  instanceMethod() {
+    // 实例方法中调用父类方法
+    return super.instanceMethod() + ' -> child instance'
+  }
+}
+
+const child = new Child(1, 2)
+console.log(child.instanceMethod()) // "parent instance -> child instance"
+console.log(Child.staticMethod()) // "parent static -> child static"
+```
+
+### 继承内置类
+
+```javascript
+// 扩展 Array
+class MyArray extends Array {
+  first() {
+    return this[0]
+  }
+
+  last() {
+    return this[this.length - 1]
+  }
+
+  sum() {
+    return this.reduce((a, b) => a + b, 0)
+  }
+}
+
+const arr = new MyArray(1, 2, 3, 4, 5)
+console.log(arr.first()) // 1
+console.log(arr.last()) // 5
+console.log(arr.sum()) // 15
+console.log(arr.map((x) => x * 2)) // MyArray [2, 4, 6, 8, 10]
+
+// 扩展 Error
+class ValidationError extends Error {
+  constructor(message, field) {
+    super(message)
+    this.name = 'ValidationError'
+    this.field = field
+  }
+}
+
+try {
+  throw new ValidationError('必填项', 'username')
+} catch (e) {
+  console.log(e.name) // "ValidationError"
+  console.log(e.field) // "username"
+}
+```
+
+## 抽象与封装
+
+### 模拟抽象类
+
+```javascript
+class Shape {
+  constructor() {
+    if (new.target === Shape) {
+      throw new Error('Shape 是抽象类，不能直接实例化')
+    }
+  }
+
+  // 抽象方法
+  area() {
+    throw new Error('子类必须实现 area 方法')
+  }
+
+  // 具体方法
+  describe() {
+    return `这是一个面积为 ${this.area()} 的图形`
+  }
+}
+
+class Rectangle extends Shape {
+  constructor(width, height) {
+    super()
+    this.width = width
+    this.height = height
+  }
+
+  area() {
+    return this.width * this.height
+  }
+}
+
+// const shape = new Shape()  // Error
+const rect = new Rectangle(10, 5)
+console.log(rect.area()) // 50
+console.log(rect.describe()) // "这是一个面积为 50 的图形"
+```
+
+### 封装与信息隐藏
+
+```javascript
+// 使用闭包（ES6 之前）
+function createPerson(name) {
+  let _age = 0 // 私有变量
+
+  return {
+    getName() {
+      return name
+    },
+    getAge() {
+      return _age
+    },
+    setAge(age) {
+      if (age < 0) throw new Error('年龄不能为负')
+      _age = age
+    },
+  }
+}
+
+// 使用 WeakMap（ES6）
+const _private = new WeakMap()
+
+class Person {
+  constructor(name) {
+    _private.set(this, { name, age: 0 })
+  }
+
+  get name() {
+    return _private.get(this).name
+  }
+
+  get age() {
+    return _private.get(this).age
+  }
+
+  set age(value) {
+    if (value < 0) throw new Error('年龄不能为负')
+    _private.get(this).age = value
+  }
+}
+
+// 使用私有字段（ES2022）
+class User {
+  #password
+
+  constructor(username, password) {
+    this.username = username
+    this.#password = password
+  }
+
+  checkPassword(input) {
+    return this.#password === input
+  }
+}
+```
+
+## 多态
+
+```javascript
+class Animal {
+  speak() {
+    return '动物发出声音'
+  }
+}
+
+class Dog extends Animal {
+  speak() {
+    return '汪汪！'
+  }
+}
+
+class Cat extends Animal {
+  speak() {
+    return '喵喵！'
+  }
+}
+
+class Bird extends Animal {
+  speak() {
+    return '叽叽！'
+  }
+}
+
+// 多态：同一接口，不同实现
+function makeAllSpeak(animals) {
+  animals.forEach((animal) => {
+    console.log(animal.speak())
+  })
+}
+
+makeAllSpeak([new Dog(), new Cat(), new Bird()])
+// ���汪！
+// 喵喵！
+// 叽叽！
+```
+
+## 组合优于继承
+
+```javascript
+// 过深的继承层次会导致问题
+// 使用组合更灵活
+
+// 可复用的行为
+const canSwim = {
+  swim() {
+    return `${this.name}在游泳`
+  },
+}
+
+const canFly = {
+  fly() {
+    return `${this.name}在飞翔`
+  },
+}
+
+const canWalk = {
+  walk() {
+    return `${this.name}在行走`
+  },
+}
+
+// 组合行为
+class Duck {
+  constructor(name) {
+    this.name = name
+  }
+}
+
+Object.assign(Duck.prototype, canSwim, canFly, canWalk)
+
+const duck = new Duck('唐老鸭')
+console.log(duck.swim()) // "唐老鸭在游泳"
+console.log(duck.fly()) // "唐老鸭在飞翔"
+console.log(duck.walk()) // "唐老鸭在行走"
+
+// 使用工厂函数
+function createDuck(name) {
+  const duck = { name }
+  return Object.assign(duck, canSwim, canFly, canWalk)
+}
+```
+
+## 设计模式示例
+
+### 单例模式
+
+```javascript
+class Database {
+  static #instance = null
+
+  constructor() {
+    if (Database.#instance) {
+      return Database.#instance
+    }
+    this.connection = this.connect()
+    Database.#instance = this
+  }
+
+  connect() {
+    console.log('建立数据库连接')
+    return { connected: true }
+  }
+
+  static getInstance() {
+    if (!Database.#instance) {
+      Database.#instance = new Database()
+    }
+    return Database.#instance
+  }
+}
+
+const db1 = Database.getInstance()
+const db2 = Database.getInstance()
+console.log(db1 === db2) // true
+```
+
+### 工厂模式
+
+```javascript
+class Car {
+  constructor(brand) {
+    this.brand = brand
+  }
+}
+
+class Bike {
+  constructor(brand) {
+    this.brand = brand
+  }
+}
+
+class VehicleFactory {
+  static create(type, brand) {
+    switch (type) {
+      case 'car':
+        return new Car(brand)
+      case 'bike':
+        return new Bike(brand)
+      default:
+        throw new Error(`未知类型: ${type}`)
+    }
+  }
+}
+
+const car = VehicleFactory.create('car', 'Toyota')
+const bike = VehicleFactory.create('bike', 'Giant')
+```
+
+### 观察者模式
+
+```javascript
+class EventEmitter {
+  #events = {}
+
+  on(event, callback) {
+    if (!this.#events[event]) {
+      this.#events[event] = []
+    }
+    this.#events[event].push(callback)
+  }
+
+  off(event, callback) {
+    if (!this.#events[event]) return
+    this.#events[event] = this.#events[event].filter((cb) => cb !== callback)
+  }
+
+  emit(event, ...args) {
+    if (!this.#events[event]) return
+    this.#events[event].forEach((callback) => {
+      callback(...args)
+    })
+  }
+
+  once(event, callback) {
+    const wrapper = (...args) => {
+      callback(...args)
+      this.off(event, wrapper)
+    }
+    this.on(event, wrapper)
+  }
+}
+
+const emitter = new EventEmitter()
+emitter.on('message', (msg) => console.log('收到:', msg))
+emitter.emit('message', '你好') // "收到: 你好"
+```
+
+## Class vs 构造函数
+
+```javascript
+// 构造函数
+function PersonFn(name) {
+  this.name = name
+}
+PersonFn.prototype.greet = function () {
+  return `你好，${this.name}`
+}
+
+// Class
+class PersonClass {
+  constructor(name) {
+    this.name = name
+  }
+  greet() {
+    return `你好，${this.name}`
+  }
+}
+
+// 主要区别：
+// 1. Class 必须用 new 调用
+// PersonClass('张三')  // TypeError
+
+// 2. Class 不会提升
+// new Foo()  // ReferenceError
+// class Foo {}
+
+// 3. Class 内部默认严格模式
+
+// 4. Class 的方法不可枚举
+console.log(Object.keys(PersonFn.prototype)) // ["greet"]
+console.log(Object.keys(PersonClass.prototype)) // []
+```
+
+## 总结
+
+| 特性     | 构造函数          | ES6 Class     |
+| -------- | ----------------- | ------------- |
+| 语法     | function          | class         |
+| 继承     | 手动设置原型      | extends       |
+| super    | Parent.call(this) | super()       |
+| 私有成员 | 闭包 / WeakMap    | # 前缀        |
+| 静态成员 | 直接挂载          | static 关键字 |
+| 严格模式 | 需手动声明        | 默认          |
+
+**核心要点**：
+
+- Class 是构造函数的语法糖，本质是原型继承
+- 使用 `extends` 和 `super` 实现继承
+- `#` 前缀定义真正的私有成员
+- 组合优于继承，保持继承层次扁平

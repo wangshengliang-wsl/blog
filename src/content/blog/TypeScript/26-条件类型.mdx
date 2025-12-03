@@ -1,0 +1,414 @@
+---
+title: '条件类型'
+description: 'TypeScript 条件类型详解：条件表达式、分布式条件类型、类型推断与条件类型结合'
+pubDate: 2024-02-09
+toc: true
+ogImage: true
+category: 'TypeScript'
+tags: ['TypeScript', '条件类型', 'Conditional Types', '类型推断', '高级类型']
+---
+
+条件类型（Conditional Types）允许根据类型关系选择不同的类型，类似于类型级别的 if-else 语句。
+
+## 基本语法
+
+条件类型使用 `extends` 关键字判断类型关系：
+
+```typescript
+// TypeScript 5.x
+
+// 基本语法：T extends U ? X : Y
+type IsString<T> = T extends string ? true : false
+
+type A = IsString<string> // true
+type B = IsString<number> // false
+type C = IsString<'hello'> // true
+
+// 实际应用
+type NonNullable<T> = T extends null | undefined ? never : T
+
+type D = NonNullable<string | null> // string
+type E = NonNullable<number | undefined> // number
+type F = NonNullable<null> // never
+
+// 嵌套条件
+type TypeName<T> = T extends string
+  ? 'string'
+  : T extends number
+    ? 'number'
+    : T extends boolean
+      ? 'boolean'
+      : T extends undefined
+        ? 'undefined'
+        : T extends Function
+          ? 'function'
+          : 'object'
+
+type T1 = TypeName<string> // 'string'
+type T2 = TypeName<number[]> // 'object'
+type T3 = TypeName<() => void> // 'function'
+```
+
+## 分布式条件类型
+
+当条件类型作用于联合类型时，会自动分配到每个成员：
+
+```typescript
+// 分布式条件类型
+type ToArray<T> = T extends any ? T[] : never
+
+type StrArr = ToArray<string> // string[]
+type NumArr = ToArray<number> // number[]
+
+// 联合类型会被分配
+type Mixed = ToArray<string | number>
+// string[] | number[]（不是 (string | number)[]）
+
+// 过滤联合类型
+type Filter<T, U> = T extends U ? T : never
+
+type OnlyStrings = Filter<string | number | boolean, string>
+// string
+
+type OnlyNumbers = Filter<string | number | boolean, number>
+// number
+
+// 排除类型
+type MyExclude<T, U> = T extends U ? never : T
+
+type WithoutString = MyExclude<string | number | boolean, string>
+// number | boolean
+
+// 提取类型
+type MyExtract<T, U> = T extends U ? T : never
+
+type OnlyStringOrNumber = MyExtract<string | number | boolean, string | number>
+// string | number
+```
+
+## 禁用分布式行为
+
+使用元组包装类型参数可以禁用分布式行为：
+
+```typescript
+// 分布式（默认）
+type Distributed<T> = T extends any ? T[] : never
+type D1 = Distributed<string | number> // string[] | number[]
+
+// 非分布式
+type NonDistributed<T> = [T] extends [any] ? T[] : never
+type D2 = NonDistributed<string | number> // (string | number)[]
+
+// 检查联合类型
+type IsUnion<T> = [T] extends [UnionToIntersection<T>] ? false : true
+
+type Check1 = IsUnion<string> // false
+type Check2 = IsUnion<string | number> // true
+
+// 辅助类型
+type UnionToIntersection<U> = (U extends any ? (k: U) => void : never) extends (
+  k: infer I
+) => void
+  ? I
+  : never
+```
+
+## 条件类型约束
+
+在条件分支中使用类型约束：
+
+```typescript
+// 约束 T 必须有 length 属性
+type GetLength<T> = T extends { length: infer L } ? L : never
+
+type StrLength = GetLength<string> // number
+type ArrLength = GetLength<number[]> // number
+type NoLength = GetLength<number> // never
+
+// 约束 T 必须是函数
+type GetReturnType<T> = T extends (...args: any[]) => infer R ? R : never
+
+type FnReturn = GetReturnType<() => string> // string
+type NotFn = GetReturnType<string> // never
+
+// 多层约束
+type DeepValue<T, K extends string> = K extends keyof T
+  ? T[K]
+  : K extends `${infer First}.${infer Rest}`
+    ? First extends keyof T
+      ? DeepValue<T[First], Rest>
+      : never
+    : never
+```
+
+## 实用条件类型
+
+```typescript
+// 检查类型相等
+type Equals<X, Y> =
+  (<T>() => T extends X ? 1 : 2) extends <T>() => T extends Y ? 1 : 2
+    ? true
+    : false
+
+type E1 = Equals<string, string> // true
+type E2 = Equals<string, number> // false
+type E3 = Equals<{ a: 1 }, { a: 1 }> // true
+
+// 检查是否为 any
+type IsAny<T> = 0 extends 1 & T ? true : false
+
+type A1 = IsAny<any> // true
+type A2 = IsAny<unknown> // false
+type A3 = IsAny<string> // false
+
+// 检查是否为 never
+type IsNever<T> = [T] extends [never] ? true : false
+
+type N1 = IsNever<never> // true
+type N2 = IsNever<string> // false
+
+// 检查是否为数组
+type IsArray<T> = T extends any[] ? true : false
+
+type Arr1 = IsArray<string[]> // true
+type Arr2 = IsArray<string> // false
+
+// 检查是否为元组
+type IsTuple<T> = T extends readonly any[]
+  ? number extends T['length']
+    ? false
+    : true
+  : false
+
+type Tup1 = IsTuple<[string, number]> // true
+type Tup2 = IsTuple<string[]> // false
+```
+
+## 条件类型与泛型
+
+```typescript
+// 根据类型选择行为
+type Flatten<T> = T extends any[] ? T[number] : T
+
+type Flat1 = Flatten<string[]> // string
+type Flat2 = Flatten<string> // string
+type Flat3 = Flatten<number[][]> // number[]
+
+// 深度展平
+type DeepFlatten<T> = T extends any[] ? DeepFlatten<T[number]> : T
+
+type Deep1 = DeepFlatten<string[][][]> // string
+type Deep2 = DeepFlatten<number> // number
+
+// 条件默认值
+type WithDefault<T, D> = T extends undefined | null ? D : T
+
+type WD1 = WithDefault<string, 'default'> // string
+type WD2 = WithDefault<undefined, 'default'> // 'default'
+
+// 可选属性检测
+type OptionalKeys<T> = {
+  [K in keyof T]-?: {} extends Pick<T, K> ? K : never
+}[keyof T]
+
+interface Example {
+  required: string
+  optional?: number
+  alsoOptional?: boolean
+}
+
+type OptKeys = OptionalKeys<Example>
+// 'optional' | 'alsoOptional'
+```
+
+## 实际应用
+
+### Promise 解包
+
+```typescript
+// 解包 Promise
+type UnwrapPromise<T> = T extends Promise<infer U> ? U : T
+
+type P1 = UnwrapPromise<Promise<string>> // string
+type P2 = UnwrapPromise<string> // string
+
+// 深度解包
+type Awaited<T> = T extends Promise<infer U> ? Awaited<U> : T
+
+type A1 = Awaited<Promise<Promise<string>>> // string
+type A2 = Awaited<Promise<number>> // number
+
+// 函数返回值解包
+type UnwrapReturnType<T extends (...args: any[]) => any> = Awaited<
+  ReturnType<T>
+>
+
+async function fetchUser() {
+  return { id: 1, name: '张三' }
+}
+
+type User = UnwrapReturnType<typeof fetchUser>
+// { id: number; name: string }
+```
+
+### 事件处理
+
+```typescript
+type EventType = 'click' | 'focus' | 'blur'
+
+type EventPayload<T extends EventType> = T extends 'click'
+  ? { x: number; y: number }
+  : T extends 'focus'
+    ? { target: HTMLElement }
+    : T extends 'blur'
+      ? { relatedTarget: HTMLElement | null }
+      : never
+
+function handleEvent<T extends EventType>(type: T, payload: EventPayload<T>) {
+  switch (type) {
+    case 'click':
+      const clickPayload = payload as EventPayload<'click'>
+      console.log(clickPayload.x, clickPayload.y)
+      break
+    case 'focus':
+      const focusPayload = payload as EventPayload<'focus'>
+      console.log(focusPayload.target)
+      break
+  }
+}
+
+handleEvent('click', { x: 100, y: 200 })
+handleEvent('focus', { target: document.body })
+```
+
+### 路由参数
+
+```typescript
+type ExtractParams<T extends string> =
+  T extends `${string}:${infer Param}/${infer Rest}`
+    ? Param | ExtractParams<Rest>
+    : T extends `${string}:${infer Param}`
+      ? Param
+      : never
+
+type Params1 = ExtractParams<'/users/:id'>
+// 'id'
+
+type Params2 = ExtractParams<'/posts/:postId/comments/:commentId'>
+// 'postId' | 'commentId'
+
+// 构建参数对象
+type RouteParams<T extends string> = {
+  [K in ExtractParams<T>]: string
+}
+
+type UserParams = RouteParams<'/users/:id'>
+// { id: string }
+
+type PostParams = RouteParams<'/posts/:postId/comments/:commentId'>
+// { postId: string; commentId: string }
+```
+
+### API 响应类型
+
+```typescript
+type ApiResponse<T, E = Error> =
+  | { success: true; data: T }
+  | { success: false; error: E }
+
+type ExtractData<T> = T extends { success: true; data: infer D } ? D : never
+
+type ExtractError<T> = T extends { success: false; error: infer E } ? E : never
+
+type Response = ApiResponse<{ id: number; name: string }>
+
+type Data = ExtractData<Response>
+// { id: number; name: string }
+
+type Err = ExtractError<Response>
+// Error
+
+// 处理函数
+async function handleResponse<T>(response: ApiResponse<T>): Promise<T> {
+  if (response.success) {
+    return response.data
+  }
+  throw response.error
+}
+```
+
+### 函数重载选择
+
+```typescript
+type Overload<T, U> = T extends string
+  ? (value: T) => string
+  : T extends number
+    ? (value: T) => number
+    : (value: T) => U
+
+function process(value: string): string
+function process(value: number): number
+function process(value: any): any {
+  return value
+}
+
+// 类型推断
+type ProcessString = Overload<string, never> // (value: string) => string
+type ProcessNumber = Overload<number, never> // (value: number) => number
+```
+
+## 常见问题
+
+### 🙋 条件类型可以递归吗？
+
+```typescript
+// TypeScript 支持条件类型递归
+type Reverse<T extends any[]> = T extends [infer First, ...infer Rest]
+  ? [...Reverse<Rest>, First]
+  : []
+
+type Reversed = Reverse<[1, 2, 3]>
+// [3, 2, 1]
+
+// 注意：过深的递归会导致错误
+// TypeScript 有递归深度限制
+```
+
+### 🙋 为什么条件类型结果是 never？
+
+```typescript
+type Result<T> = T extends string ? T : never
+
+// never 出现的情况：
+type R1 = Result<number> // never（条件不满足）
+type R2 = Result<never> // never（never 是空联合类型）
+
+// 联合类型分配后全是 never
+type R3 = Result<number | boolean>
+// never（两个分支都是 never，合并后还是 never）
+```
+
+### 🙋 如何调试条件类型？
+
+```typescript
+// 使用辅助类型展开
+type Debug<T> = { [K in keyof T]: T[K] }
+
+type Complex<T> = T extends object ? { [K in keyof T]: Complex<T[K]> } : T
+
+// 具体化查看
+type Test = Debug<Complex<{ a: { b: string } }>>
+// 悬停查看展开后的类型
+```
+
+## 总结
+
+| 特性       | 语法                  | 用途                   |
+| ---------- | --------------------- | ---------------------- |
+| 条件表达式 | `T extends U ? X : Y` | 类型级别的 if-else     |
+| 分布式条件 | 联合类型自动分配      | 对每个联合成员应用条件 |
+| 禁用分布   | `[T] extends [U]`     | 防止联合类型分配       |
+| 类型推断   | `infer R`             | 在条件中提取类型       |
+| 嵌套条件   | 多层 `? :`            | 多条件判断             |
+
+下一篇我们将学习 infer 关键字，深入了解条件类型中的类型推断。

@@ -1,0 +1,614 @@
+---
+title: 字体优化
+description: 使用 next/font 优化字体加载，实现零布局偏移和本地托管
+pubDate: 2025-12-03
+toc: true
+ogImage: true
+category: Next
+tags: ['Next.js', 'next/font', '字体优化', '性能']
+---
+
+🙋 字体加载导致页面闪烁？next/font 能自动优化字体，消除布局偏移。
+
+## 为什么使用 next/font
+
+| 问题           | 传统方式           | next/font     |
+| -------------- | ------------------ | ------------- |
+| 布局偏移 (CLS) | 常见               | ✅ 零偏移     |
+| 隐私           | 请求 Google 服务器 | ✅ 本地托管   |
+| 请求数         | 多次               | ✅ 构建时内联 |
+| 配置复杂度     | 高                 | ✅ 简单       |
+
+## Google 字体
+
+### 基础用法
+
+```tsx
+// app/layout.tsx
+import { Inter } from 'next/font/google'
+
+const inter = Inter({
+  subsets: ['latin'],
+})
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="zh-CN" className={inter.className}>
+      <body>{children}</body>
+    </html>
+  )
+}
+```
+
+### 中文字体
+
+```tsx
+// app/layout.tsx
+import { Noto_Sans_SC } from 'next/font/google'
+
+const notoSansSC = Noto_Sans_SC({
+  subsets: ['latin'],
+  weight: ['400', '500', '700'],
+  display: 'swap',
+})
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="zh-CN" className={notoSansSC.className}>
+      <body>{children}</body>
+    </html>
+  )
+}
+```
+
+### 多字体组合
+
+```tsx
+// app/layout.tsx
+import { Inter, Noto_Sans_SC, JetBrains_Mono } from 'next/font/google'
+
+// 英文正文
+const inter = Inter({
+  subsets: ['latin'],
+  variable: '--font-inter',
+})
+
+// 中文
+const notoSansSC = Noto_Sans_SC({
+  subsets: ['latin'],
+  weight: ['400', '500', '700'],
+  variable: '--font-noto-sans-sc',
+})
+
+// 代码
+const jetBrainsMono = JetBrains_Mono({
+  subsets: ['latin'],
+  variable: '--font-mono',
+})
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html
+      lang="zh-CN"
+      className={`${inter.variable} ${notoSansSC.variable} ${jetBrainsMono.variable}`}
+    >
+      <body>{children}</body>
+    </html>
+  )
+}
+```
+
+配合 Tailwind CSS：
+
+```tsx
+// tailwind.config.ts
+import type { Config } from 'tailwindcss'
+
+const config: Config = {
+  theme: {
+    extend: {
+      fontFamily: {
+        sans: ['var(--font-inter)', 'var(--font-noto-sans-sc)', 'sans-serif'],
+        mono: ['var(--font-mono)', 'monospace'],
+      },
+    },
+  },
+}
+
+export default config
+```
+
+使用：
+
+```tsx
+<p className="font-sans">正文文字</p>
+<code className="font-mono">代码文字</code>
+```
+
+### 可变字体
+
+```tsx
+import { Inter } from 'next/font/google'
+
+// 可变字体支持所有字重
+const inter = Inter({
+  subsets: ['latin'],
+  // 不需要指定 weight，可变字体包含所有字重
+})
+```
+
+## 本地字体
+
+### 基础用法
+
+```tsx
+// app/layout.tsx
+import localFont from 'next/font/local'
+
+const myFont = localFont({
+  src: './fonts/MyFont.woff2',
+  display: 'swap',
+})
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="zh-CN" className={myFont.className}>
+      <body>{children}</body>
+    </html>
+  )
+}
+```
+
+### 多字重
+
+```tsx
+import localFont from 'next/font/local'
+
+const myFont = localFont({
+  src: [
+    {
+      path: './fonts/MyFont-Regular.woff2',
+      weight: '400',
+      style: 'normal',
+    },
+    {
+      path: './fonts/MyFont-Medium.woff2',
+      weight: '500',
+      style: 'normal',
+    },
+    {
+      path: './fonts/MyFont-Bold.woff2',
+      weight: '700',
+      style: 'normal',
+    },
+    {
+      path: './fonts/MyFont-Italic.woff2',
+      weight: '400',
+      style: 'italic',
+    },
+  ],
+  display: 'swap',
+  variable: '--font-my-font',
+})
+```
+
+### 可变本地字体
+
+```tsx
+import localFont from 'next/font/local'
+
+const myVariableFont = localFont({
+  src: './fonts/MyFont-Variable.woff2',
+  display: 'swap',
+  variable: '--font-my-variable',
+})
+```
+
+## 字体配置选项
+
+### display 策略
+
+```tsx
+const font = Inter({
+  subsets: ['latin'],
+  display: 'swap', // 推荐
+  // 可选值：
+  // 'auto' - 浏览器默认
+  // 'block' - 短暂隐藏，然后显示
+  // 'swap' - 立即显示后备字体，加载后替换
+  // 'fallback' - 短暂隐藏，超时用后备字体
+  // 'optional' - 短暂隐藏，可能不显示自定义字体
+})
+```
+
+### preload
+
+```tsx
+const font = Inter({
+  subsets: ['latin'],
+  preload: true, // 默认 true，预加载字体
+})
+```
+
+### adjustFontFallback
+
+```tsx
+const font = Inter({
+  subsets: ['latin'],
+  adjustFontFallback: true, // 自动调整后备字体以减少 CLS
+})
+```
+
+### subsets
+
+```tsx
+const font = Inter({
+  // 只加载需要的字符子集
+  subsets: ['latin', 'latin-ext'],
+})
+
+// 中文字体
+const notoSansSC = Noto_Sans_SC({
+  subsets: ['latin'], // 中文自动包含
+  weight: ['400', '700'],
+})
+```
+
+## CSS 变量模式
+
+### 定义变量
+
+```tsx
+// app/layout.tsx
+import { Inter } from 'next/font/google'
+
+const inter = Inter({
+  subsets: ['latin'],
+  variable: '--font-inter',
+})
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="zh-CN" className={inter.variable}>
+      <body>{children}</body>
+    </html>
+  )
+}
+```
+
+### 使用变量
+
+```css
+/* globals.css */
+body {
+  font-family: var(--font-inter), sans-serif;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-heading), serif;
+}
+
+code,
+pre {
+  font-family: var(--font-mono), monospace;
+}
+```
+
+### 配合 Tailwind
+
+```tsx
+// tailwind.config.ts
+const config: Config = {
+  theme: {
+    extend: {
+      fontFamily: {
+        sans: ['var(--font-inter)'],
+        heading: ['var(--font-heading)'],
+        mono: ['var(--font-mono)'],
+      },
+    },
+  },
+}
+```
+
+```tsx
+<h1 className="font-heading">标题</h1>
+<p className="font-sans">正文</p>
+<code className="font-mono">代码</code>
+```
+
+## 组件级字体
+
+### 局部字体
+
+```tsx
+// components/SpecialText.tsx
+import { Playfair_Display } from 'next/font/google'
+
+const playfair = Playfair_Display({
+  subsets: ['latin'],
+  weight: ['400', '700'],
+})
+
+export function SpecialText({ children }: { children: React.ReactNode }) {
+  return <span className={playfair.className}>{children}</span>
+}
+```
+
+### 条件字体
+
+```tsx
+// components/Logo.tsx
+import { Pacifico } from 'next/font/google'
+
+const logoFont = Pacifico({
+  subsets: ['latin'],
+  weight: '400',
+})
+
+export function Logo() {
+  return <span className={logoFont.className}>MyBrand</span>
+}
+```
+
+## 实战配置
+
+### 博客网站
+
+```tsx
+// app/layout.tsx
+import { Inter, Merriweather, JetBrains_Mono } from 'next/font/google'
+
+// UI 字体
+const inter = Inter({
+  subsets: ['latin'],
+  variable: '--font-sans',
+})
+
+// 文章正文
+const merriweather = Merriweather({
+  subsets: ['latin'],
+  weight: ['300', '400', '700'],
+  variable: '--font-serif',
+})
+
+// 代码块
+const jetBrainsMono = JetBrains_Mono({
+  subsets: ['latin'],
+  variable: '--font-mono',
+})
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html
+      lang="zh-CN"
+      className={`${inter.variable} ${merriweather.variable} ${jetBrainsMono.variable}`}
+    >
+      <body className="font-sans">{children}</body>
+    </html>
+  )
+}
+```
+
+```css
+/* globals.css */
+.prose {
+  font-family: var(--font-serif);
+}
+
+.prose code {
+  font-family: var(--font-mono);
+}
+
+.prose h1,
+.prose h2,
+.prose h3 {
+  font-family: var(--font-sans);
+}
+```
+
+### 电商网站
+
+```tsx
+// app/layout.tsx
+import { Poppins, Noto_Sans_SC } from 'next/font/google'
+
+const poppins = Poppins({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-poppins',
+})
+
+const notoSansSC = Noto_Sans_SC({
+  subsets: ['latin'],
+  weight: ['400', '500', '700'],
+  variable: '--font-noto',
+})
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="zh-CN" className={`${poppins.variable} ${notoSansSC.variable}`}>
+      <body>{children}</body>
+    </html>
+  )
+}
+```
+
+```tsx
+// tailwind.config.ts
+const config: Config = {
+  theme: {
+    extend: {
+      fontFamily: {
+        // 英文优先，中文回退
+        sans: [
+          'var(--font-poppins)',
+          'var(--font-noto)',
+          'system-ui',
+          'sans-serif',
+        ],
+        // 纯中文
+        chinese: ['var(--font-noto)', 'sans-serif'],
+      },
+    },
+  },
+}
+```
+
+### 品牌定制
+
+```tsx
+// app/layout.tsx
+import localFont from 'next/font/local'
+import { Inter } from 'next/font/google'
+
+// 品牌字体（本地）
+const brandFont = localFont({
+  src: [
+    { path: './fonts/Brand-Regular.woff2', weight: '400' },
+    { path: './fonts/Brand-Bold.woff2', weight: '700' },
+  ],
+  variable: '--font-brand',
+})
+
+// 正文字体（Google）
+const inter = Inter({
+  subsets: ['latin'],
+  variable: '--font-body',
+})
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="zh-CN" className={`${brandFont.variable} ${inter.variable}`}>
+      <body className="font-body">{children}</body>
+    </html>
+  )
+}
+```
+
+## 性能优化
+
+### 只加载需要的字重
+
+```tsx
+// ❌ 加载所有字重
+const font = Noto_Sans_SC({
+  subsets: ['latin'],
+  weight: ['100', '200', '300', '400', '500', '600', '700', '800', '900'],
+})
+
+// ✅ 只加载使用的字重
+const font = Noto_Sans_SC({
+  subsets: ['latin'],
+  weight: ['400', '500', '700'],
+})
+```
+
+### 使用可变字体
+
+```tsx
+// 可变字体一个文件包含所有字重
+const inter = Inter({
+  subsets: ['latin'],
+  // 无需指定 weight
+})
+```
+
+### 子集优化
+
+```tsx
+// 只加载拉丁字符
+const font = Inter({
+  subsets: ['latin'],
+})
+
+// 需要扩展拉丁字符时
+const font = Inter({
+  subsets: ['latin', 'latin-ext'],
+})
+```
+
+## 常见问题
+
+🤔 **Q: 字体加载时页面闪烁怎么办？**
+
+使用 `display: 'swap'` 配合 `adjustFontFallback`：
+
+```tsx
+const font = Inter({
+  subsets: ['latin'],
+  display: 'swap',
+  adjustFontFallback: true,
+})
+```
+
+🤔 **Q: 如何减少中文字体体积？**
+
+中文字体较大，可以：
+
+1. 使用字体子集服务（如 FontSpider）
+2. 使用系统字体作为后备
+3. 只在标题使用自定义中文字体
+
+```tsx
+const config: Config = {
+  theme: {
+    fontFamily: {
+      sans: [
+        'var(--font-inter)',
+        'PingFang SC',
+        'Microsoft YaHei',
+        'sans-serif',
+      ],
+    },
+  },
+}
+```
+
+🤔 **Q: next/font 支持所有 Google 字体吗？**
+
+是的，支持所有 Google Fonts。字体名使用下划线分隔：
+
+```tsx
+import { Open_Sans, Source_Code_Pro } from 'next/font/google'
+```
+
+---
+
+下一篇将介绍脚本优化，学习如何高效加载第三方脚本。
+
+-EOF-

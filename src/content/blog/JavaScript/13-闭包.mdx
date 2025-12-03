@@ -1,0 +1,616 @@
+---
+title: '闭包'
+description: '深入理解 JavaScript 闭包的原理、应用场景与内存管理'
+pubDate: 2025-12-03
+toc: true
+ogImage: true
+category: 'JavaScript'
+tags: ['JavaScript', '闭包', '作用域', '内存']
+---
+
+闭包是 JavaScript 最强大的特性之一。函数可以"记住"并访问其定义时的词法作用域，即使在该作用域之外执行。
+
+## 🎯 什么是闭包
+
+闭包 = 函数 + 函数定义时的词法环境
+
+```javascript
+function outer() {
+  const message = '你好'
+
+  function inner() {
+    console.log(message) // 访问外层变量
+  }
+
+  return inner
+}
+
+const fn = outer()
+fn() // "你好"
+
+// inner 函数被返回后，message 变量仍然可以访问
+// 这就是闭包
+```
+
+### 理解闭包
+
+```javascript
+function createCounter() {
+  let count = 0 // 这个变量被闭包"捕获"
+
+  return {
+    increment() {
+      count++
+      return count
+    },
+    decrement() {
+      count--
+      return count
+    },
+    getCount() {
+      return count
+    },
+  }
+}
+
+const counter = createCounter()
+console.log(counter.increment()) // 1
+console.log(counter.increment()) // 2
+console.log(counter.decrement()) // 1
+console.log(counter.getCount()) // 1
+
+// count 变量对外部不可见，但函数可以访问
+// console.log(count)  // ReferenceError
+```
+
+### 每次调用创建新的闭包
+
+```javascript
+function createGreeter(name) {
+  return function () {
+    console.log(`你好，${name}`)
+  }
+}
+
+const greetZhang = createGreeter('张三')
+const greetLi = createGreeter('李四')
+
+greetZhang() // "你好，张三"
+greetLi() // "你好，李四"
+
+// 两个函数各自有独立的闭包，保存不同的 name
+```
+
+## 闭包的应用场景
+
+### 1. 数据封装
+
+```javascript
+function createBankAccount(initialBalance) {
+  let balance = initialBalance // 私有变量
+
+  return {
+    deposit(amount) {
+      if (amount <= 0) throw new Error('金额必须大于0')
+      balance += amount
+      return balance
+    },
+
+    withdraw(amount) {
+      if (amount <= 0) throw new Error('金额必须大于0')
+      if (amount > balance) throw new Error('余额不足')
+      balance -= amount
+      return balance
+    },
+
+    getBalance() {
+      return balance
+    },
+  }
+}
+
+const account = createBankAccount(1000)
+account.deposit(500) // 1500
+account.withdraw(200) // 1300
+console.log(account.getBalance()) // 1300
+// account.balance  // undefined（无法直接访问）
+```
+
+### 2. 函数工厂
+
+```javascript
+// 创建乘法函数
+function createMultiplier(factor) {
+  return function (number) {
+    return number * factor
+  }
+}
+
+const double = createMultiplier(2)
+const triple = createMultiplier(3)
+const tenTimes = createMultiplier(10)
+
+console.log(double(5)) // 10
+console.log(triple(5)) // 15
+console.log(tenTimes(5)) // 50
+
+// 创建验证函数
+function createValidator(min, max) {
+  return function (value) {
+    return value >= min && value <= max
+  }
+}
+
+const isValidAge = createValidator(0, 150)
+const isValidScore = createValidator(0, 100)
+
+console.log(isValidAge(25)) // true
+console.log(isValidScore(101)) // false
+```
+
+### 3. 模块模式
+
+```javascript
+const Calculator = (function () {
+  // 私有变量
+  let result = 0
+
+  // 私有方法
+  function validate(n) {
+    if (typeof n !== 'number') throw new Error('必须是数字')
+  }
+
+  // 公开接口
+  return {
+    add(n) {
+      validate(n)
+      result += n
+      return this
+    },
+
+    subtract(n) {
+      validate(n)
+      result -= n
+      return this
+    },
+
+    multiply(n) {
+      validate(n)
+      result *= n
+      return this
+    },
+
+    getResult() {
+      return result
+    },
+
+    reset() {
+      result = 0
+      return this
+    },
+  }
+})()
+
+Calculator.add(10).subtract(3).multiply(2)
+console.log(Calculator.getResult()) // 14
+```
+
+### 4. 记忆化（缓存）
+
+```javascript
+function memoize(fn) {
+  const cache = {} // 闭包保存缓存
+
+  return function (...args) {
+    const key = JSON.stringify(args)
+    if (key in cache) {
+      console.log('从缓存获取')
+      return cache[key]
+    }
+    console.log('计算中...')
+    const result = fn.apply(this, args)
+    cache[key] = result
+    return result
+  }
+}
+
+// 计算斐波那契
+const fibonacci = memoize(function (n) {
+  if (n <= 1) return n
+  return fibonacci(n - 1) + fibonacci(n - 2)
+})
+
+console.log(fibonacci(40)) // 快速计算
+console.log(fibonacci(40)) // 从缓存获取
+```
+
+### 5. 柯里化
+
+```javascript
+function curry(fn) {
+  return function curried(...args) {
+    if (args.length >= fn.length) {
+      return fn.apply(this, args)
+    }
+    return function (...moreArgs) {
+      return curried.apply(this, [...args, ...moreArgs])
+    }
+  }
+}
+
+function add(a, b, c) {
+  return a + b + c
+}
+
+const curriedAdd = curry(add)
+
+console.log(curriedAdd(1)(2)(3)) // 6
+console.log(curriedAdd(1, 2)(3)) // 6
+console.log(curriedAdd(1)(2, 3)) // 6
+console.log(curriedAdd(1, 2, 3)) // 6
+
+// 实际应用
+const log = curry((level, message, data) => {
+  console.log(`[${level}] ${message}`, data)
+})
+
+const logError = log('ERROR')
+const logInfo = log('INFO')
+
+logError('请求失败', { code: 500 })
+logInfo('用户登录', { user: '张三' })
+```
+
+### 6. 防抖与节流
+
+```javascript
+// 防抖：延迟执行，重复调用会重置计时器
+function debounce(fn, delay) {
+  let timer = null
+
+  return function (...args) {
+    clearTimeout(timer)
+    timer = setTimeout(() => {
+      fn.apply(this, args)
+    }, delay)
+  }
+}
+
+// 节流：固定频率执行
+function throttle(fn, interval) {
+  let lastTime = 0
+
+  return function (...args) {
+    const now = Date.now()
+    if (now - lastTime >= interval) {
+      lastTime = now
+      fn.apply(this, args)
+    }
+  }
+}
+
+// 使用
+const debouncedSearch = debounce((query) => {
+  console.log('搜索:', query)
+}, 300)
+
+const throttledScroll = throttle(() => {
+  console.log('滚动位置:', window.scrollY)
+}, 100)
+```
+
+### 7. once 函数
+
+```javascript
+function once(fn) {
+  let called = false
+  let result
+
+  return function (...args) {
+    if (called) return result
+    called = true
+    result = fn.apply(this, args)
+    return result
+  }
+}
+
+const initialize = once(() => {
+  console.log('初始化完成')
+  return { initialized: true }
+})
+
+initialize() // 打印"初始化完成"，返回对象
+initialize() // 直接返回之前的结果，不再执行
+initialize() // 同上
+```
+
+## 循环中的闭包
+
+### 经典问题
+
+```javascript
+// 问题代码
+for (var i = 0; i < 3; i++) {
+  setTimeout(function () {
+    console.log(i)
+  }, 100)
+}
+// 输出：3, 3, 3
+
+// 为什么？
+// 1. var 没有块级作用域，i 是同一个变量
+// 2. setTimeout 回调在循环结束后执行
+// 3. 此时 i 已经是 3
+```
+
+### 解决方案
+
+```javascript
+// 方案1：使用 let（推荐）
+for (let i = 0; i < 3; i++) {
+  setTimeout(() => console.log(i), 100)
+}
+// 输出：0, 1, 2
+
+// 方案2：IIFE 创建闭包
+for (var i = 0; i < 3; i++) {
+  ;(function (j) {
+    setTimeout(() => console.log(j), 100)
+  })(i)
+}
+
+// 方案3：创建函数返回函数
+for (var i = 0; i < 3; i++) {
+  setTimeout(
+    (function (j) {
+      return function () {
+        console.log(j)
+      }
+    })(i),
+    100
+  )
+}
+
+// 方案4：bind 预设参数
+for (var i = 0; i < 3; i++) {
+  setTimeout(
+    function (j) {
+      console.log(j)
+    }.bind(null, i),
+    100
+  )
+}
+```
+
+## 闭包与内存
+
+### 内存泄漏风险
+
+```javascript
+// 🔶 闭包会保持对外部变量的引用
+function createHeavyClosure() {
+  const largeData = new Array(1000000).fill('x') // 大数组
+
+  return function () {
+    // 即使只使用 length，整个 largeData 都会被保留
+    console.log(largeData.length)
+  }
+}
+
+const fn = createHeavyClosure()
+// largeData 无法被垃圾回收
+
+// ✅ 只保存需要的数据
+function createLightClosure() {
+  const largeData = new Array(1000000).fill('x')
+  const length = largeData.length // 只保存需要的
+
+  return function () {
+    console.log(length)
+  }
+}
+```
+
+### DOM 引用
+
+```javascript
+// 🔶 闭包引用 DOM 可能导致内存泄漏
+function attachHandler() {
+  const button = document.getElementById('myButton')
+
+  button.addEventListener('click', function () {
+    // 这个闭包引用了 button
+    console.log(button.id)
+  })
+
+  // 即使 button 从 DOM 移除，闭包仍持有引用
+}
+
+// ✅ 使用事件委托��在移除时解绑
+function attachHandlerSafe() {
+  const button = document.getElementById('myButton')
+
+  function handleClick() {
+    console.log(this.id)
+  }
+
+  button.addEventListener('click', handleClick)
+
+  // 提供清理方法
+  return function cleanup() {
+    button.removeEventListener('click', handleClick)
+  }
+}
+```
+
+### 解除闭包
+
+```javascript
+function createClosure() {
+  let data = { heavy: new Array(10000) }
+
+  return {
+    getData() {
+      return data
+    },
+    // 提供释放方法
+    dispose() {
+      data = null
+    },
+  }
+}
+
+const obj = createClosure()
+console.log(obj.getData()) // 使用数据
+obj.dispose() // 释放引用
+```
+
+## 闭包的本质
+
+### 作用域链
+
+```javascript
+function outer() {
+  const a = 1
+
+  function middle() {
+    const b = 2
+
+    function inner() {
+      const c = 3
+      console.log(a, b, c) // 通过作用域链访问
+    }
+
+    return inner
+  }
+
+  return middle
+}
+
+const middle = outer()
+const inner = middle()
+inner() // 1, 2, 3
+
+// inner 函数保存了完整的作用域链：
+// inner [[Scope]] -> middle 变量环境 -> outer 变量环境 -> 全局
+```
+
+### 变量生命周期
+
+```javascript
+// 普通情况：函数执行完，局部变量销毁
+function normal() {
+  const x = 1
+  console.log(x)
+} // x 被销毁
+
+// 闭包情况：被引用的变量不会销毁
+function closure() {
+  const x = 1
+  return function () {
+    console.log(x)
+  }
+}
+
+const fn = closure()
+// x 不会被销毁，因为 fn 引用了它
+fn() // 1
+```
+
+## 常见面试题
+
+### 🙋 实现 add(1)(2)(3)
+
+```javascript
+function add(a) {
+  return function (b) {
+    return function (c) {
+      return a + b + c
+    }
+  }
+}
+
+console.log(add(1)(2)(3)) // 6
+
+// 通用版本
+function sum(a) {
+  return function (b) {
+    if (b === undefined) return a
+    return sum(a + b)
+  }
+}
+
+sum(1)(2)(3)() // 6
+sum(1)(2)(3)(4)() // 10
+```
+
+### 🙋 实现私有变量
+
+```javascript
+function Person(name) {
+  // 私有变量
+  let _age = 0
+
+  this.name = name
+
+  this.getAge = function () {
+    return _age
+  }
+
+  this.setAge = function (age) {
+    if (age < 0 || age > 150) {
+      throw new Error('无效年龄')
+    }
+    _age = age
+  }
+}
+
+const p = new Person('张三')
+p.setAge(25)
+console.log(p.getAge()) // 25
+// console.log(p._age)  // undefined
+```
+
+### 🙋 解释输出
+
+```javascript
+function fun(n, o) {
+  console.log(o)
+  return {
+    fun: function (m) {
+      return fun(m, n)
+    },
+  }
+}
+
+var a = fun(0) // undefined
+a.fun(1) // 0
+a.fun(2) // 0
+a.fun(3) // 0
+
+var b = fun(0).fun(1).fun(2).fun(3)
+// undefined, 0, 1, 2
+
+var c = fun(0).fun(1)
+c.fun(2) // 1
+c.fun(3) // 1
+```
+
+## 总结
+
+| 应用场景 | 说明                     |
+| -------- | ------------------------ |
+| 数据封装 | 创建私有变量和方法       |
+| 函数工厂 | 生成预配置的函数         |
+| 模块模式 | 实现模��化，暴露公开接口 |
+| 记忆化   | 缓存计算结果             |
+| 柯里化   | 参数复用和延迟执行       |
+| 防抖节流 | 控制函数执行频率         |
+
+**核心要点**：
+
+- 闭包 = 函数 + 函数定义时的词法环境
+- 闭包让函数可以访问定义时的作用域
+- 注意闭包可能导致的内存泄漏
+- 循环中使用 `let` 避免闭包陷阱
+- 闭包是实现数据封装的重要手段

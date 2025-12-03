@@ -1,0 +1,409 @@
+---
+title: 缓存策略
+description: 深入理解 Next.js 的四层缓存机制，掌握请求缓存、数据缓存、路由缓存与完整路由缓存的配置
+pubDate: 2025-12-03
+toc: true
+ogImage: true
+category: Next
+tags: ['Next.js', '缓存', 'revalidate', '性能优化']
+---
+
+🙋 Next.js 的缓存机制有点复杂？理解四层缓存后，你就能精确控制数据新鲜度和性能。
+
+## 缓存机制概览
+
+Next.js 有四层缓存：
+
+| 缓存类型     | 位置   | 作用           | 默认行为     |
+| ------------ | ------ | -------------- | ------------ |
+| 请求记忆化   | 服务器 | 同一渲染中去重 | 自动         |
+| 数据缓存     | 服务器 | 跨请求持久化   | 启用         |
+| 完整路由缓存 | 服务器 | 缓存渲染结果   | 静态路由启用 |
+| 路由缓存     | 客户端 | 缓存已访问页面 | 启用         |
+
+## 请求记忆化
+
+### 自动去重
+
+同一渲染过程中，相同的 fetch 请求只执行一次：
+
+```tsx
+// 这两个组件在同一页面渲染时，只发送一次请求
+async function ComponentA() {
+  const data = await fetch('https://api.example.com/data').then((r) => r.json())
+  return <div>{data.a}</div>
+}
+
+async function ComponentB() {
+  const data = await fetch('https://api.example.com/data').then((r) => r.json())
+  return <div>{data.b}</div>
+}
+
+export default function Page() {
+  return (
+    <>
+      <ComponentA />
+      <ComponentB />
+    </>
+  )
+}
+```
+
+### 非 fetch 请求的去重
+
+使用 React `cache` 函数：
+
+```tsx
+// lib/db.ts
+import { cache } from 'react'
+import { db } from './prisma'
+
+export const getUser = cache(async (id: string) => {
+  console.log('查询用户:', id) // 只输出一次
+  return db.user.findUnique({ where: { id } })
+})
+```
+
+## 数据缓存
+
+### 默认缓存
+
+fetch 请求默认被缓存：
+
+```tsx
+// 默认行为：永久缓存
+const data = await fetch('https://api.example.com/data')
+// 等同于
+const data = await fetch('https://api.example.com/data', {
+  cache: 'force-cache',
+})
+```
+
+### 禁用缓存
+
+```tsx
+// 每次请求都获取最新数据
+const data = await fetch('https://api.example.com/data', {
+  cache: 'no-store',
+})
+```
+
+### 定时重新验证
+
+```tsx
+// 60 秒后数据过期
+const data = await fetch('https://api.example.com/data', {
+  next: { revalidate: 60 },
+})
+```
+
+### 缓存标签
+
+```tsx
+// 添加标签便于按需失效
+const data = await fetch('https://api.example.com/posts', {
+  next: { tags: ['posts'] },
+})
+
+const post = await fetch(`https://api.example.com/posts/${id}`, {
+  next: { tags: ['posts', `post-${id}`] },
+})
+```
+
+## 按需重新验证
+
+### revalidatePath
+
+```tsx
+// app/actions.ts
+'use server'
+
+import { revalidatePath } from 'next/cache'
+
+export async function createPost(formData: FormData) {
+  // 创建文章...
+
+  // 重新验证文章列表页
+  revalidatePath('/blog')
+
+  // 重新验证整个布局
+  revalidatePath('/blog', 'layout')
+
+  // 重新验证所有数据
+  revalidatePath('/', 'layout')
+}
+```
+
+### revalidateTag
+
+```tsx
+// app/actions.ts
+'use server'
+
+import { revalidateTag } from 'next/cache'
+
+export async function updatePost(id: string, formData: FormData) {
+  // 更新文章...
+
+  // 只重新验证相关标签的数据
+  revalidateTag(`post-${id}`)
+}
+
+export async function refreshAllPosts() {
+  // 重新验证所有文章
+  revalidateTag('posts')
+}
+```
+
+### API 路由触发
+
+```tsx
+// app/api/revalidate/route.ts
+import { revalidateTag, revalidatePath } from 'next/cache'
+import { NextRequest, NextResponse } from 'next/server'
+
+export async function POST(request: NextRequest) {
+  const { secret, tag, path } = await request.json()
+
+  // 验证密钥
+  if (secret !== process.env.REVALIDATE_SECRET) {
+    return NextResponse.json({ error: 'Invalid secret' }, { status: 401 })
+  }
+
+  if (tag) {
+    revalidateTag(tag)
+  }
+
+  if (path) {
+    revalidatePath(path)
+  }
+
+  return NextResponse.json({ revalidated: true, now: Date.now() })
+}
+```
+
+Webhook 调用示例：
+
+```bash
+curl -X POST https://your-site.com/api/revalidate \
+  -H "Content-Type: application/json" \
+  -d '{"secret": "your-secret", "tag": "posts"}'
+```
+
+## 路由段配置
+
+### 页面级配置
+
+```tsx
+// app/dashboard/page.tsx
+
+// 禁用此页面的所有缓存
+export const dynamic = 'force-dynamic'
+
+// 强制静态生成
+// export const dynamic = 'force-static'
+
+// 设置重新验证时间
+export const revalidate = 3600 // 1 小时
+
+// 控制 fetch 默认行为
+export const fetchCache = 'default-cache'
+// 可选值: 'auto' | 'default-cache' | 'only-cache' |
+//         'force-cache' | 'force-no-store' | 'default-no-store' | 'only-no-store'
+
+export default function DashboardPage() {
+  return <div>Dashboard</div>
+}
+```
+
+### 布局级配置
+
+```tsx
+// app/blog/layout.tsx
+
+// 此布局及所有子路由 60 秒重新验证
+export const revalidate = 60
+
+export default function BlogLayout({ children }) {
+  return <div>{children}</div>
+}
+```
+
+## 缓存策略选择
+
+### 决策流程
+
+```
+数据是否频繁变化？
+│
+├─ 否 → 使用默认缓存（永久）
+│       适用：静态内容、配置、不常更新的数据
+│
+└─ 是 → 是否需要实时更新？
+        │
+        ├─ 是 → cache: 'no-store'
+        │       适用：用户数据、实时状态
+        │
+        └─ 否 → 使用 revalidate
+                适用：新闻、商品、博客
+```
+
+### 场景配置表
+
+| 场景       | 配置                | 说明                |
+| ---------- | ------------------- | ------------------- |
+| 静态页面   | 默认                | 构建时生成          |
+| 博客文章   | `revalidate: 3600`  | 1 小时更新          |
+| 商品价格   | `revalidate: 60`    | 1 分钟更新          |
+| 用户仪表盘 | `cache: 'no-store'` | 实时数据            |
+| 配置信息   | 默认 + 按需         | 永久缓存 + 手动失效 |
+
+## 实战配置
+
+### 电商网站
+
+```tsx
+// lib/api.ts
+
+// 商品列表：5 分钟缓存
+export async function getProducts() {
+  return fetch('https://api.example.com/products', {
+    next: { revalidate: 300, tags: ['products'] },
+  }).then((r) => r.json())
+}
+
+// 商品详情：1 小时缓存 + 标签
+export async function getProduct(id: string) {
+  return fetch(`https://api.example.com/products/${id}`, {
+    next: { revalidate: 3600, tags: ['products', `product-${id}`] },
+  }).then((r) => r.json())
+}
+
+// 库存：不缓存
+export async function getStock(id: string) {
+  return fetch(`https://api.example.com/products/${id}/stock`, {
+    cache: 'no-store',
+  }).then((r) => r.json())
+}
+
+// 分类：永久缓存
+export async function getCategories() {
+  return fetch('https://api.example.com/categories').then((r) => r.json())
+}
+```
+
+```tsx
+// app/actions.ts
+'use server'
+
+import { revalidateTag } from 'next/cache'
+
+export async function updateProduct(id: string, data: FormData) {
+  await fetch(`https://api.example.com/products/${id}`, {
+    method: 'PUT',
+    body: data,
+  })
+
+  // 只失效这个产品的缓存
+  revalidateTag(`product-${id}`)
+}
+
+export async function addProduct(data: FormData) {
+  await fetch('https://api.example.com/products', {
+    method: 'POST',
+    body: data,
+  })
+
+  // 失效产品列表缓存
+  revalidateTag('products')
+}
+```
+
+### 新闻网站
+
+```tsx
+// lib/news.ts
+
+// 头条：5 分钟
+export async function getHeadlines() {
+  return fetch('https://api.example.com/headlines', {
+    next: { revalidate: 300, tags: ['headlines'] },
+  }).then((r) => r.json())
+}
+
+// 文章：1 小时
+export async function getArticle(slug: string) {
+  return fetch(`https://api.example.com/articles/${slug}`, {
+    next: { revalidate: 3600, tags: ['articles', `article-${slug}`] },
+  }).then((r) => r.json())
+}
+
+// 评论：不缓存
+export async function getComments(articleId: string) {
+  return fetch(`https://api.example.com/articles/${articleId}/comments`, {
+    cache: 'no-store',
+  }).then((r) => r.json())
+}
+```
+
+## 调试缓存
+
+### 查看缓存状态
+
+```tsx
+// 开发环境日志
+async function getData() {
+  const start = Date.now()
+  const res = await fetch('https://api.example.com/data')
+  console.log(`请求耗时: ${Date.now() - start}ms`)
+  console.log('缓存状态:', res.headers.get('x-vercel-cache'))
+  return res.json()
+}
+```
+
+### 构建输出
+
+构建时查看路由类型：
+
+```
+Route (app)                              Size     First Load JS
+┌ ○ /                                    5.2 kB         92 kB
+├ ○ /about                               1.2 kB         88 kB
+├ λ /api/revalidate                      0 B            0 B
+├ ● /blog                                2.1 kB         89 kB
+├ ● /blog/[slug]                         3.5 kB         91 kB
+└ λ /dashboard                           4.2 kB         91 kB
+
+○ (Static)   静态预渲染
+● (SSG)      静态生成，可增量更新
+λ (Dynamic)  动态渲染
+```
+
+## 常见问题
+
+🤔 **Q: 为什么数据没有更新？**
+
+检查：
+
+1. revalidate 时间是否过长
+2. 是否有客户端路由缓存（尝试硬刷新）
+3. 是否正确配置了缓存选项
+
+🤔 **Q: 开发环境缓存和生产环境一样吗？**
+
+不完全一样。开发环境默认不缓存以便调试。
+
+🤔 **Q: 如何清除所有缓存？**
+
+```bash
+# 删除 .next 目录
+rm -rf .next
+# 重新构建
+pnpm build
+```
+
+---
+
+下一篇将介绍 Server Actions，学习如何直接从客户端调用服务端函数。
+
+-EOF-

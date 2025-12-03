@@ -1,0 +1,743 @@
+---
+title: '表单处理'
+description: '掌握 JavaScript 表单操作，学会表单验证和数据提交'
+pubDate: 2025-12-03
+toc: true
+ogImage: true
+category: 'JavaScript'
+tags: ['JavaScript', '表单', '验证', 'FormData']
+---
+
+表单是 Web 应用获取用户输入的主要方式。掌握表单处理技巧，能够构建更好的用户体验。
+
+## 🎯 获取表单元素
+
+### 获取表单
+
+```javascript
+// 通过 ID
+const form = document.getElementById('myForm')
+
+// 通过 name
+const form2 = document.forms['loginForm']
+
+// 通过索引
+const form3 = document.forms[0]
+
+// 使用 querySelector
+const form4 = document.querySelector('form.login')
+```
+
+### 获取表单元素
+
+```javascript
+const form = document.getElementById('myForm')
+
+// 通过 name 属性
+const username = form.elements['username']
+const password = form.elements['password']
+
+// 通过索引
+const firstInput = form.elements[0]
+
+// 所有表单元素
+console.log(form.elements.length)
+
+// 简写方式
+const email = form.email // 等同于 form.elements['email']
+```
+
+## 表单元素操作
+
+### 文本输入
+
+```javascript
+const input = document.getElementById('username')
+
+// 获取/设置值
+console.log(input.value)
+input.value = '新值'
+
+// 获取属性
+input.type // 'text'
+input.name // 'username'
+input.placeholder // '请输入用户名'
+input.maxLength // 20
+input.disabled // false
+input.readOnly // false
+
+// 设置属性
+input.disabled = true
+input.readOnly = true
+
+// 焦点控制
+input.focus()
+input.blur()
+
+// 选中文本
+input.select()
+input.setSelectionRange(0, 5) // 选中前5个字符
+```
+
+### 复选框和单选框
+
+```javascript
+// 复选框
+const checkbox = document.getElementById('agree')
+console.log(checkbox.checked) // true/false
+checkbox.checked = true
+
+// 获取所有选��的复选框
+const checked = document.querySelectorAll('input[name="hobbies"]:checked')
+const values = [...checked].map((cb) => cb.value)
+
+// 单选框
+const radios = document.querySelectorAll('input[name="gender"]')
+let selectedValue
+radios.forEach((radio) => {
+  if (radio.checked) {
+    selectedValue = radio.value
+  }
+})
+
+// 或使用 :checked
+const selected = document.querySelector('input[name="gender"]:checked')
+console.log(selected?.value)
+```
+
+### 下拉选择
+
+```javascript
+const select = document.getElementById('city')
+
+// 获取选中值
+console.log(select.value)
+
+// 获取选中的 option
+console.log(select.selectedIndex)
+console.log(select.options[select.selectedIndex])
+console.log(select.selectedOptions) // 多选时
+
+// 设置选中
+select.value = 'beijing'
+select.selectedIndex = 2
+
+// 获取所有选项
+for (const option of select.options) {
+  console.log(option.value, option.text)
+}
+
+// 动态添加选项
+const newOption = new Option('上海', 'shanghai')
+select.add(newOption)
+// 或
+select.innerHTML += '<option value="shenzhen">深圳</option>'
+
+// 多选下拉框
+const multiSelect = document.getElementById('skills')
+const selectedValues = [...multiSelect.selectedOptions].map((o) => o.value)
+```
+
+### 文本域
+
+```javascript
+const textarea = document.getElementById('content')
+
+// 获取/设置内容
+console.log(textarea.value)
+textarea.value = '新内容'
+
+// 行数和列数
+console.log(textarea.rows)
+console.log(textarea.cols)
+
+// 自动调整高度
+textarea.addEventListener('input', function () {
+  this.style.height = 'auto'
+  this.style.height = this.scrollHeight + 'px'
+})
+```
+
+## 表单事件
+
+### 常用事件
+
+```javascript
+const form = document.getElementById('myForm')
+const input = document.getElementById('username')
+
+// 表单提交
+form.addEventListener('submit', (e) => {
+  e.preventDefault() // 阻止默认提交
+  console.log('表单提交')
+})
+
+// 表单重置
+form.addEventListener('reset', (e) => {
+  console.log('表单重置')
+})
+
+// 输入事件（实时触发）
+input.addEventListener('input', (e) => {
+  console.log('输入:', e.target.value)
+})
+
+// 改变事件（失焦后触发）
+input.addEventListener('change', (e) => {
+  console.log('改变:', e.target.value)
+})
+
+// 获得焦点
+input.addEventListener('focus', () => {
+  console.log('获得焦点')
+})
+
+// 失去焦点
+input.addEventListener('blur', () => {
+  console.log('失去焦点')
+})
+
+// 按键事件
+input.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    console.log('按下回车')
+  }
+})
+```
+
+### 使用事件委托
+
+```javascript
+const form = document.getElementById('myForm')
+
+// 统一处理所有输入
+form.addEventListener('input', (e) => {
+  const { name, value } = e.target
+  console.log(`${name}: ${value}`)
+
+  // 实时验证
+  validateField(e.target)
+})
+
+// 统一处理失焦验证
+form.addEventListener('focusout', (e) => {
+  if (e.target.matches('input, textarea, select')) {
+    validateField(e.target)
+  }
+})
+```
+
+## 表单验证
+
+### HTML5 原生验证
+
+```html
+<form id="myForm">
+  <!-- 必填 -->
+  <input type="text" name="username" required />
+
+  <!-- 邮箱格式 -->
+  <input type="email" name="email" required />
+
+  <!-- 最小/最大长度 -->
+  <input type="text" name="password" minlength="6" maxlength="20" />
+
+  <!-- 数字范围 -->
+  <input type="number" name="age" min="0" max="150" />
+
+  <!-- 正则模式 -->
+  <input type="text" name="phone" pattern="1[3-9]\d{9}" />
+
+  <button type="submit">提交</button>
+</form>
+```
+
+```javascript
+const form = document.getElementById('myForm')
+
+form.addEventListener('submit', (e) => {
+  // 检查表单是否有效
+  if (!form.checkValidity()) {
+    e.preventDefault()
+    // 显示验证错误
+    form.reportValidity()
+  }
+})
+
+// 检查单个字段
+const input = form.username
+console.log(input.validity.valid) // 是否有效
+console.log(input.validity.valueMissing) // 是否缺少值
+console.log(input.validity.typeMismatch) // 类型不匹配
+console.log(input.validity.patternMismatch) // 模式不匹配
+console.log(input.validity.tooShort) // 太短
+console.log(input.validity.tooLong) // 太长
+console.log(input.validity.rangeUnderflow) // 小于最小值
+console.log(input.validity.rangeOverflow) // 大于最大值
+
+// 自定义错误消息
+input.setCustomValidity('用户名已存在')
+input.setCustomValidity('') // 清除自定义错误
+```
+
+### 自定义验证
+
+```javascript
+const validators = {
+  required(value) {
+    return value.trim() !== '' || '此字段必填'
+  },
+
+  email(value) {
+    const regex = /^[\w.-]+@[\w.-]+\.\w+$/
+    return regex.test(value) || '请输入有效的邮箱'
+  },
+
+  phone(value) {
+    const regex = /^1[3-9]\d{9}$/
+    return regex.test(value) || '请输入有效的手机号'
+  },
+
+  minLength(min) {
+    return (value) => value.length >= min || `至少需要 ${min} 个字符`
+  },
+
+  maxLength(max) {
+    return (value) => value.length <= max || `最多 ${max} 个字符`
+  },
+
+  pattern(regex, message) {
+    return (value) => regex.test(value) || message
+  },
+
+  match(fieldName) {
+    return (value, form) => {
+      const other = form.elements[fieldName].value
+      return value === other || '两次输入不一致'
+    }
+  },
+}
+
+// 验证函数
+function validateField(field, form) {
+  const rules = field.dataset.validate?.split('|') || []
+  const value = field.value
+
+  for (const rule of rules) {
+    let validator
+    let params
+
+    if (rule.includes(':')) {
+      const [name, param] = rule.split(':')
+      validator = validators[name]
+      params = param
+    } else {
+      validator = validators[rule]
+    }
+
+    if (typeof validator === 'function') {
+      const fn = params ? validator(params) : validator
+      const result = fn(value, form)
+
+      if (result !== true) {
+        return result // 返回错误消息
+      }
+    }
+  }
+
+  return true
+}
+
+// 使用
+// <input name="email" data-validate="required|email">
+// <input name="password" data-validate="required|minLength:6">
+```
+
+### 完整验证示例
+
+```javascript
+class FormValidator {
+  constructor(form) {
+    this.form = form
+    this.errors = {}
+    this.setupListeners()
+  }
+
+  setupListeners() {
+    this.form.addEventListener('submit', (e) => {
+      if (!this.validate()) {
+        e.preventDefault()
+      }
+    })
+
+    this.form.addEventListener(
+      'blur',
+      (e) => {
+        if (e.target.matches('input, textarea, select')) {
+          this.validateField(e.target)
+          this.showFieldError(e.target)
+        }
+      },
+      true
+    )
+  }
+
+  validate() {
+    this.errors = {}
+
+    for (const field of this.form.elements) {
+      if (field.name) {
+        this.validateField(field)
+      }
+    }
+
+    this.showErrors()
+    return Object.keys(this.errors).length === 0
+  }
+
+  validateField(field) {
+    const { name, value } = field
+    const rules = this.getRules(field)
+
+    delete this.errors[name]
+
+    for (const { validator, message } of rules) {
+      if (!validator(value)) {
+        this.errors[name] = message
+        break
+      }
+    }
+  }
+
+  getRules(field) {
+    const rules = []
+
+    if (field.required) {
+      rules.push({
+        validator: (v) => v.trim() !== '',
+        message: '此字段必填',
+      })
+    }
+
+    if (field.type === 'email') {
+      rules.push({
+        validator: (v) => /^[\w.-]+@[\w.-]+\.\w+$/.test(v),
+        message: '请输入有效的邮箱',
+      })
+    }
+
+    if (field.minLength > 0) {
+      rules.push({
+        validator: (v) => v.length >= field.minLength,
+        message: `至少 ${field.minLength} 个字符`,
+      })
+    }
+
+    return rules
+  }
+
+  showErrors() {
+    // 清除所有错误
+    this.form.querySelectorAll('.error-message').forEach((el) => el.remove())
+    this.form.querySelectorAll('.is-invalid').forEach((el) => {
+      el.classList.remove('is-invalid')
+    })
+
+    // 显示新错误
+    for (const [name, message] of Object.entries(this.errors)) {
+      const field = this.form.elements[name]
+      this.showFieldError(field, message)
+    }
+  }
+
+  showFieldError(field, message = this.errors[field.name]) {
+    field.classList.toggle('is-invalid', !!message)
+
+    const existing = field.parentNode.querySelector('.error-message')
+    if (existing) existing.remove()
+
+    if (message) {
+      const errorEl = document.createElement('div')
+      errorEl.className = 'error-message'
+      errorEl.textContent = message
+      field.parentNode.appendChild(errorEl)
+    }
+  }
+}
+
+// 使用
+const validator = new FormValidator(document.getElementById('myForm'))
+```
+
+## FormData
+
+### 基本用法
+
+```javascript
+const form = document.getElementById('myForm')
+
+// 从表单创建
+const formData = new FormData(form)
+
+// 获取值
+formData.get('username')
+formData.getAll('hobbies') // 多个同名字段
+
+// 设置值
+formData.set('username', '新用户名')
+formData.append('extra', '额外数据')
+
+// 删除
+formData.delete('password')
+
+// 检查是否存在
+formData.has('username')
+
+// 遍历
+for (const [key, value] of formData) {
+  console.log(`${key}: ${value}`)
+}
+
+// 转为对象
+const data = Object.fromEntries(formData)
+
+// 转为 JSON（需处理多值情况）
+function formDataToJson(formData) {
+  const obj = {}
+  for (const [key, value] of formData) {
+    if (obj[key]) {
+      // 处理多值
+      if (!Array.isArray(obj[key])) {
+        obj[key] = [obj[key]]
+      }
+      obj[key].push(value)
+    } else {
+      obj[key] = value
+    }
+  }
+  return JSON.stringify(obj)
+}
+```
+
+### 文件上传
+
+```javascript
+const form = document.getElementById('uploadForm')
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault()
+
+  const formData = new FormData(form)
+  const fileInput = form.querySelector('input[type="file"]')
+
+  // 检查文件
+  const file = fileInput.files[0]
+  if (file) {
+    console.log('文件名:', file.name)
+    console.log('大小:', file.size)
+    console.log('类型:', file.type)
+
+    // 验证文件类型
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif']
+    if (!allowedTypes.includes(file.type)) {
+      alert('只支持 JPG、PNG、GIF 图片')
+      return
+    }
+
+    // 验证文件大小（2MB）
+    if (file.size > 2 * 1024 * 1024) {
+      alert('文件不能超过 2MB')
+      return
+    }
+  }
+
+  // 上传
+  try {
+    const response = await fetch('/api/upload', {
+      method: 'POST',
+      body: formData, // 不要设置 Content-Type
+    })
+    const result = await response.json()
+    console.log('上传成功:', result)
+  } catch (error) {
+    console.error('上传失败:', error)
+  }
+})
+```
+
+### 进度监控
+
+```javascript
+function uploadWithProgress(url, formData, onProgress) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+
+    xhr.upload.addEventListener('progress', (e) => {
+      if (e.lengthComputable) {
+        const percent = (e.loaded / e.total) * 100
+        onProgress(percent)
+      }
+    })
+
+    xhr.addEventListener('load', () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(JSON.parse(xhr.responseText))
+      } else {
+        reject(new Error(`HTTP ${xhr.status}`))
+      }
+    })
+
+    xhr.addEventListener('error', () => reject(new Error('网络错误')))
+
+    xhr.open('POST', url)
+    xhr.send(formData)
+  })
+}
+
+// 使用
+const formData = new FormData(form)
+uploadWithProgress('/api/upload', formData, (percent) => {
+  progressBar.style.width = `${percent}%`
+  progressText.textContent = `${Math.round(percent)}%`
+}).then((result) => {
+  console.log('完成:', result)
+})
+```
+
+## 实际应用
+
+### 表单序列化
+
+```javascript
+function serializeForm(form) {
+  const data = {}
+
+  for (const field of form.elements) {
+    if (!field.name || field.disabled) continue
+
+    switch (field.type) {
+      case 'checkbox':
+        if (field.checked) {
+          if (data[field.name]) {
+            data[field.name] = [].concat(data[field.name], field.value)
+          } else {
+            data[field.name] = field.value
+          }
+        }
+        break
+
+      case 'radio':
+        if (field.checked) {
+          data[field.name] = field.value
+        }
+        break
+
+      case 'select-multiple':
+        data[field.name] = [...field.selectedOptions].map((o) => o.value)
+        break
+
+      case 'file':
+        // 跳过文件字段
+        break
+
+      default:
+        data[field.name] = field.value
+    }
+  }
+
+  return data
+}
+```
+
+### 表单状态管理
+
+```javascript
+class FormState {
+  constructor(form) {
+    this.form = form
+    this.initialState = this.getState()
+  }
+
+  getState() {
+    return serializeForm(this.form)
+  }
+
+  isDirty() {
+    const current = this.getState()
+    return JSON.stringify(current) !== JSON.stringify(this.initialState)
+  }
+
+  reset() {
+    this.form.reset()
+    this.initialState = this.getState()
+  }
+
+  save() {
+    this.initialState = this.getState()
+  }
+}
+
+// 使用
+const formState = new FormState(form)
+
+// 离开页面前检查
+window.addEventListener('beforeunload', (e) => {
+  if (formState.isDirty()) {
+    e.preventDefault()
+    e.returnValue = ''
+  }
+})
+```
+
+### 动态表单字段
+
+```javascript
+// 动态添加字段
+function addField(form, name, type = 'text') {
+  const wrapper = document.createElement('div')
+  wrapper.className = 'form-field'
+  wrapper.innerHTML = `
+    <input type="${type}" name="${name}" placeholder="${name}">
+    <button type="button" class="remove-field">删除</button>
+  `
+
+  wrapper.querySelector('.remove-field').addEventListener('click', () => {
+    wrapper.remove()
+  })
+
+  form.insertBefore(wrapper, form.querySelector('[type="submit"]'))
+}
+
+// 动态字段验证
+document.getElementById('addFieldBtn').addEventListener('click', () => {
+  const fieldCount = form.querySelectorAll('.form-field').length
+  addField(form, `field_${fieldCount + 1}`)
+})
+```
+
+## 总结
+
+| 事件     | 触发时机         |
+| -------- | ---------------- |
+| `input`  | 值改变（实时）   |
+| `change` | 值改变（失焦后） |
+| `focus`  | 获得焦点         |
+| `blur`   | 失去焦点         |
+| `submit` | 表单提交         |
+| `reset`  | 表单重置         |
+
+| 方法                        | 说明             |
+| --------------------------- | ---------------- |
+| `form.elements`             | 获取所有表单元素 |
+| `form.checkValidity()`      | 检查表单是否有效 |
+| `form.reportValidity()`     | 显示验证错误     |
+| `input.setCustomValidity()` | 设置自定义错误   |
+| `new FormData(form)`        | 创建表单数据对象 |
+
+**核心要点**：
+
+- 使用事件委托处理表单事件
+- 结合 HTML5 验证和自定义验证
+- FormData 适合处理包含文件的表单
+- 注意表单状态管理和用户体验
+- 文件上传需要验证类型和大小

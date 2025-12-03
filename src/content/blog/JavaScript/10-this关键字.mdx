@@ -1,0 +1,583 @@
+---
+title: 'this 关键字'
+description: '彻底理解 JavaScript 中 this 的绑定规则，掌握 call、apply、bind 的使用'
+pubDate: 2025-12-03
+toc: true
+ogImage: true
+category: 'JavaScript'
+tags: ['JavaScript', 'this', 'call', 'apply', 'bind']
+---
+
+`this` 是 JavaScript 中最容易混淆的概念之一。它的值取决于函数的调用方式，而不是定义位置。
+
+## 🎯 this 是什么
+
+`this` 是函数执行时的上下文对象，它的值在函数被调用时确定。
+
+```javascript
+function greet() {
+  console.log(this)
+}
+
+// 不同调用方式，this 不同
+greet() // window（非严格模式）或 undefined（严格模式）
+
+const obj = { greet }
+obj.greet() // obj
+
+const boundGreet = greet.bind({ name: '张三' })
+boundGreet() // { name: "张三" }
+```
+
+## 四种绑定规则
+
+### 1. 默认绑定
+
+独立函数调用时，`this` 指向全局对象（非严格模式）或 `undefined`（严格模式）。
+
+```javascript
+function foo() {
+  console.log(this)
+}
+
+// 非严格模式
+foo() // window（浏览器）/ global（Node.js）
+
+// 严格模式
+;('use strict')
+function bar() {
+  console.log(this)
+}
+bar() // undefined
+```
+
+### 2. 隐式绑定
+
+通过对象调用方法时，`this` 指向该对象。
+
+```javascript
+const person = {
+  name: '张三',
+  greet() {
+    console.log(`你好，我是${this.name}`)
+  },
+}
+
+person.greet() // "你好，我是张三"
+
+// 链式调用
+const company = {
+  name: '公司',
+  department: {
+    name: '技术部',
+    getName() {
+      return this.name
+    },
+  },
+}
+console.log(company.department.getName()) // "技术部"（最近的对象）
+```
+
+🔶 **隐式丢失**：
+
+```javascript
+const person = {
+  name: '张三',
+  greet() {
+    console.log(this.name)
+  },
+}
+
+// 赋值给变量后调用
+const greet = person.greet
+greet() // undefined（this 丢失）
+
+// 作为回调传递
+setTimeout(person.greet, 100) // undefined
+
+// 解决方案
+setTimeout(() => person.greet(), 100) // "张三"
+setTimeout(person.greet.bind(person), 100) // "张三"
+```
+
+### 3. 显式绑定
+
+使用 `call`、`apply`、`bind` 明确指定 `this`。
+
+```javascript
+function greet(greeting, punctuation) {
+  console.log(`${greeting}，${this.name}${punctuation}`)
+}
+
+const person = { name: '张三' }
+
+// call：参数逐个传递
+greet.call(person, '你好', '！') // "你好，张三！"
+
+// apply：参数作为数组
+greet.apply(person, ['你好', '！']) // "你好，张三！"
+
+// bind：返回绑定 this 的新函数
+const boundGreet = greet.bind(person)
+boundGreet('你好', '！') // "你好，张三！"
+
+// bind 还可以预设参数（柯里化）
+const greetHello = greet.bind(person, '你好')
+greetHello('！') // "你好，张三！"
+```
+
+### 4. new 绑定
+
+使用 `new` 调用构造函数时，`this` 指向新创建的对象。
+
+```javascript
+function Person(name) {
+  this.name = name
+  console.log(this)
+}
+
+const p = new Person('张三') // Person { name: "张三" }
+console.log(p.name) // "张三"
+
+// 如果构造函数返回对象，则返回该对象
+function Foo() {
+  this.a = 1
+  return { b: 2 }
+}
+const foo = new Foo()
+console.log(foo.a) // undefined
+console.log(foo.b) // 2
+```
+
+## 优先级
+
+当多种规则同时适用时，按以下优先级判断：
+
+```
+new 绑定 > 显式绑定 > 隐式绑定 > 默认绑定
+```
+
+```javascript
+function foo() {
+  console.log(this.a)
+}
+
+const obj1 = { a: 1, foo }
+const obj2 = { a: 2, foo }
+
+// 隐式 vs 显式
+obj1.foo.call(obj2) // 2（显式优先）
+
+// 隐式 vs new
+function Bar(a) {
+  this.a = a
+}
+const obj3 = { a: 3, Bar }
+const bar = new obj3.Bar(4)
+console.log(bar.a) // 4（new 优先）
+
+// 显式 vs new
+const boundBar = Bar.bind({ a: 5 })
+const baz = new boundBar(6)
+console.log(baz.a) // 6（new 优先，忽略 bind）
+```
+
+## 箭头函数
+
+箭头函数没有自己的 `this`，它继承定义时外层作用域的 `this`。
+
+```javascript
+const person = {
+  name: '张三',
+
+  // 普通函数
+  greet() {
+    console.log(this.name)
+  },
+
+  // 箭头函数
+  greetArrow: () => {
+    console.log(this.name) // this 不是 person
+  },
+
+  // 嵌套场景
+  delayGreet() {
+    // 普通函数：this 丢失
+    setTimeout(function () {
+      console.log(this.name) // undefined
+    }, 100)
+
+    // 箭头函数：继承外层 this
+    setTimeout(() => {
+      console.log(this.name) // "张三"
+    }, 100)
+  },
+}
+
+person.greet() // "张三"
+person.greetArrow() // undefined
+person.delayGreet()
+```
+
+### 箭头函数的特殊性
+
+```javascript
+const arrow = () => {
+  console.log(this)
+}
+
+const obj = { arrow }
+
+// 以下都无法改变箭头函数的 this
+obj.arrow() // window（定义时的外层 this）
+arrow.call({ a: 1 }) // window
+arrow.apply({ a: 1 }) // window
+arrow.bind({ a: 1 })() // window
+
+// 不能用 new
+// new arrow()  // TypeError
+```
+
+### 实际应用
+
+```javascript
+// ✅ 适合：回调函数
+class Counter {
+  constructor() {
+    this.count = 0
+  }
+
+  increment() {
+    setInterval(() => {
+      this.count++ // this 正确指向实例
+      console.log(this.count)
+    }, 1000)
+  }
+}
+
+// ✅ 适合：数组方法
+const numbers = [1, 2, 3]
+const doubled = numbers.map((n) => n * 2)
+
+// ❌ 不适合：对象方法
+const obj = {
+  name: '张三',
+  greet: () => {
+    console.log(this.name) // 不是 obj
+  },
+}
+
+// ❌ 不适合：事件处理器（需要访问事件目标）
+button.addEventListener('click', () => {
+  console.log(this) // 不是 button
+})
+
+// ✅ 改用普通函数
+button.addEventListener('click', function () {
+  console.log(this) // button
+})
+```
+
+## call、apply、bind 详解
+
+### call
+
+```javascript
+function greet(greeting, punctuation) {
+  return `${greeting}，${this.name}${punctuation}`
+}
+
+const person = { name: '张三' }
+console.log(greet.call(person, '你好', '！')) // "你好，张三！"
+
+// 借用方法
+const arrayLike = { 0: 'a', 1: 'b', length: 2 }
+const arr = Array.prototype.slice.call(arrayLike)
+console.log(arr) // ["a", "b"]
+
+// 调用父类构造函数
+function Animal(name) {
+  this.name = name
+}
+function Dog(name, breed) {
+  Animal.call(this, name)
+  this.breed = breed
+}
+```
+
+### apply
+
+```javascript
+// 与 call 类似，但参数是数组
+function greet(greeting, punctuation) {
+  return `${greeting}，${this.name}${punctuation}`
+}
+
+const person = { name: '张三' }
+console.log(greet.apply(person, ['你好', '！'])) // "你好，张三！"
+
+// 经典用法：求数组最大值
+const numbers = [1, 5, 3, 9, 2]
+console.log(Math.max.apply(null, numbers)) // 9
+// ES6 更简洁
+console.log(Math.max(...numbers)) // 9
+
+// 合并数组
+const arr1 = [1, 2]
+const arr2 = [3, 4]
+Array.prototype.push.apply(arr1, arr2)
+console.log(arr1) // [1, 2, 3, 4]
+// ES6 更简洁
+arr1.push(...arr2)
+```
+
+### bind
+
+```javascript
+function greet(greeting) {
+  return `${greeting}，${this.name}`
+}
+
+const person = { name: '张三' }
+
+// 创建绑定函数
+const boundGreet = greet.bind(person)
+console.log(boundGreet('你好')) // "你好，张三"
+
+// 绑定无法被覆盖
+const anotherPerson = { name: '李四' }
+console.log(boundGreet.call(anotherPerson, '嗨')) // "嗨，张三"（仍是张三）
+
+// 部分应用（柯里化）
+function add(a, b, c) {
+  return a + b + c
+}
+const add5 = add.bind(null, 5)
+console.log(add5(3, 2)) // 10
+
+const add5and3 = add.bind(null, 5, 3)
+console.log(add5and3(2)) // 10
+```
+
+### 手写实现
+
+```javascript
+// 实现 call
+Function.prototype.myCall = function (context, ...args) {
+  context = context ?? globalThis
+  context = Object(context) // 处理原始值
+  const fn = Symbol()
+  context[fn] = this
+  const result = context[fn](...args)
+  delete context[fn]
+  return result
+}
+
+// 实现 apply
+Function.prototype.myApply = function (context, args = []) {
+  context = context ?? globalThis
+  context = Object(context)
+  const fn = Symbol()
+  context[fn] = this
+  const result = context[fn](...args)
+  delete context[fn]
+  return result
+}
+
+// 实现 bind
+Function.prototype.myBind = function (context, ...args) {
+  const fn = this
+  return function (...newArgs) {
+    return fn.apply(this instanceof fn ? this : context, [...args, ...newArgs])
+  }
+}
+```
+
+## 类中的 this
+
+```javascript
+class Person {
+  constructor(name) {
+    this.name = name
+  }
+
+  greet() {
+    console.log(`你好，我是${this.name}`)
+  }
+
+  // 箭头函数作为类字段
+  greetArrow = () => {
+    console.log(`你好，我是${this.name}`)
+  }
+}
+
+const p = new Person('张三')
+
+// 普通方法需要注意 this
+const greet = p.greet
+greet() // TypeError 或 undefined
+
+// 箭头函数字段自动绑定
+const greetArrow = p.greetArrow
+greetArrow() // "你好，我是张三"
+
+// 手动绑定
+class Button {
+  constructor(text) {
+    this.text = text
+    this.click = this.click.bind(this)
+  }
+
+  click() {
+    console.log(this.text)
+  }
+}
+```
+
+## 常见场景
+
+### 事件处理
+
+```javascript
+class App {
+  constructor() {
+    this.name = 'MyApp'
+    this.button = document.querySelector('button')
+
+    // 方式1：bind
+    this.button.addEventListener('click', this.handleClick.bind(this))
+
+    // 方式2：箭头函数
+    this.button.addEventListener('click', (e) => this.handleClick(e))
+
+    // 方式3：类字段箭���函数
+    // handleClick = (e) => { ... }
+  }
+
+  handleClick(e) {
+    console.log(this.name)
+  }
+}
+```
+
+### 回调函数
+
+```javascript
+const obj = {
+  data: [1, 2, 3],
+
+  double() {
+    // 错误：this 丢失
+    // return this.data.map(function(n) {
+    //   return n * this.multiplier  // this 不是 obj
+    // })
+
+    // 方式1：箭头函数
+    return this.data.map((n) => n * 2)
+
+    // 方式2：bind
+    // return this.data.map(function(n) {
+    //   return n * 2
+    // }.bind(this))
+
+    // 方式3：保存 this
+    // const self = this
+    // return this.data.map(function(n) {
+    //   return n * self.multiplier
+    // })
+  },
+}
+```
+
+### 定时器
+
+```javascript
+const timer = {
+  seconds: 0,
+
+  // 错误示例
+  startBad() {
+    setInterval(function () {
+      this.seconds++ // this 不是 timer
+      console.log(this.seconds)
+    }, 1000)
+  },
+
+  // 正确示例
+  start() {
+    setInterval(() => {
+      this.seconds++
+      console.log(this.seconds)
+    }, 1000)
+  },
+}
+```
+
+## 常见面试题
+
+### 🙋 输出什么？
+
+```javascript
+const obj = {
+  name: '张三',
+  greet() {
+    return function () {
+      return this.name
+    }
+  },
+  greetArrow() {
+    return () => {
+      return this.name
+    }
+  },
+}
+
+console.log(obj.greet()()) // undefined
+console.log(obj.greetArrow()()) // "张三"
+```
+
+### 🙋 如何让 a.x.fn() 输出 a？
+
+```javascript
+const a = {
+  name: 'a',
+  x: {
+    fn() {
+      console.log(this)
+    },
+  },
+}
+
+// 使用 bind
+a.x.fn = a.x.fn.bind(a)
+a.x.fn() // a
+
+// 或使用 call
+a.x.fn.call(a) // a
+```
+
+### 🙋 箭头函数可以用 new 吗？
+
+```javascript
+const Arrow = () => {}
+// new Arrow()  // TypeError: Arrow is not a constructor
+
+// 原因：箭头函数没有 [[Construct]] 内部方法
+```
+
+## 总结
+
+| 调用方式 | this 指向            | 示例           |
+| -------- | -------------------- | -------------- |
+| 默认绑定 | 全局对象 / undefined | `fn()`         |
+| 隐式绑定 | 调用对象             | `obj.fn()`     |
+| 显式绑定 | 指定对象             | `fn.call(obj)` |
+| new 绑定 | 新创建的对象         | `new Fn()`     |
+| 箭头函数 | 继承外层 this        | `() => {}`     |
+
+**核心要点**：
+
+- `this` 取决于调用方式，不是定义位置
+- 优先级：new > 显式 > 隐式 > 默认
+- 箭头函数没有自己的 `this`，继承外层
+- 用 `bind` 解决回调中的 `this` 丢失

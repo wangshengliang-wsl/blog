@@ -1,0 +1,614 @@
+---
+title: '定时器'
+description: '掌握 JavaScript 定时器的使用，理解 setTimeout、setInterval 和 requestAnimationFrame'
+pubDate: 2025-12-03
+toc: true
+ogImage: true
+category: 'JavaScript'
+tags: ['JavaScript', '定时器', 'setTimeout', 'setInterval']
+---
+
+定时器是 JavaScript 中实现延迟执行和周期执行的核心机制。理解定时器的工作原理对于编写异步代码至关重要。
+
+## 🎯 setTimeout
+
+### 基本用法
+
+```javascript
+// 延迟执行一次
+setTimeout(function () {
+  console.log('3秒后执行')
+}, 3000)
+
+// 箭头函数
+setTimeout(() => {
+  console.log('2秒后执行')
+}, 2000)
+
+// 返回定时器 ID
+const timerId = setTimeout(() => {
+  console.log('执行')
+}, 1000)
+
+console.log(timerId) // 数字 ID
+```
+
+### 传递参数
+
+```javascript
+// 方式1：通过 setTimeout 的额外参数
+setTimeout(
+  (name, age) => {
+    console.log(`姓名: ${name}, 年龄: ${age}`)
+  },
+  1000,
+  '张三',
+  25
+)
+
+// 方式2：闭包
+const name = '李四'
+setTimeout(() => {
+  console.log(name) // 可以访问外部变量
+}, 1000)
+
+// 🔶 不要用字符串（有安全风险，性能差）
+setTimeout('console.log("不推荐")', 1000)
+```
+
+### 取消定时器
+
+```javascript
+const timerId = setTimeout(() => {
+  console.log('不会执行')
+}, 5000)
+
+// 取消定时器
+clearTimeout(timerId)
+
+// 实际应用：防止重复提交
+let submitTimer = null
+
+function handleSubmit() {
+  if (submitTimer) {
+    clearTimeout(submitTimer)
+  }
+
+  submitTimer = setTimeout(() => {
+    // 提交逻辑
+    console.log('提交')
+  }, 300)
+}
+```
+
+### 最小延迟时间
+
+```javascript
+// 延迟时间最小约为 4ms（浏览器限制）
+setTimeout(() => console.log('1'), 0)
+setTimeout(() => console.log('2'), 0)
+console.log('3')
+
+// 输出顺序：3, 1, 2
+// 即使设为 0，也不会立即执行
+
+// 嵌套 setTimeout 在 5 层后强制最小 4ms
+function nested(n) {
+  if (n === 0) return
+  setTimeout(() => nested(n - 1), 0)
+}
+```
+
+## setInterval
+
+### 基本用法
+
+```javascript
+// 每隔指���时间重复执行
+const intervalId = setInterval(() => {
+  console.log('每秒执行一次')
+}, 1000)
+
+// 取消定时器
+// clearInterval(intervalId)
+```
+
+### 实现计数器
+
+```javascript
+let count = 0
+const maxCount = 5
+
+const intervalId = setInterval(() => {
+  count++
+  console.log(`计数: ${count}`)
+
+  if (count >= maxCount) {
+    clearInterval(intervalId)
+    console.log('计数完成')
+  }
+}, 1000)
+```
+
+### 🔶 setInterval 的问题
+
+```javascript
+// 问题1：回调执行时间不计入间隔
+setInterval(() => {
+  // 如果这里执行需要 500ms
+  // 实际间隔会小于设定的间隔
+  heavyTask()
+}, 1000)
+
+// 问题2：错过的执行会堆积
+// 如果页面被隐藏，回来后可能快速执行多次
+
+// ✅ 解决方案：用 setTimeout 递归替代
+function betterInterval(callback, delay) {
+  function loop() {
+    callback()
+    setTimeout(loop, delay)
+  }
+  setTimeout(loop, delay)
+}
+
+// 或者使用自校准的 setInterval
+function accurateInterval(callback, delay) {
+  let expected = Date.now() + delay
+
+  function step() {
+    const drift = Date.now() - expected
+    callback()
+    expected += delay
+    setTimeout(step, Math.max(0, delay - drift))
+  }
+
+  setTimeout(step, delay)
+}
+```
+
+## requestAnimationFrame
+
+### 基本用法
+
+```javascript
+// 在下次重绘之前调用（通常 60fps，约 16.67ms）
+function animate() {
+  // 动画逻辑
+  console.log('动画帧')
+
+  // 继续下一帧
+  requestAnimationFrame(animate)
+}
+
+// 开始动画
+requestAnimationFrame(animate)
+```
+
+### 优势
+
+```javascript
+// ✅ 自动与显示器刷新率同步
+// ✅ 页面隐藏时自动暂停，节省资源
+// ✅ 浏览器优化，更流畅
+
+// 获取帧 ID 并取消
+const frameId = requestAnimationFrame(animate)
+cancelAnimationFrame(frameId)
+```
+
+### 实现平滑动画
+
+```javascript
+// 移动元素
+function moveElement(element, targetX, duration) {
+  const startX = element.offsetLeft
+  const distance = targetX - startX
+  const startTime = performance.now()
+
+  function animate(currentTime) {
+    const elapsed = currentTime - startTime
+    const progress = Math.min(elapsed / duration, 1)
+
+    // 缓动函数（ease-out）
+    const easeProgress = 1 - Math.pow(1 - progress, 3)
+
+    element.style.left = startX + distance * easeProgress + 'px'
+
+    if (progress < 1) {
+      requestAnimationFrame(animate)
+    }
+  }
+
+  requestAnimationFrame(animate)
+}
+
+// 使用
+const box = document.getElementById('box')
+moveElement(box, 500, 1000) // 1秒内移动到 x=500
+```
+
+### 帧率控制
+
+```javascript
+// 限制帧率（例如 30fps）
+function animateWithFPS(callback, fps) {
+  const interval = 1000 / fps
+  let lastTime = 0
+
+  function loop(currentTime) {
+    requestAnimationFrame(loop)
+
+    const delta = currentTime - lastTime
+    if (delta >= interval) {
+      lastTime = currentTime - (delta % interval)
+      callback(delta)
+    }
+  }
+
+  requestAnimationFrame(loop)
+}
+
+// 使用
+animateWithFPS((delta) => {
+  console.log(`帧间隔: ${delta}ms`)
+}, 30)
+```
+
+## 实际应用
+
+### 防抖（Debounce）
+
+```javascript
+// 延迟执行，重复触发会重新计时
+function debounce(fn, delay) {
+  let timer = null
+
+  return function (...args) {
+    if (timer) clearTimeout(timer)
+
+    timer = setTimeout(() => {
+      fn.apply(this, args)
+    }, delay)
+  }
+}
+
+// 使用：搜索框输入
+const search = debounce((keyword) => {
+  console.log('搜索:', keyword)
+  // 发起请求
+}, 300)
+
+input.addEventListener('input', (e) => {
+  search(e.target.value)
+})
+```
+
+### 节流（Throttle）
+
+```javascript
+// 限制执行频率，固定时间内只执行一次
+function throttle(fn, delay) {
+  let lastTime = 0
+
+  return function (...args) {
+    const now = Date.now()
+
+    if (now - lastTime >= delay) {
+      lastTime = now
+      fn.apply(this, args)
+    }
+  }
+}
+
+// 使用：滚动事件
+const handleScroll = throttle(() => {
+  console.log('滚动位置:', window.scrollY)
+}, 100)
+
+window.addEventListener('scroll', handleScroll)
+```
+
+### 倒计时
+
+```javascript
+function countdown(seconds, onTick, onComplete) {
+  let remaining = seconds
+
+  function tick() {
+    onTick(remaining)
+
+    if (remaining > 0) {
+      remaining--
+      setTimeout(tick, 1000)
+    } else {
+      onComplete()
+    }
+  }
+
+  tick()
+}
+
+// 使用
+countdown(
+  10,
+  (sec) => console.log(`剩余 ${sec} 秒`),
+  () => console.log('倒计时结束')
+)
+```
+
+### 轮询
+
+```javascript
+// 定期检查状态
+function poll(fn, interval, maxAttempts = Infinity) {
+  let attempts = 0
+
+  return new Promise((resolve, reject) => {
+    function check() {
+      attempts++
+
+      Promise.resolve(fn())
+        .then((result) => {
+          if (result) {
+            resolve(result)
+          } else if (attempts >= maxAttempts) {
+            reject(new Error('超过最大尝试次数'))
+          } else {
+            setTimeout(check, interval)
+          }
+        })
+        .catch(reject)
+    }
+
+    check()
+  })
+}
+
+// 使用：等待任务完成
+poll(
+  async () => {
+    const status = await checkTaskStatus()
+    return status === 'completed'
+  },
+  2000, // 每 2 秒检查
+  30 // 最多 30 次
+)
+```
+
+### 延迟加载
+
+```javascript
+// 延迟加载图片
+function lazyLoadImages() {
+  const images = document.querySelectorAll('img[data-src]')
+
+  const loadImage = (img) => {
+    img.src = img.dataset.src
+    img.removeAttribute('data-src')
+  }
+
+  // 使用 Intersection Observer
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (entry.isIntersecting) {
+        // 小延迟，避免滚动过快时加载过多
+        setTimeout(() => loadImage(entry.target), 100)
+        observer.unobserve(entry.target)
+      }
+    })
+  })
+
+  images.forEach((img) => observer.observe(img))
+}
+```
+
+### 自动保存
+
+```javascript
+class AutoSave {
+  constructor(saveFunction, delay = 2000) {
+    this.saveFunction = saveFunction
+    this.delay = delay
+    this.timer = null
+    this.isDirty = false
+  }
+
+  markDirty() {
+    this.isDirty = true
+    this.scheduleSave()
+  }
+
+  scheduleSave() {
+    if (this.timer) {
+      clearTimeout(this.timer)
+    }
+
+    this.timer = setTimeout(() => {
+      if (this.isDirty) {
+        this.saveFunction()
+        this.isDirty = false
+      }
+    }, this.delay)
+  }
+
+  saveNow() {
+    if (this.timer) {
+      clearTimeout(this.timer)
+    }
+    if (this.isDirty) {
+      this.saveFunction()
+      this.isDirty = false
+    }
+  }
+}
+
+// 使用
+const autoSave = new AutoSave(() => {
+  console.log('保存数据')
+})
+
+textarea.addEventListener('input', () => {
+  autoSave.markDirty()
+})
+
+// 页面关闭前立即保存
+window.addEventListener('beforeunload', () => {
+  autoSave.saveNow()
+})
+```
+
+## 定时器与���件循环
+
+```javascript
+// 定时器回调进入宏任务队列
+console.log('1')
+
+setTimeout(() => {
+  console.log('2')
+}, 0)
+
+Promise.resolve().then(() => {
+  console.log('3')
+})
+
+console.log('4')
+
+// 输出顺序：1, 4, 3, 2
+// 同步代码 > 微任务��Promise）> 宏任务（setTimeout）
+```
+
+### 执行顺序
+
+```javascript
+setTimeout(() => console.log('timeout1'), 0)
+setTimeout(() => console.log('timeout2'), 0)
+
+Promise.resolve()
+  .then(() => console.log('promise1'))
+  .then(() => console.log('promise2'))
+
+console.log('sync')
+
+// 输出：
+// sync
+// promise1
+// promise2
+// timeout1
+// timeout2
+```
+
+## 注意事项
+
+### this 绑定
+
+```javascript
+const obj = {
+  name: '对象',
+  greet() {
+    // 🔶 普通函数会丢失 this
+    setTimeout(function () {
+      console.log(this.name) // undefined
+    }, 1000)
+
+    // ✅ 箭头函数保持 this
+    setTimeout(() => {
+      console.log(this.name) // '对象'
+    }, 1000)
+
+    // ✅ bind 绑定
+    setTimeout(
+      function () {
+        console.log(this.name) // '对象'
+      }.bind(this),
+      1000
+    )
+  },
+}
+```
+
+### 清理定时器
+
+```javascript
+// 组件卸载时清理
+class Component {
+  constructor() {
+    this.timers = []
+  }
+
+  setTimeout(fn, delay) {
+    const id = setTimeout(fn, delay)
+    this.timers.push({ type: 'timeout', id })
+    return id
+  }
+
+  setInterval(fn, delay) {
+    const id = setInterval(fn, delay)
+    this.timers.push({ type: 'interval', id })
+    return id
+  }
+
+  destroy() {
+    this.timers.forEach(({ type, id }) => {
+      if (type === 'timeout') {
+        clearTimeout(id)
+      } else {
+        clearInterval(id)
+      }
+    })
+    this.timers = []
+  }
+}
+```
+
+### 避免长时间定时器
+
+```javascript
+// 🔶 浏览器对长时间定时器可能不准确
+setTimeout(() => {
+  console.log('1小时后')
+}, 3600000) // 1小时
+
+// ✅ 对于长时间任务，使用短间隔检查
+function scheduleAt(targetTime, callback) {
+  function check() {
+    const remaining = targetTime - Date.now()
+
+    if (remaining <= 0) {
+      callback()
+    } else if (remaining > 60000) {
+      // 还有超过1分钟，1分钟后再检查
+      setTimeout(check, 60000)
+    } else {
+      // 不到1分钟，精确等待
+      setTimeout(callback, remaining)
+    }
+  }
+
+  check()
+}
+```
+
+## 总结
+
+| 方法                    | 用途         | 精度             |
+| ----------------------- | ------------ | ---------------- |
+| `setTimeout`            | 延迟执行一次 | ≥4ms             |
+| `setInterval`           | 周期执行     | ≥4ms             |
+| `requestAnimationFrame` | 动画         | ~16.67ms (60fps) |
+
+| 场景      | 推荐方法              |
+| --------- | --------------------- |
+| 延迟执行  | setTimeout            |
+| 动画效果  | requestAnimationFrame |
+| 定时任务  | setTimeout 递归       |
+| 防抖/节流 | setTimeout            |
+| 倒计时    | setTimeout 递归       |
+
+**核心要点**：
+
+- setTimeout/setInterval 返回 ID 用于取消
+- requestAnimationFrame 更适合动画
+- 避免 setInterval 的时间累积问题
+- 注意 this 绑定和内存泄漏
+- 定时器回调是宏任务

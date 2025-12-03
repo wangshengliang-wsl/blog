@@ -1,0 +1,518 @@
+---
+title: '声明文件基础'
+description: 'TypeScript 声明文件基础：.d.ts 文件、declare 关键字、@types 包的使用方法'
+pubDate: 2024-02-14
+toc: true
+ogImage: true
+category: 'TypeScript'
+tags: ['TypeScript', '声明文件', '.d.ts', 'declare', '@types']
+---
+
+声明文件（Declaration Files）为 JavaScript 代码提供类型信息，让 TypeScript 能够理解 JS 库的 API。
+
+## 什么是声明文件
+
+声明文件以 `.d.ts` 为扩展名，只包含类型声明，不包含实现：
+
+```typescript
+// TypeScript 5.x
+
+// utils.d.ts - 声明文件
+declare function greet(name: string): string
+declare const VERSION: string
+declare class Calculator {
+  add(a: number, b: number): number
+  subtract(a: number, b: number): number
+}
+
+// 对应的 JavaScript 实现 (utils.js)
+function greet(name) {
+  return `Hello, ${name}!`
+}
+const VERSION = '1.0.0'
+class Calculator {
+  add(a, b) {
+    return a + b
+  }
+  subtract(a, b) {
+    return a - b
+  }
+}
+```
+
+## declare 关键字
+
+`declare` 告诉 TypeScript 某个值存在于运行时：
+
+```typescript
+// 声明变量
+declare const API_URL: string
+declare let debug: boolean
+declare var window: Window
+
+// 声明函数
+declare function fetch(url: string): Promise<Response>
+declare function log(message: string): void
+
+// 声明类
+declare class User {
+  constructor(name: string)
+  name: string
+  greet(): string
+}
+
+// 声明枚举
+declare enum Direction {
+  Up,
+  Down,
+  Left,
+  Right,
+}
+
+// 声明命名空间
+declare namespace MyLib {
+  function init(): void
+  const version: string
+}
+```
+
+## 常见声明模式
+
+### 全局变量
+
+```typescript
+// global.d.ts
+
+// 简单类型
+declare const API_KEY: string
+declare let isLoggedIn: boolean
+
+// 对象类型
+declare const config: {
+  apiUrl: string
+  timeout: number
+  debug: boolean
+}
+
+// 函数类型
+declare function $(selector: string): HTMLElement | null
+declare function ajax(url: string, options?: AjaxOptions): Promise<unknown>
+
+interface AjaxOptions {
+  method?: 'GET' | 'POST' | 'PUT' | 'DELETE'
+  data?: unknown
+  headers?: Record<string, string>
+}
+```
+
+### 全局函数
+
+```typescript
+// 函数声明
+declare function require(module: string): unknown
+declare function define(deps: string[], factory: Function): void
+
+// 函数重载
+declare function createElement(tag: 'div'): HTMLDivElement
+declare function createElement(tag: 'span'): HTMLSpanElement
+declare function createElement(tag: 'a'): HTMLAnchorElement
+declare function createElement(tag: string): HTMLElement
+```
+
+### 全局类
+
+```typescript
+// 类声明
+declare class Observable<T> {
+  constructor(subscribe: (observer: Observer<T>) => void)
+  subscribe(observer: Observer<T>): Subscription
+  pipe<R>(...operators: OperatorFunction<T, R>[]): Observable<R>
+}
+
+interface Observer<T> {
+  next(value: T): void
+  error(err: unknown): void
+  complete(): void
+}
+
+interface Subscription {
+  unsubscribe(): void
+}
+
+type OperatorFunction<T, R> = (source: Observable<T>) => Observable<R>
+```
+
+### 全局接口扩展
+
+```typescript
+// 扩展 Window
+interface Window {
+  myApp: {
+    version: string
+    init(): void
+  }
+}
+
+// 扩展 Array
+interface Array<T> {
+  first(): T | undefined
+  last(): T | undefined
+}
+
+// 扩展 String
+interface String {
+  capitalize(): string
+  truncate(length: number): string
+}
+
+// 使用
+window.myApp.init()
+;[1, 2, 3].first()
+'hello'.capitalize()
+```
+
+## 模块声明
+
+### 声明外部模块
+
+```typescript
+// 声明模块
+declare module 'my-library' {
+  export function init(options: Options): void
+  export function destroy(): void
+
+  export interface Options {
+    debug?: boolean
+    logLevel?: 'info' | 'warn' | 'error'
+  }
+
+  export const version: string
+
+  export default class MyLibrary {
+    constructor(options?: Options)
+    start(): void
+    stop(): void
+  }
+}
+
+// 使用
+import MyLibrary, { init, Options } from 'my-library'
+
+const lib = new MyLibrary({ debug: true })
+lib.start()
+```
+
+### 声明非 JS 模块
+
+```typescript
+// 声明 CSS 模块
+declare module '*.css' {
+  const styles: { [className: string]: string }
+  export default styles
+}
+
+// 声明 SCSS 模块
+declare module '*.scss' {
+  const styles: { [className: string]: string }
+  export default styles
+}
+
+// 声明图片模块
+declare module '*.png' {
+  const src: string
+  export default src
+}
+
+declare module '*.jpg' {
+  const src: string
+  export default src
+}
+
+declare module '*.svg' {
+  const content: string
+  export default content
+}
+
+// 声明 JSON 模块
+declare module '*.json' {
+  const value: unknown
+  export default value
+}
+
+// 使用
+import styles from './app.css'
+import logo from './logo.png'
+import config from './config.json'
+```
+
+### 模块扩展
+
+```typescript
+// 扩展现有模块
+// express-extension.d.ts
+import 'express'
+
+declare module 'express' {
+  interface Request {
+    user?: {
+      id: string
+      name: string
+      role: 'admin' | 'user'
+    }
+    session?: {
+      id: string
+      data: Record<string, unknown>
+    }
+  }
+
+  interface Response {
+    success(data: unknown): void
+    error(code: number, message: string): void
+  }
+}
+
+// vue-extension.d.ts
+import 'vue'
+
+declare module 'vue' {
+  interface ComponentCustomProperties {
+    $http: typeof import('axios').default
+    $store: import('vuex').Store<unknown>
+  }
+}
+```
+
+## @types 包
+
+### 使用 DefinitelyTyped
+
+```bash
+# 安装类型包
+npm install --save-dev @types/node
+npm install --save-dev @types/lodash
+npm install --save-dev @types/express
+npm install --save-dev @types/react
+```
+
+```typescript
+// 安装后自动生效
+import express from 'express'
+import _ from 'lodash'
+
+const app = express() // 类型完整
+_.map([1, 2, 3], (n) => n * 2) // 类型安全
+```
+
+### 类型包结构
+
+```
+node_modules/@types/lodash/
+├── index.d.ts       # 主声明文件
+├── common/          # 公共声明
+├── fp/              # fp 版本声明
+└── package.json     # 包信息
+```
+
+### 查找类型声明
+
+TypeScript 按以下顺序查找类型：
+
+1. 本地 `.d.ts` 文件
+2. `package.json` 的 `types` 或 `typings` 字段
+3. `node_modules/@types/`
+4. `tsconfig.json` 的 `typeRoots`
+
+```typescript
+// tsconfig.json
+{
+  "compilerOptions": {
+    // 自定义类型根目录
+    "typeRoots": [
+      "./types",
+      "./node_modules/@types"
+    ],
+    // 只包含特定类型
+    "types": ["node", "lodash", "express"]
+  }
+}
+```
+
+## 编写声明文件
+
+### 为自己的库编写
+
+```typescript
+// my-utils/index.d.ts
+
+/**
+ * 格式化日期
+ * @param date 日期对象或时间戳
+ * @param format 格式字符串
+ */
+export function formatDate(date: Date | number, format?: string): string
+
+/**
+ * 深拷贝对象
+ * @param obj 要拷贝的对象
+ */
+export function deepClone<T>(obj: T): T
+
+/**
+ * 防抖函数
+ * @param fn 要防抖的函数
+ * @param delay 延迟时间（毫秒）
+ */
+export function debounce<T extends (...args: any[]) => any>(
+  fn: T,
+  delay: number
+): T
+
+/**
+ * 节流函数
+ * @param fn 要节流的函数
+ * @param interval 间隔时间（毫秒）
+ */
+export function throttle<T extends (...args: any[]) => any>(
+  fn: T,
+  interval: number
+): T
+
+export interface Config {
+  baseUrl: string
+  timeout: number
+  headers?: Record<string, string>
+}
+
+export class HttpClient {
+  constructor(config: Config)
+  get<T>(url: string): Promise<T>
+  post<T>(url: string, data: unknown): Promise<T>
+}
+```
+
+### package.json 配置
+
+```json
+{
+  "name": "my-utils",
+  "version": "1.0.0",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist"]
+}
+```
+
+## 最佳实践
+
+### 使用 JSDoc 注释
+
+````typescript
+/**
+ * 用户信息
+ */
+export interface User {
+  /** 用户 ID */
+  id: number
+  /** 用户名 */
+  name: string
+  /** 邮箱地址 */
+  email: string
+  /**
+   * 用户角色
+   * @default 'user'
+   */
+  role?: 'admin' | 'user'
+}
+
+/**
+ * 创建新用户
+ * @param data - 用户数据
+ * @returns 创建的用户对象
+ * @throws {Error} 如果数据无效
+ * @example
+ * ```ts
+ * const user = createUser({ name: '张三', email: 'test@test.com' })
+ * ```
+ */
+export function createUser(data: Omit<User, 'id'>): User
+````
+
+### 导出类型
+
+```typescript
+// 导出所有类型供使用者使用
+export type { User, CreateUserData, UpdateUserData }
+export type { Config, Options }
+
+// 导出类型和值
+export { UserService }
+export type { UserServiceOptions }
+```
+
+## 常见问题
+
+### 🙋 找不到模块的类型声明？
+
+```typescript
+// 方法 1：安装 @types 包
+npm install --save-dev @types/library-name
+
+// 方法 2：创建本地声明
+// types/library-name.d.ts
+declare module 'library-name' {
+  export function doSomething(): void
+}
+
+// 方法 3：使用 any（不推荐）
+// types/library-name.d.ts
+declare module 'library-name'
+```
+
+### 🙋 如何声明全局变量？
+
+```typescript
+// global.d.ts
+
+// 方法 1：直接声明
+declare const MY_GLOBAL: string
+
+// 方法 2：扩展 Window
+interface Window {
+  MY_GLOBAL: string
+}
+
+// 方法 3：在模块中声明全局
+declare global {
+  const MY_GLOBAL: string
+}
+
+export {} // 使文件成为模块
+```
+
+### 🙋 声明文件不生效？
+
+```typescript
+// 检查 tsconfig.json
+{
+  "compilerOptions": {
+    "declaration": true,  // 生成声明文件
+    "declarationDir": "./dist",  // 声明文件输出目录
+  },
+  "include": [
+    "src/**/*",
+    "types/**/*"  // 包含类型目录
+  ]
+}
+```
+
+## 总结
+
+| 特性     | 语法              | 用途                 |
+| -------- | ----------------- | -------------------- |
+| declare  | `declare const x` | 声明运行时存在的值   |
+| 模块声明 | `declare module`  | 声明外部模块类型     |
+| 全局声明 | `declare global`  | 在模块中添加全局类型 |
+| @types   | `@types/xxx`      | 社区类型定义包       |
+| JSDoc    | `/** */`          | 添加文档注释         |
+
+下一篇我们将深入学习声明文件进阶，了解更复杂的声明场景。

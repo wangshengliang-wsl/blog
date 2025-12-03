@@ -1,0 +1,454 @@
+---
+title: 创建第一个页面
+description: 动手实践创建 Next.js 页面，深入理解 page.tsx、layout.tsx 与 template.tsx 的协作关系
+pubDate: 2025-12-03
+toc: true
+ogImage: true
+category: Next
+tags: ['Next.js', 'page', 'layout', 'template', '路由']
+---
+
+🙋 App Router 中，页面是如何组织的？`layout.tsx` 和 `page.tsx` 各司何职？
+
+## 最简单的页面
+
+在 `app` 目录下创建一个 `page.tsx` 就是首页：
+
+```tsx
+// app/page.tsx
+// Next.js 15.x
+export default function HomePage() {
+  return <h1>欢迎来到 Next.js</h1>
+}
+```
+
+访问 `http://localhost:3000/` 即可看到这个页面。
+
+🎯 **核心规则**：文件夹定义路由路径，`page.tsx` 定义页面内容。
+
+## 理解 page.tsx
+
+### 基本规则
+
+- 每个路由段（文件夹）可以有一个 `page.tsx`
+- 只有包含 `page.tsx` 的文件夹才是可访问的路由
+- `page.tsx` 导出的默认组件就是页面内容
+
+```
+app/
+├── page.tsx           # /
+├── about/
+│   └── page.tsx       # /about
+├── blog/
+│   ├── page.tsx       # /blog
+│   └── [slug]/
+│       └── page.tsx   # /blog/:slug
+└── contact/           # 没有 page.tsx，不可访问
+    └── form.tsx       # 只是普通组件
+```
+
+### 接收参数
+
+```tsx
+// app/blog/[slug]/page.tsx
+// Next.js 15.x
+
+interface PageProps {
+  params: Promise<{ slug: string }>
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
+}
+
+export default async function BlogPost({ params, searchParams }: PageProps) {
+  const { slug } = await params
+  const { page } = await searchParams
+
+  return (
+    <article>
+      <h1>文章: {slug}</h1>
+      <p>页码: {page || '1'}</p>
+    </article>
+  )
+}
+```
+
+🔶 **注意**：Next.js 15 中，`params` 和 `searchParams` 是 Promise，需要 await。
+
+### 元数据导出
+
+```tsx
+// app/about/page.tsx
+// Next.js 15.x
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: '关于我们',
+  description: '了解我们的团队和使命',
+}
+
+export default function AboutPage() {
+  return (
+    <main>
+      <h1>关于我们</h1>
+      <p>这是一个 Next.js 示例项目。</p>
+    </main>
+  )
+}
+```
+
+## 理解 layout.tsx
+
+Layout 是包裹子路由的共享 UI，在路由切换时不会重新挂载。
+
+### 根布局（必需）
+
+```tsx
+// app/layout.tsx - 根布局
+// Next.js 15.x
+import type { Metadata } from 'next'
+import { Inter } from 'next/font/google'
+import './globals.css'
+
+const inter = Inter({ subsets: ['latin'] })
+
+export const metadata: Metadata = {
+  title: {
+    template: '%s | My App',
+    default: 'My App',
+  },
+  description: '一个 Next.js 应用',
+}
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="zh-CN">
+      <body className={inter.className}>
+        <header className="border-b p-4">
+          <nav>全站导航</nav>
+        </header>
+        <main className="min-h-screen">{children}</main>
+        <footer className="border-t p-4">
+          <p>© 2025 My App</p>
+        </footer>
+      </body>
+    </html>
+  )
+}
+```
+
+🔶 **必须**：根布局必须包含 `<html>` 和 `<body>` 标签。
+
+### 嵌套布局
+
+```tsx
+// app/dashboard/layout.tsx
+// Next.js 15.x
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <div className="flex min-h-screen">
+      <aside className="w-64 bg-gray-100 p-4">
+        <nav>
+          <ul className="space-y-2">
+            <li>
+              <a href="/dashboard">概览</a>
+            </li>
+            <li>
+              <a href="/dashboard/analytics">分析</a>
+            </li>
+            <li>
+              <a href="/dashboard/settings">设置</a>
+            </li>
+          </ul>
+        </nav>
+      </aside>
+      <section className="flex-1 p-6">{children}</section>
+    </div>
+  )
+}
+```
+
+```tsx
+// app/dashboard/page.tsx
+// Next.js 15.x
+export default function DashboardPage() {
+  return (
+    <div>
+      <h1 className="text-2xl font-bold">仪表盘</h1>
+      <p>欢迎回来！</p>
+    </div>
+  )
+}
+```
+
+```tsx
+// app/dashboard/analytics/page.tsx
+// Next.js 15.x
+export default function AnalyticsPage() {
+  return (
+    <div>
+      <h1 className="text-2xl font-bold">数据分析</h1>
+      <p>查看你的数据统计。</p>
+    </div>
+  )
+}
+```
+
+访问 `/dashboard` 和 `/dashboard/analytics` 时，侧边栏布局保持不变，只有内容区域更新。
+
+### Layout 的特性
+
+| 特性              | 说明                                 |
+| ----------------- | ------------------------------------ |
+| 不重新渲染        | 路由切换时，layout 保持挂载状态      |
+| 可嵌套            | 子路由的 layout 会嵌套在父 layout 中 |
+| 可访问 params     | 动态路由的 layout 可以接收 params    |
+| 不能访问 pathname | 需要使用 `usePathname()` 钩子        |
+
+## 理解 template.tsx
+
+Template 与 Layout 类似，但每次导航都会重新挂载。
+
+```tsx
+// app/dashboard/template.tsx
+// Next.js 15.x
+'use client'
+
+import { useEffect } from 'react'
+
+export default function DashboardTemplate({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  useEffect(() => {
+    // 每次路由切换都会执行
+    console.log('页面访问:', new Date().toISOString())
+  }, [])
+
+  return <div className="fade-in">{children}</div>
+}
+```
+
+🎯 **使用场景**：
+
+- 进入/退出动画
+- 每次导航时重置状态
+- 页面访问统计
+- 需要 `useEffect` 每次执行的场景
+
+### Layout vs Template
+
+| 特性       | Layout     | Template       |
+| ---------- | ---------- | -------------- |
+| 路由切换时 | 保持挂载   | 重新挂载       |
+| 状态保持   | ✅ 保持    | ❌ 重置        |
+| useEffect  | 只执行一次 | 每次执行       |
+| 使用场景   | 共享 UI    | 过渡动画、统计 |
+
+## 完整示例
+
+创建一个包含布局、模板和页面的完整结构：
+
+```
+app/
+├── layout.tsx          # 根布局
+├── page.tsx            # 首页
+├── globals.css
+└── products/
+    ├── layout.tsx      # 产品页布局
+    ├── template.tsx    # 页面过渡
+    ├── page.tsx        # /products
+    └── [id]/
+        └── page.tsx    # /products/:id
+```
+
+```tsx
+// app/products/layout.tsx
+// Next.js 15.x
+export default function ProductsLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <div className="container mx-auto py-8">
+      <h1 className="text-3xl font-bold mb-6">产品中心</h1>
+      {children}
+    </div>
+  )
+}
+```
+
+```tsx
+// app/products/template.tsx
+// Next.js 15.x
+import './products.css'
+
+export default function ProductsTemplate({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return <div className="animate-fade-in">{children}</div>
+}
+```
+
+```css
+/* app/products/products.css */
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+```
+
+```tsx
+// app/products/page.tsx
+// Next.js 15.x
+import Link from 'next/link'
+
+const products = [
+  { id: '1', name: 'MacBook Pro', price: 12999 },
+  { id: '2', name: 'iPhone 15', price: 7999 },
+  { id: '3', name: 'AirPods Pro', price: 1999 },
+]
+
+export default function ProductsPage() {
+  return (
+    <ul className="grid grid-cols-3 gap-4">
+      {products.map((product) => (
+        <li key={product.id} className="border rounded-lg p-4">
+          <Link href={`/products/${product.id}`}>
+            <h2 className="font-semibold">{product.name}</h2>
+            <p className="text-gray-600">¥{product.price}</p>
+          </Link>
+        </li>
+      ))}
+    </ul>
+  )
+}
+```
+
+```tsx
+// app/products/[id]/page.tsx
+// Next.js 15.x
+
+interface PageProps {
+  params: Promise<{ id: string }>
+}
+
+const products: Record<string, { name: string; price: number; desc: string }> =
+  {
+    '1': { name: 'MacBook Pro', price: 12999, desc: '专业级笔记本电脑' },
+    '2': { name: 'iPhone 15', price: 7999, desc: '新一代智能手机' },
+    '3': { name: 'AirPods Pro', price: 1999, desc: '主动降噪耳机' },
+  }
+
+export default async function ProductDetailPage({ params }: PageProps) {
+  const { id } = await params
+  const product = products[id]
+
+  if (!product) {
+    return <p>产品不存在</p>
+  }
+
+  return (
+    <div className="max-w-md">
+      <h2 className="text-2xl font-bold">{product.name}</h2>
+      <p className="text-3xl text-blue-600 my-4">¥{product.price}</p>
+      <p className="text-gray-600">{product.desc}</p>
+      <button className="mt-4 px-6 py-2 bg-blue-600 text-white rounded">
+        加入购物车
+      </button>
+    </div>
+  )
+}
+```
+
+## 常见问题
+
+🤔 **Q: Layout 中如何获取当前路径？**
+
+```tsx
+// app/dashboard/layout.tsx
+'use client'
+
+import { usePathname } from 'next/navigation'
+
+export default function DashboardLayout({ children }) {
+  const pathname = usePathname()
+
+  return (
+    <div>
+      <nav>
+        <a
+          href="/dashboard"
+          className={pathname === '/dashboard' ? 'active' : ''}
+        >
+          首页
+        </a>
+      </nav>
+      {children}
+    </div>
+  )
+}
+```
+
+🤔 **Q: 如何在 Layout 中访问动态参数？**
+
+```tsx
+// app/blog/[slug]/layout.tsx
+// Next.js 15.x
+interface LayoutProps {
+  children: React.ReactNode
+  params: Promise<{ slug: string }>
+}
+
+export default async function BlogLayout({ children, params }: LayoutProps) {
+  const { slug } = await params
+
+  return (
+    <div>
+      <nav>当前文章: {slug}</nav>
+      {children}
+    </div>
+  )
+}
+```
+
+🤔 **Q: 可以让 Layout 只在某些子路由生效吗？**
+
+使用路由组（下一章会详细介绍）：
+
+```
+app/
+├── (with-sidebar)/
+│   ├── layout.tsx      # 有侧边栏的布局
+│   ├── dashboard/
+│   └── settings/
+└── (no-sidebar)/
+    ├── login/
+    └── register/
+```
+
+---
+
+下一篇将介绍 Next.js 的开发工具与调试技巧，包括 Turbopack、Fast Refresh 和 DevTools。
+
+-EOF-

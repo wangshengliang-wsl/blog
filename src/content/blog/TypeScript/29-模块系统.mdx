@@ -1,0 +1,508 @@
+---
+title: '模块系统'
+description: 'TypeScript 模块系统详解：ES 模块、CommonJS、模块解析策略、类型导入导出'
+pubDate: 2024-02-12
+toc: true
+ogImage: true
+category: 'TypeScript'
+tags: ['TypeScript', '模块系统', 'ES Modules', 'CommonJS', '模块解析']
+---
+
+TypeScript 支持多种模块系统，理解模块的工作方式对于构建大型应用至关重要。
+
+## ES 模块
+
+ES 模块是现代 JavaScript 的标准模块系统：
+
+```typescript
+// TypeScript 5.x
+
+// === utils.ts ===
+// 命名导出
+export const PI = 3.14159
+
+export function add(a: number, b: number): number {
+  return a + b
+}
+
+export interface User {
+  id: number
+  name: string
+}
+
+export class Calculator {
+  add(a: number, b: number) {
+    return a + b
+  }
+}
+
+// 默认导出
+export default function greet(name: string) {
+  console.log(`Hello, ${name}!`)
+}
+
+// === main.ts ===
+// 命名导入
+import { PI, add, User, Calculator } from './utils'
+
+// 默认导入
+import greet from './utils'
+
+// 混合导入
+import greet2, { PI as pi, add } from './utils'
+
+// 导入所有
+import * as utils from './utils'
+console.log(utils.PI)
+utils.add(1, 2)
+
+// 仅导入类型
+import type { User } from './utils'
+
+// 类型和值混合导入
+import { Calculator, type User } from './utils'
+```
+
+## 导出方式
+
+```typescript
+// 导出声明
+export const name = '张三'
+export function hello() {}
+export class Person {}
+export interface Animal {}
+export type ID = string | number
+
+// 导出列表
+const a = 1
+const b = 2
+function fn() {}
+
+export { a, b, fn }
+
+// 重命名导出
+export { a as alpha, b as beta }
+
+// 重新导出
+export { add, subtract } from './math'
+export * from './utils'
+export * as utils from './utils'
+export { default } from './greeting'
+export { default as greet } from './greeting'
+
+// 类型导出
+export type { User, Admin } from './types'
+export type * from './types'
+```
+
+## 导入方式
+
+```typescript
+// 命名导入
+import { add, subtract } from './math'
+
+// 重命名导入
+import { add as sum } from './math'
+
+// 默认导入
+import Calculator from './calculator'
+
+// 命名空间导入
+import * as math from './math'
+
+// 副作用导入（只执行，不导入）
+import './polyfills'
+import './styles.css'
+
+// 类型导入
+import type { User } from './types'
+import { type User, type Admin } from './types'
+
+// 动态导入
+async function loadModule() {
+  const { add } = await import('./math')
+  return add(1, 2)
+}
+```
+
+## CommonJS 兼容
+
+TypeScript 可以与 CommonJS 模块互操作：
+
+```typescript
+// CommonJS 风格导入
+import fs = require('fs')
+import path = require('path')
+
+// 等效于
+const fs = require('fs')
+
+// 导出 CommonJS 模块
+export = {
+  name: 'module',
+  version: '1.0.0',
+}
+
+// esModuleInterop 开启后
+// 可以用 ES 模块语法导入 CommonJS
+import fs from 'fs'
+import express from 'express'
+
+// 类型声明中的 CommonJS
+declare module 'my-library' {
+  interface Options {
+    debug: boolean
+  }
+
+  function init(options: Options): void
+
+  export = init
+}
+```
+
+## 模块解析策略
+
+TypeScript 提供两种模块解析策略：
+
+### Classic 策略
+
+```typescript
+// tsconfig.json
+{
+  "compilerOptions": {
+    "moduleResolution": "classic"
+  }
+}
+
+// 相对路径导入：./moduleB
+// 在 /root/src/folder/A.ts 中
+// 查找顺序：
+// 1. /root/src/folder/moduleB.ts
+// 2. /root/src/folder/moduleB.d.ts
+
+// 非相对路径导入：moduleB
+// 在 /root/src/folder/A.ts 中
+// 查找顺序：
+// 1. /root/src/folder/moduleB.ts
+// 2. /root/src/folder/moduleB.d.ts
+// 3. /root/src/moduleB.ts
+// 4. /root/src/moduleB.d.ts
+// 5. /root/moduleB.ts
+// ... 向上查找
+```
+
+### Node 策略
+
+```typescript
+// tsconfig.json
+{
+  "compilerOptions": {
+    "moduleResolution": "node"
+  }
+}
+
+// 相对路径导入：./moduleB
+// 在 /root/src/moduleA.ts 中
+// 查找顺序：
+// 1. /root/src/moduleB.ts
+// 2. /root/src/moduleB.tsx
+// 3. /root/src/moduleB.d.ts
+// 4. /root/src/moduleB/package.json (types 字段)
+// 5. /root/src/moduleB/index.ts
+// 6. /root/src/moduleB/index.tsx
+// 7. /root/src/moduleB/index.d.ts
+
+// 非相对路径导入：moduleB
+// 在 /root/src/moduleA.ts 中
+// 查找 node_modules：
+// 1. /root/src/node_modules/moduleB.ts
+// 2. /root/src/node_modules/moduleB.tsx
+// 3. /root/src/node_modules/moduleB.d.ts
+// 4. /root/src/node_modules/moduleB/package.json
+// 5. /root/src/node_modules/@types/moduleB.d.ts
+// 6. /root/node_modules/... (向上查找)
+```
+
+### Node16/NodeNext 策略
+
+```typescript
+// tsconfig.json
+{
+  "compilerOptions": {
+    "module": "node16",
+    "moduleResolution": "node16"
+  }
+}
+
+// 支持 package.json 的 exports 字段
+// package.json
+{
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs",
+      "types": "./dist/index.d.ts"
+    },
+    "./utils": {
+      "import": "./dist/utils.mjs",
+      "types": "./dist/utils.d.ts"
+    }
+  }
+}
+
+// 使用
+import { something } from 'package'
+import { util } from 'package/utils'
+```
+
+## 路径映射
+
+使用 `paths` 配置路径别名：
+
+```typescript
+// tsconfig.json
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"],
+      "@components/*": ["src/components/*"],
+      "@utils/*": ["src/utils/*"],
+      "@types": ["src/types/index"]
+    }
+  }
+}
+
+// 使用
+import { Button } from '@components/Button'
+import { formatDate } from '@utils/date'
+import type { User } from '@types'
+
+// 等效于
+import { Button } from './src/components/Button'
+import { formatDate } from './src/utils/date'
+import type { User } from './src/types/index'
+```
+
+## 模块输出格式
+
+```typescript
+// tsconfig.json
+{
+  "compilerOptions": {
+    // ES 模块
+    "module": "ESNext",        // 最新 ES 模块
+    "module": "ES2022",        // ES2022 模块
+    "module": "ES2020",        // ES2020 模块
+
+    // CommonJS
+    "module": "CommonJS",
+
+    // Node.js
+    "module": "Node16",        // Node.js 16+
+    "module": "NodeNext",      // 最新 Node.js
+
+    // 其他
+    "module": "AMD",           // AMD 模块
+    "module": "UMD",           // UMD 模块
+    "module": "System"         // SystemJS
+  }
+}
+
+// 输出示例
+
+// ESNext 输出
+export function add(a, b) {
+    return a + b;
+}
+
+// CommonJS 输出
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.add = add;
+function add(a, b) {
+    return a + b;
+}
+```
+
+## 模块隔离
+
+每个文件都是独立的模块作用域：
+
+```typescript
+// 文件是模块的条件：有 import 或 export
+
+// a.ts - 这是一个模块
+export const x = 1
+
+// b.ts - 这也是一个模块
+import { x } from './a'
+
+// c.ts - 这不是模块（全局脚本）
+const y = 2
+
+// 强制将文件视为模块
+// d.ts
+export {} // 空导出使其成为模块
+
+const privateVar = 'only in this file'
+```
+
+## 实际应用
+
+### 项目结构
+
+```typescript
+// src/
+//   index.ts          # 入口
+//   types/            # 类型定义
+//     index.ts
+//     user.ts
+//   utils/            # 工具函数
+//     index.ts
+//     date.ts
+//     string.ts
+//   services/         # 服务层
+//     index.ts
+//     api.ts
+//     auth.ts
+//   components/       # 组件
+//     index.ts
+//     Button.ts
+
+// src/types/index.ts - 类型桶文件
+export * from './user'
+export * from './product'
+export * from './order'
+
+// src/utils/index.ts - 工具桶文件
+export * from './date'
+export * from './string'
+export * from './number'
+
+// src/index.ts - 主入口
+export * from './types'
+export * from './utils'
+export * from './services'
+export * from './components'
+```
+
+### 条件导出
+
+```typescript
+// 根据环境导出不同实现
+// config/index.ts
+
+let config: Config
+
+if (process.env.NODE_ENV === 'production') {
+  config = await import('./production').then((m) => m.default)
+} else {
+  config = await import('./development').then((m) => m.default)
+}
+
+export default config
+
+// 或使用条件类型
+type Environment = 'development' | 'production'
+
+const configs = {
+  development: () => import('./development'),
+  production: () => import('./production'),
+}
+
+export async function getConfig(env: Environment) {
+  return configs[env]()
+}
+```
+
+### 延迟加载
+
+```typescript
+// 路由级代码分割
+const routes = {
+  home: () => import('./pages/Home'),
+  about: () => import('./pages/About'),
+  dashboard: () => import('./pages/Dashboard'),
+}
+
+async function loadPage(route: keyof typeof routes) {
+  const module = await routes[route]()
+  return module.default
+}
+
+// 组件延迟加载
+class App {
+  private chartModule: typeof import('chart.js') | null = null
+
+  async showChart(data: number[]) {
+    if (!this.chartModule) {
+      this.chartModule = await import('chart.js')
+    }
+    // 使用 chartModule
+  }
+}
+```
+
+## 常见问题
+
+### 🙋 import 和 require 有什么区别？
+
+```typescript
+// import 是静态的，在编译时分析
+import { add } from './math' // 必须在顶层
+
+// require 是动态的，在运行时执行
+const add = require('./math').add // 可以在任何地方
+
+// TypeScript 推荐使用 import
+// 使用 esModuleInterop 提高兼容性
+```
+
+### 🙋 何时使用 type-only 导入？
+
+```typescript
+// 仅类型导入不会在编译后保留
+import type { User } from './types'
+
+// 当你只需要类型，不需要值时使用
+// 这可以避免循环依赖问题
+// 也可以减少打包体积
+
+// 混合导入
+import { UserService, type User } from './user'
+```
+
+### 🙋 如何处理循环依赖？
+
+```typescript
+// 循环依赖示例
+// a.ts
+import { b } from './b'
+export const a = 1
+
+// b.ts
+import { a } from './a'
+export const b = a + 1
+
+// 解决方案 1：重构代码结构
+// 解决方案 2：使用 type-only 导入
+// 解决方案 3：延迟导入
+export function getA() {
+  const { a } = require('./a')
+  return a
+}
+```
+
+## 总结
+
+| 特性         | 语法              | 用途       |
+| ------------ | ----------------- | ---------- |
+| 命名导出     | `export { name }` | 导出多个值 |
+| 默认导出     | `export default`  | 导出主要值 |
+| 命名导入     | `import { name }` | 导入特定值 |
+| 命名空间导入 | `import * as ns`  | 导入所有值 |
+| 类型导入     | `import type`     | 仅导入类型 |
+| 动态导入     | `import()`        | 运行时加载 |
+
+下一篇我们将学习命名空间，了解 TypeScript 的另一种代码组织方式。

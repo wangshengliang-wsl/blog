@@ -1,0 +1,491 @@
+---
+title: '事件委托'
+description: '掌握事件委托模式，利用事件冒泡实现高效的事件处理'
+pubDate: 2025-12-03
+toc: true
+ogImage: true
+category: 'JavaScript'
+tags: ['JavaScript', '事件委托', '事件冒泡', '性能优化']
+---
+
+事件委托是利用事件冒泡机制，将子元素的事件处理委托给父元素的技术。它能显著提升性能和简化代码。
+
+## 🎯 什么是事件委托
+
+### 问题场景
+
+```javascript
+// <ul id="list">
+//   <li>项目 1</li>
+//   <li>项目 2</li>
+//   <li>项目 3</li>
+//   ... 可能有很多项
+// </ul>
+
+// 🔶 传统方式：为每个元素绑定事件
+const items = document.querySelectorAll('#list li')
+items.forEach((item) => {
+  item.addEventListener('click', function () {
+    console.log(this.textContent)
+  })
+})
+
+// 问题：
+// 1. 需要为每个元素绑定事件，消耗内存
+// 2. 新增元素需要手动绑定事件
+// 3. 元素数量多时性能差
+```
+
+### 事件委托解决方案
+
+```javascript
+// ✅ 事件委托：只在父元素上绑定一个事件
+const list = document.getElementById('list')
+
+list.addEventListener('click', function (event) {
+  // 通过 event.target 判断实际点击的元素
+  if (event.target.tagName === 'LI') {
+    console.log(event.target.textContent)
+  }
+})
+
+// 优点：
+// 1. 只需要一个事件监听器
+// 2. 新增元素自动拥有事件处理
+// 3. 内存占用少，性能好
+```
+
+## 事件委托的原理
+
+### 事件冒泡
+
+```javascript
+// <div class="container">
+//   <ul class="list">
+//     <li class="item">点击我</li>
+//   </ul>
+// </div>
+
+// 点击 li 时，事件会冒泡：
+// li -> ul -> div -> body -> html -> document
+
+const container = document.querySelector('.container')
+
+container.addEventListener('click', function (event) {
+  console.log('目标元素:', event.target) // li（实际点击的）
+  console.log('当前元素:', event.currentTarget) // container（绑定事件的）
+})
+```
+
+### target vs currentTarget
+
+```javascript
+const list = document.getElementById('list')
+
+list.addEventListener('click', function (event) {
+  // event.target - 触发事件的元素（可能是子元素）
+  // event.currentTarget - 绑定事件处理器的元素
+  // this - 等于 event.currentTarget（非箭头函数）
+
+  console.log('target:', event.target.tagName)
+  console.log('currentTarget:', event.currentTarget.tagName)
+})
+
+// 点击 li 时：
+// target: LI
+// currentTarget: UL
+```
+
+## 实现事件委托
+
+### 基础实现
+
+```javascript
+const list = document.getElementById('list')
+
+list.addEventListener('click', function (event) {
+  const target = event.target
+
+  // 判断是否是目标元素
+  if (target.classList.contains('item')) {
+    handleItemClick(target)
+  }
+})
+
+function handleItemClick(item) {
+  console.log('点击了:', item.textContent)
+}
+```
+
+### 使用 matches 方法
+
+```javascript
+const container = document.getElementById('container')
+
+container.addEventListener('click', function (event) {
+  // 使用 CSS 选择器匹配
+  if (event.target.matches('.item')) {
+    console.log('点击了 item')
+  }
+
+  if (event.target.matches('.btn-delete')) {
+    console.log('点击了删除按钮')
+  }
+
+  if (event.target.matches('a[href^="http"]')) {
+    console.log('点击了外部链接')
+  }
+})
+```
+
+### 使用 closest 方法
+
+当目标元素有嵌套子元素时，`closest` 很有用：
+
+```javascript
+// <ul id="list">
+//   <li class="item">
+//     <span class="icon">📌</span>
+//     <span class="text">项目内容</span>
+//   </li>
+// </ul>
+
+const list = document.getElementById('list')
+
+list.addEventListener('click', function (event) {
+  // 点击 span 时，找到最近的 li
+  const item = event.target.closest('.item')
+
+  if (item) {
+    console.log('点击了列表项')
+    item.classList.toggle('selected')
+  }
+})
+```
+
+### 通用委托函数
+
+```javascript
+function delegate(parent, selector, eventType, handler) {
+  parent.addEventListener(eventType, function (event) {
+    const target = event.target.closest(selector)
+
+    if (target && parent.contains(target)) {
+      handler.call(target, event)
+    }
+  })
+}
+
+// 使用
+const list = document.getElementById('list')
+
+delegate(list, '.item', 'click', function (event) {
+  console.log('点击了:', this.textContent)
+})
+
+delegate(list, '.delete-btn', 'click', function (event) {
+  event.stopPropagation()
+  this.closest('.item').remove()
+})
+```
+
+## 实际应用场景
+
+### 动态列表
+
+```javascript
+// <ul id="todo-list"></ul>
+// <button id="add-btn">添加</button>
+
+const todoList = document.getElementById('todo-list')
+const addBtn = document.getElementById('add-btn')
+let counter = 0
+
+// 添加项目
+addBtn.addEventListener('click', function () {
+  const li = document.createElement('li')
+  li.className = 'todo-item'
+  li.innerHTML = `
+    <span class="text">任务 ${++counter}</span>
+    <button class="complete-btn">完成</button>
+    <button class="delete-btn">删除</button>
+  `
+  todoList.appendChild(li)
+})
+
+// 事件委托处理所有操作
+todoList.addEventListener('click', function (event) {
+  const target = event.target
+  const item = target.closest('.todo-item')
+
+  if (!item) return
+
+  if (target.matches('.complete-btn')) {
+    item.classList.toggle('completed')
+  }
+
+  if (target.matches('.delete-btn')) {
+    item.remove()
+  }
+})
+```
+
+### 表格操作
+
+```javascript
+// <table id="data-table">
+//   <tr data-id="1"><td>数据1</td><td><button class="edit">编辑</button></td></tr>
+//   <tr data-id="2"><td>数据2</td><td><button class="edit">编辑</button></td></tr>
+// </table>
+
+const table = document.getElementById('data-table')
+
+table.addEventListener('click', function (event) {
+  const row = event.target.closest('tr')
+  if (!row) return
+
+  const id = row.dataset.id
+
+  if (event.target.matches('.edit')) {
+    editRow(id)
+  }
+
+  if (event.target.matches('.delete')) {
+    deleteRow(id, row)
+  }
+})
+
+function editRow(id) {
+  console.log('编辑行:', id)
+}
+
+function deleteRow(id, row) {
+  if (confirm('确定删除？')) {
+    row.remove()
+  }
+}
+```
+
+### 选项卡切换
+
+```javascript
+// <div class="tabs">
+//   <button class="tab" data-tab="tab1">选项卡1</button>
+//   <button class="tab" data-tab="tab2">选项卡2</button>
+//   <button class="tab" data-tab="tab3">选项卡3</button>
+// </div>
+// <div class="tab-content" id="tab1">内容1</div>
+// <div class="tab-content" id="tab2">内容2</div>
+// <div class="tab-content" id="tab3">内容3</div>
+
+const tabs = document.querySelector('.tabs')
+
+tabs.addEventListener('click', function (event) {
+  if (!event.target.matches('.tab')) return
+
+  const tabId = event.target.dataset.tab
+
+  // 移除所有活动状态
+  document.querySelectorAll('.tab').forEach((t) => t.classList.remove('active'))
+  document
+    .querySelectorAll('.tab-content')
+    .forEach((c) => c.classList.remove('active'))
+
+  // 设置当前活动状态
+  event.target.classList.add('active')
+  document.getElementById(tabId).classList.add('active')
+})
+```
+
+### 表单验证
+
+```javascript
+const form = document.getElementById('myForm')
+
+// 委托处理所有输入框的验证
+form.addEventListener(
+  'blur',
+  function (event) {
+    if (!event.target.matches('input, textarea, select')) return
+
+    validateField(event.target)
+  },
+  true
+) // 使用捕获阶段，因为 blur 不冒泡
+
+form.addEventListener('input', function (event) {
+  if (!event.target.matches('input, textarea')) return
+
+  // 实时验证
+  clearError(event.target)
+})
+
+function validateField(field) {
+  const value = field.value.trim()
+  const rules = field.dataset.rules
+
+  if (rules?.includes('required') && !value) {
+    showError(field, '此字段必填')
+    return false
+  }
+
+  if (rules?.includes('email') && !isValidEmail(value)) {
+    showError(field, '请输入有效的邮箱')
+    return false
+  }
+
+  return true
+}
+```
+
+## 注意事项
+
+### 不冒泡的事件
+
+```javascript
+// 这些事件不冒泡，不能直接使用事件委托：
+// - focus / blur
+// - mouseenter / mouseleave
+// - load / unload / scroll（部分情况）
+
+// 解决方案1：使用捕获阶段
+parent.addEventListener(
+  'focus',
+  function (event) {
+    if (event.target.matches('input')) {
+      console.log('输入框获得焦点')
+    }
+  },
+  true
+) // 捕获阶段
+
+// 解决方案2：使用冒泡的替代事件
+// focus -> focusin（冒泡）
+// blur -> focusout（冒泡）
+parent.addEventListener('focusin', function (event) {
+  if (event.target.matches('input')) {
+    console.log('输入框获得焦点')
+  }
+})
+```
+
+### stopPropagation 的影响
+
+```javascript
+// 子元素阻止冒泡会影响事件委托
+const list = document.getElementById('list')
+const item = document.querySelector('.item')
+
+// 委托
+list.addEventListener('click', function () {
+  console.log('委托处理')
+})
+
+// 子元素阻止冒泡
+item.addEventListener('click', function (event) {
+  event.stopPropagation()
+  console.log('直接处理')
+})
+
+// 点击 item 时，只输出"直接处理"
+// 委托不会触发
+```
+
+### 性能考虑
+
+```javascript
+// 🔶 避免过于宽泛的委托
+document.addEventListener('click', function (event) {
+  // 每次点击都要判断，性能差
+  if (event.target.matches('.some-class')) {
+    // ...
+  }
+})
+
+// ✅ 委托到合适的父元素
+const container = document.getElementById('container')
+container.addEventListener('click', function (event) {
+  // 只在容器内生效
+  if (event.target.matches('.some-class')) {
+    // ...
+  }
+})
+```
+
+## 封装事件委托
+
+```javascript
+class EventDelegate {
+  constructor(root) {
+    this.root = typeof root === 'string' ? document.querySelector(root) : root
+    this.handlers = new Map()
+  }
+
+  on(eventType, selector, handler) {
+    if (!this.handlers.has(eventType)) {
+      this.handlers.set(eventType, [])
+
+      this.root.addEventListener(eventType, (event) => {
+        const handlers = this.handlers.get(eventType)
+        handlers.forEach(({ selector, handler }) => {
+          const target = event.target.closest(selector)
+          if (target && this.root.contains(target)) {
+            handler.call(target, event)
+          }
+        })
+      })
+    }
+
+    this.handlers.get(eventType).push({ selector, handler })
+    return this
+  }
+
+  off(eventType, selector, handler) {
+    if (!this.handlers.has(eventType)) return this
+
+    const handlers = this.handlers.get(eventType)
+    const index = handlers.findIndex(
+      (h) => h.selector === selector && h.handler === handler
+    )
+    if (index > -1) {
+      handlers.splice(index, 1)
+    }
+    return this
+  }
+}
+
+// 使用
+const delegate = new EventDelegate('#app')
+
+delegate
+  .on('click', '.btn-save', function () {
+    console.log('保存')
+  })
+  .on('click', '.btn-cancel', function () {
+    console.log('取消')
+  })
+  .on('input', 'input', function () {
+    console.log('输入:', this.value)
+  })
+```
+
+## 总结
+
+| 方式     | 事件监听器数量 | 动态元素支持 | 内存占用 |
+| -------- | -------------- | ------------ | -------- |
+| 直接绑定 | N 个           | 需手动绑定   | 高       |
+| 事件委托 | 1 个           | 自动支持     | 低       |
+
+| 方法    | 作用                   |
+| ------- | ---------------------- |
+| target  | 获取实际触发事件的元素 |
+| matches | 判断元素是否匹配选择器 |
+| closest | 向上查找匹配的祖先元素 |
+
+**核心要点**：
+
+- 事件委托利用事件冒泡机制
+- 使用 `event.target` 获取实际触发元素
+- 使用 `closest` 处理嵌套元素
+- 委托到合适的父元素，不要委托到 document
+- 注意不冒泡的事件需要特殊处理

@@ -1,0 +1,515 @@
+---
+title: '联合类型与交叉类型'
+description: 'TypeScript 联合类型与交叉类型详解：类型组合、类型收窄、可辨识联合与实际应用场景'
+pubDate: 2024-01-21
+toc: true
+ogImage: true
+category: 'TypeScript'
+tags: ['TypeScript', '联合类型', '交叉类型', '类型收窄', '可辨识联合']
+---
+
+联合类型和交叉类型是 TypeScript 中组合类型的两种基本方式。联合类型表示"或"的关系，交叉类型表示"且"的关系。掌握这两种类型是理解 TypeScript 类型系统的关键。
+
+## 联合类型
+
+联合类型使用 `|` 表示一个值可以是多种类型之一：
+
+```typescript
+// TypeScript 5.x
+
+// 基础联合类型
+let value: string | number
+
+value = 'hello' // ✅
+value = 42 // ✅
+// value = true;  // ❌ boolean 不在联合类型中
+
+// 函数参数使用联合类型
+function formatId(id: string | number): string {
+  return `ID: ${id}`
+}
+
+formatId(123) // "ID: 123"
+formatId('abc') // "ID: abc"
+```
+
+### 联合类型的访问限制
+
+联合类型只能访问所有类型共有的成员：
+
+```typescript
+function getLength(value: string | number) {
+  // ❌ 错误：number 没有 length 属性
+  // return value.length;
+
+  // ✅ toString() 是共有方法
+  return value.toString().length
+}
+
+// 需要类型收窄才能访问特定类型的成员
+function getLength2(value: string | number): number {
+  if (typeof value === 'string') {
+    return value.length // ✅ 这里 value 是 string
+  }
+  return value.toString().length // 这里 value 是 number
+}
+```
+
+## 类型收窄
+
+TypeScript 通过控制流分析自动收窄联合类型：
+
+### typeof 收窄
+
+```typescript
+function process(value: string | number | boolean) {
+  if (typeof value === 'string') {
+    // value: string
+    console.log(value.toUpperCase())
+  } else if (typeof value === 'number') {
+    // value: number
+    console.log(value.toFixed(2))
+  } else {
+    // value: boolean
+    console.log(value ? 'yes' : 'no')
+  }
+}
+```
+
+### instanceof 收窄
+
+```typescript
+class Dog {
+  bark() {
+    console.log('Woof!')
+  }
+}
+
+class Cat {
+  meow() {
+    console.log('Meow!')
+  }
+}
+
+function speak(animal: Dog | Cat) {
+  if (animal instanceof Dog) {
+    animal.bark() // animal: Dog
+  } else {
+    animal.meow() // animal: Cat
+  }
+}
+```
+
+### in 操作符收窄
+
+```typescript
+interface Fish {
+  swim(): void
+}
+
+interface Bird {
+  fly(): void
+}
+
+function move(animal: Fish | Bird) {
+  if ('swim' in animal) {
+    animal.swim() // animal: Fish
+  } else {
+    animal.fly() // animal: Bird
+  }
+}
+```
+
+### 真值收窄
+
+```typescript
+function printMessage(message: string | null | undefined) {
+  if (message) {
+    // message: string（排除了 null、undefined 和空字符串）
+    console.log(message.toUpperCase())
+  } else {
+    console.log('No message')
+  }
+}
+```
+
+## 可辨识联合
+
+可辨识联合是联合类型的强大模式，通过共同的字面量属性来区分类型：
+
+```typescript
+// 定义带有 kind 属性的类型
+interface Circle {
+  kind: 'circle'
+  radius: number
+}
+
+interface Rectangle {
+  kind: 'rectangle'
+  width: number
+  height: number
+}
+
+interface Triangle {
+  kind: 'triangle'
+  base: number
+  height: number
+}
+
+type Shape = Circle | Rectangle | Triangle
+
+// 根据 kind 属性收窄类型
+function getArea(shape: Shape): number {
+  switch (shape.kind) {
+    case 'circle':
+      return Math.PI * shape.radius ** 2
+    case 'rectangle':
+      return shape.width * shape.height
+    case 'triangle':
+      return (shape.base * shape.height) / 2
+  }
+}
+
+// 使用
+const circle: Circle = { kind: 'circle', radius: 10 }
+console.log(getArea(circle)) // 314.159...
+```
+
+### 穷尽检查
+
+```typescript
+type Shape = Circle | Rectangle | Triangle
+
+function getArea(shape: Shape): number {
+  switch (shape.kind) {
+    case 'circle':
+      return Math.PI * shape.radius ** 2
+    case 'rectangle':
+      return shape.width * shape.height
+    case 'triangle':
+      return (shape.base * shape.height) / 2
+    default:
+      // 穷尽检查：如果所有情况都处理了，shape 是 never
+      const _exhaustiveCheck: never = shape
+      return _exhaustiveCheck
+  }
+}
+
+// 如果新增类型但忘记处理，TypeScript 会报错
+interface Square {
+  kind: 'square'
+  size: number
+}
+
+type Shape2 = Circle | Rectangle | Triangle | Square
+
+function getArea2(shape: Shape2): number {
+  switch (shape.kind) {
+    case 'circle':
+      return Math.PI * shape.radius ** 2
+    case 'rectangle':
+      return shape.width * shape.height
+    case 'triangle':
+      return (shape.base * shape.height) / 2
+    // 缺少 'square' 的处理
+    default:
+      // ❌ 错误：类型 Square 不能赋值给类型 never
+      const _exhaustiveCheck: never = shape
+      return _exhaustiveCheck
+  }
+}
+```
+
+## 交叉类型
+
+交叉类型使用 `&` 表示一个值必须同时具有多种类型的特性：
+
+```typescript
+interface Person {
+  name: string
+  age: number
+}
+
+interface Employee {
+  employeeId: string
+  department: string
+}
+
+// 交叉类型：同时具有 Person 和 Employee 的所有属性
+type Worker = Person & Employee
+
+const worker: Worker = {
+  name: '张三',
+  age: 30,
+  employeeId: 'E001',
+  department: '技术部',
+}
+```
+
+### 交叉类型的合并
+
+```typescript
+// 基础类型交叉（通常得到 never）
+type T1 = string & number // never（不存在既是字符串又是数字的值）
+
+// 对象类型交叉（合并属性）
+type A = { a: string }
+type B = { b: number }
+type AB = A & B // { a: string; b: number }
+
+// 相同属性名的交叉
+type X = { prop: string }
+type Y = { prop: number }
+type XY = X & Y // { prop: never }（string & number = never）
+
+// 相同属性名但类型兼容时可以交叉
+type P = { name: string }
+type Q = { name: 'hello' } // 字面量类型
+type PQ = P & Q // { name: "hello" }
+```
+
+### 实际应用：混入模式
+
+```typescript
+// 时间戳混入
+interface Timestamped {
+  createdAt: Date
+  updatedAt: Date
+}
+
+// ID 混入
+interface Identifiable {
+  id: string
+}
+
+// 基础用户
+interface BaseUser {
+  name: string
+  email: string
+}
+
+// 完整用户 = 基础用户 + 混入
+type User = BaseUser & Identifiable & Timestamped
+
+const user: User = {
+  id: 'u123',
+  name: '张三',
+  email: 'zhangsan@example.com',
+  createdAt: new Date(),
+  updatedAt: new Date(),
+}
+```
+
+### 函数交叉类型
+
+```typescript
+type LogFn = (message: string) => void
+type ErrorFn = (error: Error) => void
+
+// 函数交叉 = 函数重载
+type Logger = LogFn & ErrorFn
+
+const logger: Logger = (input: string | Error) => {
+  if (typeof input === 'string') {
+    console.log(input)
+  } else {
+    console.error(input.message)
+  }
+}
+
+logger('info message')
+logger(new Error('error message'))
+```
+
+## 联合类型 vs 交叉类型
+
+```typescript
+// 联合类型：或 (A | B)
+// 值可以是 A 或 B 其中之一
+type StringOrNumber = string | number
+let a: StringOrNumber = 'hello' // ✅
+let b: StringOrNumber = 42 // ✅
+
+// 交叉类型：且 (A & B)
+// 值必须同时满足 A 和 B
+type Named = { name: string }
+type Aged = { age: number }
+type Person = Named & Aged
+
+const person: Person = {
+  name: '张三', // 必须有
+  age: 25, // 必须有
+}
+```
+
+🤔 直觉上的误解：
+
+```typescript
+// 联合类型接受的值范围更广（或）
+type T1 = { a: string } | { b: number }
+const v1: T1 = { a: 'hello' } // ✅ 只需满足其一
+const v2: T1 = { b: 42 } // ✅
+
+// 交叉类型接受的值范围更窄（且）
+type T2 = { a: string } & { b: number }
+const v3: T2 = { a: 'hello', b: 42 } // ✅ 必须同时满足
+// const v4: T2 = { a: 'hello' };  // ❌ 缺少 b
+```
+
+## 实际应用场景
+
+### API 响应处理
+
+```typescript
+// API 响应可能是成功或失败
+interface SuccessResponse<T> {
+  status: 'success'
+  data: T
+}
+
+interface ErrorResponse {
+  status: 'error'
+  error: string
+  code: number
+}
+
+type ApiResponse<T> = SuccessResponse<T> | ErrorResponse
+
+function handleResponse<T>(response: ApiResponse<T>) {
+  if (response.status === 'success') {
+    // response: SuccessResponse<T>
+    console.log('Data:', response.data)
+  } else {
+    // response: ErrorResponse
+    console.error(`Error ${response.code}: ${response.error}`)
+  }
+}
+```
+
+### Redux Action 模式
+
+```typescript
+interface AddTodoAction {
+  type: 'ADD_TODO'
+  payload: { text: string }
+}
+
+interface RemoveTodoAction {
+  type: 'REMOVE_TODO'
+  payload: { id: number }
+}
+
+interface ToggleTodoAction {
+  type: 'TOGGLE_TODO'
+  payload: { id: number }
+}
+
+type TodoAction = AddTodoAction | RemoveTodoAction | ToggleTodoAction
+
+function todoReducer(state: Todo[], action: TodoAction): Todo[] {
+  switch (action.type) {
+    case 'ADD_TODO':
+      return [
+        ...state,
+        { id: Date.now(), text: action.payload.text, done: false },
+      ]
+    case 'REMOVE_TODO':
+      return state.filter((todo) => todo.id !== action.payload.id)
+    case 'TOGGLE_TODO':
+      return state.map((todo) =>
+        todo.id === action.payload.id ? { ...todo, done: !todo.done } : todo
+      )
+  }
+}
+```
+
+### 组合配置
+
+```typescript
+// 基础配置
+interface BaseConfig {
+  name: string
+  version: string
+}
+
+// 开发配置
+interface DevConfig {
+  debug: true
+  hotReload: boolean
+}
+
+// 生产配置
+interface ProdConfig {
+  debug: false
+  minify: boolean
+  sourceMaps: boolean
+}
+
+// 完整配置 = 基础 + (开发 | 生产)
+type AppConfig = BaseConfig & (DevConfig | ProdConfig)
+
+const devConfig: AppConfig = {
+  name: 'MyApp',
+  version: '1.0.0',
+  debug: true,
+  hotReload: true,
+}
+
+const prodConfig: AppConfig = {
+  name: 'MyApp',
+  version: '1.0.0',
+  debug: false,
+  minify: true,
+  sourceMaps: false,
+}
+```
+
+## 常见问题
+
+### 🙋 联合类型数组和数组的联合有什么区别？
+
+```typescript
+// (string | number)[] - 数组，元素可以是 string 或 number
+const arr1: (string | number)[] = [1, 'hello', 2, 'world']
+
+// string[] | number[] - 要么全是 string，要么全是 number
+const arr2: string[] | number[] = [1, 2, 3] // ✅
+const arr3: string[] | number[] = ['a', 'b', 'c'] // ✅
+// const arr4: string[] | number[] = [1, 'a'];  // ❌ 混合不行
+```
+
+### 🙋 如何从联合类型中提取特定类型？
+
+```typescript
+type Animal = { type: 'dog'; bark(): void } | { type: 'cat'; meow(): void }
+
+// 使用 Extract 提取
+type Dog = Extract<Animal, { type: 'dog' }>
+// { type: 'dog'; bark(): void }
+
+// 使用 Exclude 排除
+type NotDog = Exclude<Animal, { type: 'dog' }>
+// { type: 'cat'; meow(): void }
+```
+
+### 🙋 交叉类型遇到冲突怎么办？
+
+```typescript
+// 属性类型冲突会得到 never
+type A = { x: string }
+type B = { x: number }
+type C = A & B // { x: never }
+
+// 解决方案：使用 Omit 排除冲突属性
+type D = Omit<A, 'x'> & B // { x: number }
+```
+
+## 总结
+
+| 类型       | 语法                   | 含义                     | 适用场景               |
+| ---------- | ---------------------- | ------------------------ | ---------------------- |
+| 联合类型   | `A \| B`               | 值是 A 或 B 之一         | 多种可能的输入、状态机 |
+| 交叉类型   | `A & B`                | 值同时具有 A 和 B 的特性 | 混入、组合对象         |
+| 可辨识联合 | 带共同字面量属性的联合 | 可靠的类型收窄           | Redux Action、API 响应 |
+
+下一篇我们将学习字面量类型与类型别名，深入理解 TypeScript 的类型定义方式。

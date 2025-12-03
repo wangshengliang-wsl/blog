@@ -1,0 +1,308 @@
+---
+title: '内置工具类型（下）'
+description: 'TypeScript 内置工具类型详解：Record、Exclude、Extract、NonNullable、ReturnType、Parameters 的用法'
+pubDate: 2024-02-03
+toc: true
+ogImage: true
+category: 'TypeScript'
+tags: ['TypeScript', '工具类型', 'Record', 'ReturnType', 'Parameters']
+---
+
+继续学习 TypeScript 的内置工具类型，本篇介绍 Record、Exclude、Extract、NonNullable、ReturnType、Parameters 等类型。
+
+## Record\<K, V\>
+
+创建键值对类型：
+
+```typescript
+// TypeScript 5.x
+
+// 基本用法
+type StringRecord = Record<string, number>
+const scores: StringRecord = {
+  math: 90,
+  english: 85,
+}
+
+// 限定键
+type Role = 'admin' | 'user' | 'guest'
+type RolePermissions = Record<Role, string[]>
+
+const permissions: RolePermissions = {
+  admin: ['read', 'write', 'delete'],
+  user: ['read', 'write'],
+  guest: ['read'],
+}
+
+// 实现原理
+type MyRecord<K extends keyof any, V> = {
+  [P in K]: V
+}
+```
+
+## Exclude\<T, U\>
+
+从联合类型中排除某些类型：
+
+```typescript
+type All = 'a' | 'b' | 'c' | 'd'
+
+type WithoutA = Exclude<All, 'a'>
+// 'b' | 'c' | 'd'
+
+type WithoutAB = Exclude<All, 'a' | 'b'>
+// 'c' | 'd'
+
+// 过滤 null 和 undefined
+type Values = string | number | null | undefined
+type NonNullValues = Exclude<Values, null | undefined>
+// string | number
+
+// 实现原理
+type MyExclude<T, U> = T extends U ? never : T
+```
+
+## Extract\<T, U\>
+
+从联合类型中提取某些类型（与 Exclude 相反）：
+
+```typescript
+type All = 'a' | 'b' | 'c' | 1 | 2
+
+type OnlyStrings = Extract<All, string>
+// 'a' | 'b' | 'c'
+
+type OnlyNumbers = Extract<All, number>
+// 1 | 2
+
+// 提取公共类型
+type A = 'a' | 'b' | 'c'
+type B = 'b' | 'c' | 'd'
+type Common = Extract<A, B>
+// 'b' | 'c'
+
+// 实现原理
+type MyExtract<T, U> = T extends U ? T : never
+```
+
+## NonNullable\<T\>
+
+排除 null 和 undefined：
+
+```typescript
+type MaybeString = string | null | undefined
+
+type DefiniteString = NonNullable<MaybeString>
+// string
+
+// 常用于处理可选值
+function process(value: string | null | undefined) {
+  const definite: NonNullable<typeof value> = value!
+  return definite.toUpperCase()
+}
+
+// 实现原理
+type MyNonNullable<T> = T extends null | undefined ? never : T
+```
+
+## ReturnType\<T\>
+
+获取函数返回类型：
+
+```typescript
+function getUser() {
+  return { id: 1, name: '张三', age: 25 }
+}
+
+type User = ReturnType<typeof getUser>
+// { id: number; name: string; age: number }
+
+// 异步函数
+async function fetchData() {
+  return { data: 'hello' }
+}
+
+type FetchResult = ReturnType<typeof fetchData>
+// Promise<{ data: string }>
+
+// 获取 Promise 内部类型
+type UnwrappedResult = Awaited<ReturnType<typeof fetchData>>
+// { data: string }
+
+// 实现原理
+type MyReturnType<T extends (...args: any) => any> = T extends (
+  ...args: any
+) => infer R
+  ? R
+  : any
+```
+
+## Parameters\<T\>
+
+获取函数参数类型（元组）：
+
+```typescript
+function greet(name: string, age: number, active: boolean) {
+  console.log(name, age, active)
+}
+
+type GreetParams = Parameters<typeof greet>
+// [name: string, age: number, active: boolean]
+
+// 使用
+const args: GreetParams = ['张三', 25, true]
+greet(...args)
+
+// 获取特定参数
+type FirstParam = Parameters<typeof greet>[0] // string
+type SecondParam = Parameters<typeof greet>[1] // number
+
+// 实现原理
+type MyParameters<T extends (...args: any) => any> = T extends (
+  ...args: infer P
+) => any
+  ? P
+  : never
+```
+
+## ConstructorParameters\<T\>
+
+获取构造函数参数类型：
+
+```typescript
+class User {
+  constructor(
+    public name: string,
+    public age: number
+  ) {}
+}
+
+type UserConstructorParams = ConstructorParameters<typeof User>
+// [name: string, age: number]
+
+// 工厂函数
+function createInstance<T extends new (...args: any) => any>(
+  Ctor: T,
+  ...args: ConstructorParameters<T>
+): InstanceType<T> {
+  return new Ctor(...args)
+}
+
+const user = createInstance(User, '张三', 25)
+```
+
+## InstanceType\<T\>
+
+获取构造函数实例类型：
+
+```typescript
+class User {
+  name = '张三'
+  age = 25
+}
+
+type UserInstance = InstanceType<typeof User>
+// User
+
+// 结合使用
+function createAndLog<T extends new (...args: any) => any>(
+  Ctor: T,
+  ...args: ConstructorParameters<T>
+): InstanceType<T> {
+  const instance = new Ctor(...args)
+  console.log('Created:', instance)
+  return instance
+}
+```
+
+## ThisParameterType 和 OmitThisParameter
+
+处理 this 参数：
+
+```typescript
+function greet(this: { name: string }, greeting: string) {
+  return `${greeting}, ${this.name}!`
+}
+
+type GreetThis = ThisParameterType<typeof greet>
+// { name: string }
+
+type GreetWithoutThis = OmitThisParameter<typeof greet>
+// (greeting: string) => string
+```
+
+## 组合应用
+
+```typescript
+// API 处理器类型
+type ApiHandler<T extends (...args: any) => Promise<any>> = {
+  handler: T
+  params: Parameters<T>
+  result: Awaited<ReturnType<T>>
+}
+
+async function fetchUser(id: string) {
+  return { id, name: '张三' }
+}
+
+type FetchUserHandler = ApiHandler<typeof fetchUser>
+// {
+//   handler: (id: string) => Promise<{ id: string; name: string }>
+//   params: [id: string]
+//   result: { id: string; name: string }
+// }
+
+// 事件映射
+type EventHandlers = {
+  click: (x: number, y: number) => void
+  input: (value: string) => void
+  submit: (data: Record<string, unknown>) => void
+}
+
+type EventParams = {
+  [K in keyof EventHandlers]: Parameters<EventHandlers[K]>
+}
+// {
+//   click: [x: number, y: number]
+//   input: [value: string]
+//   submit: [data: Record<string, unknown>]
+// }
+```
+
+## 常见问题
+
+### 🙋 ReturnType 和 Awaited 有什么区别？
+
+```typescript
+async function fn() {
+  return 'hello'
+}
+
+type A = ReturnType<typeof fn> // Promise<string>
+type B = Awaited<ReturnType<typeof fn>> // string
+```
+
+### 🙋 如何获取函数的第 N 个参数类型？
+
+```typescript
+type SecondArg<T extends (...args: any) => any> = Parameters<T>[1]
+
+function example(a: string, b: number, c: boolean) {}
+
+type Second = SecondArg<typeof example> // number
+```
+
+## 总结
+
+| 工具类型                   | 作用                |
+| -------------------------- | ------------------- |
+| `Record<K, V>`             | 创建键值对类型      |
+| `Exclude<T, U>`            | 从 T 中排除 U       |
+| `Extract<T, U>`            | 从 T 中提取 U       |
+| `NonNullable<T>`           | 排除 null/undefined |
+| `ReturnType<T>`            | 获取函数返回类型    |
+| `Parameters<T>`            | 获取函数参数类型    |
+| `ConstructorParameters<T>` | 获取构造函数参数    |
+| `InstanceType<T>`          | 获取实例类型        |
+
+下一篇我们将学习泛型的实战应用。

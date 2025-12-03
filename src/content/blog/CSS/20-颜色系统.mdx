@@ -1,0 +1,527 @@
+---
+title: 颜色系统
+description: 掌握 CSS 现代颜色系统，从传统格式到 oklch、color-mix 等新特性
+pubDate: 2025-12-03
+toc: true
+ogImage: true
+category: CSS
+---
+
+CSS 颜色经历了从简单的关键字到现代感知均匀色彩空间的演进。掌握颜色系统不仅能让你精确控制视觉效果，还能构建更灵活的主题系统。
+
+## 传统颜色格式
+
+### 颜色关键字
+
+```css
+.named {
+  color: red;
+  background: cornflowerblue;
+  border-color: transparent;
+}
+
+/* 特殊关键字 */
+.special {
+  color: currentColor; /* 继承当前 color 值 */
+  background: inherit;
+}
+```
+
+CSS 定义了 147 个命名颜色，从 `aliceblue` 到 `yellowgreen`。
+
+### 十六进制
+
+```css
+.hex {
+  color: #ff0000; /* 红色 */
+  background: #3b82f6; /* 蓝色 */
+}
+
+/* 简写 */
+.hex-short {
+  color: #f00; /* #ff0000 */
+  background: #38f; /* #3388ff */
+}
+
+/* 带透明度 */
+.hex-alpha {
+  color: #ff000080; /* 50% 透明 */
+  background: #3b82f680;
+}
+```
+
+### RGB / RGBA
+
+```css
+.rgb {
+  color: rgb(255, 0, 0);
+  background: rgb(59, 130, 246);
+}
+
+/* 带透明度 */
+.rgba {
+  color: rgba(255, 0, 0, 0.5);
+  background: rgba(59, 130, 246, 0.8);
+}
+
+/* 现代语法（空格分隔） */
+.rgb-modern {
+  color: rgb(255 0 0);
+  background: rgb(59 130 246 / 0.5);
+}
+
+/* 百分比 */
+.rgb-percent {
+  color: rgb(100% 0% 0%);
+}
+```
+
+### HSL / HSLA
+
+HSL 更直观：色相(Hue)、饱和度(Saturation)、亮度(Lightness)。
+
+```css
+.hsl {
+  color: hsl(0, 100%, 50%); /* 红色 */
+  background: hsl(217, 91%, 60%); /* 蓝色 */
+}
+
+/* 色相：0-360 度色轮 */
+.hue-examples {
+  --red: hsl(0, 100%, 50%);
+  --orange: hsl(30, 100%, 50%);
+  --yellow: hsl(60, 100%, 50%);
+  --green: hsl(120, 100%, 50%);
+  --cyan: hsl(180, 100%, 50%);
+  --blue: hsl(240, 100%, 50%);
+  --purple: hsl(270, 100%, 50%);
+  --magenta: hsl(300, 100%, 50%);
+}
+
+/* 带透明度 */
+.hsla {
+  background: hsla(217, 91%, 60%, 0.5);
+}
+
+/* 现代语法 */
+.hsl-modern {
+  background: hsl(217 91% 60% / 0.5);
+}
+```
+
+🎯 HSL 的优势：调整亮度和饱和度时色相保持不变，非常适合创建色彩变体。
+
+## 现代颜色格式
+
+### HWB
+
+色相(Hue)、白度(Whiteness)、黑度(Blackness)：
+
+```css
+.hwb {
+  color: hwb(0 0% 0%); /* 纯红 */
+  background: hwb(217 20% 20%); /* 蓝色 */
+}
+
+/* 添加白色变浅 */
+.hwb-light {
+  background: hwb(217 40% 0%);
+}
+
+/* 添加黑色变深 */
+.hwb-dark {
+  background: hwb(217 0% 40%);
+}
+
+/* 带透明度 */
+.hwb-alpha {
+  background: hwb(217 20% 20% / 0.5);
+}
+```
+
+### LAB
+
+基于人类视觉感知的颜色空间：
+
+```css
+.lab {
+  /* L: 亮度 0-100 */
+  /* a: 绿-红 轴 */
+  /* b: 蓝-黄 轴 */
+  color: lab(50% 80 0); /* 红色调 */
+  background: lab(60% -20 60); /* 黄绿色 */
+}
+```
+
+### LCH
+
+LAB 的极坐标形式，更直观：
+
+```css
+.lch {
+  /* L: 亮度 0-100% */
+  /* C: 色度（饱和度） */
+  /* H: 色相 0-360 */
+  color: lch(50% 100 30); /* 红色 */
+  background: lch(60% 80 250); /* 蓝色 */
+}
+```
+
+### OKLCH（推荐）
+
+改进的 LCH，感知更均匀：
+
+```css
+.oklch {
+  /* L: 亮度 0-1 */
+  /* C: 色度 0-0.4+ */
+  /* H: 色相 0-360 */
+  color: oklch(0.6 0.25 30); /* 红色 */
+  background: oklch(0.6 0.15 250); /* 蓝色 */
+}
+
+/* 带透明度 */
+.oklch-alpha {
+  background: oklch(0.6 0.15 250 / 0.5);
+}
+```
+
+🎯 OKLCH 是目前最推荐的颜色格式：
+
+- 感知均匀：相同数值变化产生相同视觉变化
+- 广色域支持：P3、Rec.2020 等
+- 直观调整：亮度、饱和度、色相独立控制
+
+### OKLAB
+
+OKLCH 的直角坐标形式：
+
+```css
+.oklab {
+  color: oklab(0.6 0.15 0.1);
+  background: oklab(0.6 -0.05 -0.1);
+}
+```
+
+## color() 函数
+
+访问特定颜色空间：
+
+```css
+.color-function {
+  /* sRGB */
+  color: color(srgb 1 0 0);
+
+  /* Display P3（广色域） */
+  background: color(display-p3 1 0.5 0);
+
+  /* Rec.2020（超广色域） */
+  border-color: color(rec2020 0.5 0.5 0);
+}
+
+/* 带透明度 */
+.color-alpha {
+  background: color(display-p3 1 0.5 0 / 0.5);
+}
+```
+
+### 广色域检测
+
+```css
+@media (color-gamut: p3) {
+  .vibrant {
+    background: color(display-p3 1 0 0); /* P3 红色，比 sRGB 更鲜艳 */
+  }
+}
+
+@supports (color: oklch(0 0 0)) {
+  .modern {
+    --primary: oklch(0.6 0.15 250);
+  }
+}
+```
+
+## color-mix() 混合
+
+混合两种颜色：
+
+```css
+.mixed {
+  /* 默认 50% 混合 */
+  background: color-mix(in srgb, red, blue);
+
+  /* 指定比例 */
+  color: color-mix(in srgb, red 70%, blue);
+}
+
+/* 不同颜色空间混合 */
+.mix-oklch {
+  background: color-mix(in oklch, oklch(0.6 0.2 30), oklch(0.6 0.2 250));
+}
+
+.mix-hsl {
+  background: color-mix(in hsl, hsl(0 100% 50%), hsl(240 100% 50%));
+}
+```
+
+### 创建色彩变体
+
+```css
+:root {
+  --primary: oklch(0.6 0.15 250);
+
+  /* 使用 color-mix 创建变体 */
+  --primary-light: color-mix(in oklch, var(--primary), white 30%);
+  --primary-dark: color-mix(in oklch, var(--primary), black 30%);
+  --primary-muted: color-mix(in oklch, var(--primary), gray 40%);
+}
+```
+
+### 透明度变体
+
+```css
+:root {
+  --primary: oklch(0.6 0.15 250);
+
+  /* 混合透明色创建半透明变体 */
+  --primary-50: color-mix(in oklch, var(--primary), transparent 50%);
+  --primary-20: color-mix(in oklch, var(--primary), transparent 80%);
+}
+```
+
+## 相对颜色语法
+
+基于现有颜色创建新颜色：
+
+```css
+:root {
+  --base: oklch(0.6 0.15 250);
+
+  /* 调整亮度 */
+  --lighter: oklch(from var(--base) calc(l + 0.2) c h);
+  --darker: oklch(from var(--base) calc(l - 0.2) c h);
+
+  /* 调整饱和度 */
+  --vivid: oklch(from var(--base) l calc(c + 0.1) h);
+  --muted: oklch(from var(--base) l calc(c - 0.05) h);
+
+  /* 调整色相 */
+  --complement: oklch(from var(--base) l c calc(h + 180));
+  --analogous: oklch(from var(--base) l c calc(h + 30));
+}
+```
+
+### HSL 相对颜色
+
+```css
+:root {
+  --base: hsl(217 91% 60%);
+
+  --light: hsl(from var(--base) h s calc(l + 20%));
+  --dark: hsl(from var(--base) h s calc(l - 20%));
+  --desaturated: hsl(from var(--base) h calc(s - 30%) l);
+}
+```
+
+🔶 相对颜色语法是较新特性，请检查浏览器支持。
+
+## currentColor
+
+引用当前元素的 `color` 值：
+
+```css
+.icon-button {
+  color: #3b82f6;
+
+  /* 边框和 SVG 自动继承颜色 */
+  border: 2px solid currentColor;
+}
+
+.icon-button svg {
+  fill: currentColor;
+}
+
+.icon-button:hover {
+  color: #2563eb;
+  /* 边框和图标颜色自动更新 */
+}
+```
+
+## accent-color
+
+设置表单控件的强调色：
+
+```css
+:root {
+  accent-color: #3b82f6;
+}
+
+/* 影响的元素 */
+input[type='checkbox'] {
+  accent-color: #10b981;
+}
+
+input[type='radio'] {
+  accent-color: #8b5cf6;
+}
+
+input[type='range'] {
+  accent-color: #f59e0b;
+}
+
+progress {
+  accent-color: #ef4444;
+}
+```
+
+## 实战案例
+
+### OKLCH 主题系统
+
+```css
+:root {
+  /* 基础色相 */
+  --hue-primary: 250;
+  --hue-success: 150;
+  --hue-warning: 80;
+  --hue-error: 25;
+
+  /* 主色 */
+  --primary: oklch(0.6 0.15 var(--hue-primary));
+  --primary-50: oklch(0.97 0.02 var(--hue-primary));
+  --primary-100: oklch(0.93 0.04 var(--hue-primary));
+  --primary-200: oklch(0.85 0.08 var(--hue-primary));
+  --primary-300: oklch(0.75 0.12 var(--hue-primary));
+  --primary-400: oklch(0.65 0.15 var(--hue-primary));
+  --primary-500: oklch(0.6 0.15 var(--hue-primary));
+  --primary-600: oklch(0.5 0.15 var(--hue-primary));
+  --primary-700: oklch(0.4 0.12 var(--hue-primary));
+  --primary-800: oklch(0.3 0.08 var(--hue-primary));
+  --primary-900: oklch(0.2 0.05 var(--hue-primary));
+}
+
+/* 切换主题只需改变色相 */
+[data-theme='green'] {
+  --hue-primary: 150;
+}
+
+[data-theme='purple'] {
+  --hue-primary: 300;
+}
+```
+
+### 暗色模式
+
+```css
+:root {
+  --bg: oklch(0.98 0 0);
+  --text: oklch(0.2 0 0);
+  --primary: oklch(0.6 0.15 250);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: oklch(0.15 0 0);
+    --text: oklch(0.9 0 0);
+    --primary: oklch(0.7 0.15 250); /* 暗色下稍亮 */
+  }
+}
+```
+
+### 渐变按钮
+
+```css
+.gradient-btn {
+  --from: oklch(0.6 0.2 250);
+  --to: oklch(0.6 0.2 300);
+
+  background: linear-gradient(135deg, var(--from), var(--to));
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+}
+
+.gradient-btn:hover {
+  --from: oklch(0.55 0.22 250);
+  --to: oklch(0.55 0.22 300);
+}
+```
+
+### 色彩对比检查
+
+```css
+/* 确保文字可读性 */
+.accessible-text {
+  /* 亮度差异至少 0.4 以上 */
+  --bg: oklch(0.95 0.02 250);
+  --text: oklch(0.3 0.05 250);
+
+  background: var(--bg);
+  color: var(--text);
+}
+```
+
+### 动态调色板
+
+```css
+.color-picker {
+  --h: 250;
+  --c: 0.15;
+  --l: 0.6;
+
+  background: oklch(var(--l) var(--c) var(--h));
+}
+
+/* JavaScript 控制 */
+.color-picker[style*='--h: 30'] {
+  /* 橙色 */
+}
+```
+
+## 颜色函数对比
+
+| 格式      | 优点             | 缺点           |
+| --------- | ---------------- | -------------- |
+| hex       | 简洁、兼容性好   | 不直观、难调整 |
+| rgb       | 熟悉、兼容性好   | 颜色调整不直观 |
+| hsl       | 直观、易调整     | 感知不均匀     |
+| oklch     | 感知均匀、广色域 | 较新、需学习   |
+| color-mix | 灵活混合         | 较新特性       |
+
+## 浏览器兼容性
+
+```css
+/* 渐进增强 */
+.button {
+  /* 回退 */
+  background: #3b82f6;
+
+  /* 现代浏览器 */
+  background: oklch(0.6 0.15 250);
+}
+
+@supports (color: oklch(0 0 0)) {
+  :root {
+    --primary: oklch(0.6 0.15 250);
+  }
+}
+```
+
+## 常见问题
+
+🤔 **oklch 和 hsl 怎么选？**
+
+新项目推荐 oklch，它的亮度调整更符合视觉感知。hsl 中 `l: 50%` 的黄色和蓝色视觉亮度差异很大，oklch 则均匀得多。
+
+🤔 **color-mix 有什么实际用途？**
+
+最常用于创建透明度变体和悬停状态，无需定义多个颜色变量。
+
+🤔 **广色域有什么用？**
+
+P3 色域能显示比 sRGB 更鲜艳的颜色，在支持的显示器上效果更佳。
+
+---
+
+CSS 颜色系统已经从简单的十六进制发展到感知均匀的 OKLCH。掌握现代颜色格式和 color-mix 函数，能让你构建更灵活、更专业的设计系统。下一篇我们将学习边框与阴影。

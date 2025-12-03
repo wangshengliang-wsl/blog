@@ -1,0 +1,571 @@
+---
+title: 'HTML 表单基础：用户交互的起点'
+description: '掌握 HTML 表单核心知识，学习各类表单控件、label 可访问性设计和表单分组技巧'
+pubDate: 2025-12-03
+toc: true
+ogImage: true
+category: 'HTML'
+tags: ['HTML', '表单', 'Form', '可访问性']
+---
+
+用户登录、搜索框、评论区、购物车结算——这些交互场景的背后都是 HTML 表单。表单是 Web 应用收集用户输入的核心机制。
+
+## 🎯 表单基础结构
+
+一个完整的表单由 `<form>` 元素包裹：
+
+```html
+<form action="/api/login" method="POST">
+  <label for="username">用户名</label>
+  <input type="text" id="username" name="username" />
+
+  <label for="password">密码</label>
+  <input type="password" id="password" name="password" />
+
+  <button type="submit">登录</button>
+</form>
+```
+
+### `<form>` 属性详解
+
+| 属性           | 说明               | 常用值                |
+| -------------- | ------------------ | --------------------- |
+| `action`       | 表单提交的目标 URL | `/api/submit`、`#`    |
+| `method`       | HTTP 请求方法      | `GET`（默认）、`POST` |
+| `enctype`      | 数据编码方式       | 见下表                |
+| `novalidate`   | 禁用浏览器原生验证 | 布尔属性              |
+| `autocomplete` | 自动填充           | `on`（默认）、`off`   |
+
+### enctype 编码方式
+
+| 值                                  | 场景                 |
+| ----------------------------------- | -------------------- |
+| `application/x-www-form-urlencoded` | 默认，普通表单数据   |
+| `multipart/form-data`               | 文件上传（必须使用） |
+| `text/plain`                        | 纯文本，较少使用     |
+
+```html
+<!-- 文件上传表单 -->
+<form action="/upload" method="POST" enctype="multipart/form-data">
+  <input type="file" name="avatar" />
+  <button type="submit">上传</button>
+</form>
+```
+
+## 输入控件 `<input>`
+
+`<input>` 是最常用的表单控件，通过 `type` 属性变换形态。
+
+### 文本类输入
+
+```html
+<!-- 单行文本 -->
+<input type="text" name="username" placeholder="请输入用户名" />
+
+<!-- 密码（显示为圆点） -->
+<input type="password" name="password" />
+
+<!-- 邮箱（移动端弹出邮箱键盘） -->
+<input type="email" name="email" />
+
+<!-- 电话（移动端弹出数字键盘） -->
+<input type="tel" name="phone" />
+
+<!-- URL -->
+<input type="url" name="website" />
+
+<!-- 搜索（部分浏览器显示清除按钮） -->
+<input type="search" name="q" />
+```
+
+### 数字类输入
+
+```html
+<!-- 数字（带上下调节按钮） -->
+<input type="number" name="age" min="0" max="120" step="1" />
+
+<!-- 范围滑块 -->
+<input type="range" name="volume" min="0" max="100" value="50" />
+```
+
+### 日期时间类
+
+```html
+<!-- 日期选择器 -->
+<input type="date" name="birthday" />
+
+<!-- 时间选择器 -->
+<input type="time" name="meeting-time" />
+
+<!-- 日期+时间 -->
+<input type="datetime-local" name="appointment" />
+
+<!-- 月份 -->
+<input type="month" name="expire-month" />
+
+<!-- 周 -->
+<input type="week" name="week" />
+```
+
+🔶 **兼容性提示**：日期类型在不同浏览器的 UI 表现差异较大，如需统一体验可考虑第三方日期选择器。
+
+### 选择类输入
+
+```html
+<!-- 复选框 -->
+<input type="checkbox" id="agree" name="agree" value="yes" />
+<label for="agree">我同意服务条款</label>
+
+<!-- 单选按钮（同 name 互斥） -->
+<input type="radio" id="male" name="gender" value="male" />
+<label for="male">男</label>
+
+<input type="radio" id="female" name="gender" value="female" />
+<label for="female">女</label>
+```
+
+### 其他类型
+
+```html
+<!-- 颜色选择器 -->
+<input type="color" name="theme-color" value="#3b82f6" />
+
+<!-- 文件上传 -->
+<input type="file" name="document" accept=".pdf,.doc,.docx" />
+
+<!-- 多文件上传 -->
+<input type="file" name="photos" multiple accept="image/*" />
+
+<!-- 隐藏字段（用户不可见） -->
+<input type="hidden" name="csrf_token" value="abc123" />
+```
+
+### 常用属性一览
+
+| 属性          | 说明                   | 示例                      |
+| ------------- | ---------------------- | ------------------------- |
+| `name`        | 提交时的字段名（必需） | `name="email"`            |
+| `value`       | 默认值                 | `value="张三"`            |
+| `placeholder` | 占位提示文本           | `placeholder="请输入..."` |
+| `required`    | 必填                   | 布尔属性                  |
+| `disabled`    | 禁用（不会提交）       | 布尔属性                  |
+| `readonly`    | 只读（会提交）         | 布尔属性                  |
+| `autofocus`   | 页面加载时自动聚焦     | 布尔属性                  |
+| `maxlength`   | 最大字符数             | `maxlength="50"`          |
+| `min` / `max` | 数值/日期范围          | `min="0" max="100"`       |
+| `pattern`     | 正则验证               | `pattern="[0-9]{6}"`      |
+
+## 多行文本 `<textarea>`
+
+```html
+<textarea
+  name="comment"
+  rows="4"
+  cols="50"
+  placeholder="请输入评论内容..."
+  maxlength="500"
+></textarea>
+```
+
+| 属性   | 说明                 |
+| ------ | -------------------- |
+| `rows` | 可见行数             |
+| `cols` | 可见列数（字符宽度） |
+
+🔶 **注意**：`<textarea>` 的默认值写在标签之间，不是 `value` 属性：
+
+```html
+<textarea name="bio">这是默认内容</textarea>
+```
+
+## 下拉选择 `<select>`
+
+```html
+<label for="city">选择城市</label>
+<select id="city" name="city">
+  <option value="">请选择</option>
+  <option value="beijing">北京</option>
+  <option value="shanghai">上海</option>
+  <option value="guangzhou" selected>广州</option>
+  <option value="shenzhen">深圳</option>
+</select>
+```
+
+### 分组选项
+
+```html
+<select name="car">
+  <optgroup label="德系">
+    <option value="benz">奔驰</option>
+    <option value="bmw">宝马</option>
+    <option value="audi">奥迪</option>
+  </optgroup>
+  <optgroup label="日系">
+    <option value="toyota">丰田</option>
+    <option value="honda">本田</option>
+  </optgroup>
+</select>
+```
+
+### 多选下拉
+
+```html
+<select name="skills" multiple size="5">
+  <option value="html">HTML</option>
+  <option value="css">CSS</option>
+  <option value="js">JavaScript</option>
+  <option value="react">React</option>
+  <option value="vue">Vue</option>
+</select>
+```
+
+按住 `Ctrl`（Windows）或 `Command`（Mac）可多选。
+
+## 按钮 `<button>`
+
+```html
+<!-- 提交按钮（默认） -->
+<button type="submit">提交表单</button>
+
+<!-- 重置按钮（清空表单） -->
+<button type="reset">重置</button>
+
+<!-- 普通按钮（不触发表单提交） -->
+<button type="button" onclick="doSomething()">点击执行</button>
+```
+
+🔶 **重要**：`<form>` 内的 `<button>` 默认 `type="submit"`，会触发表单提交。如果只想执行 JavaScript，务必设置 `type="button"`。
+
+### `<button>` vs `<input type="submit">`
+
+```html
+<!-- input 只能显示文本 -->
+<input type="submit" value="提交" />
+
+<!-- button 可以包含任意 HTML -->
+<button type="submit"><span>🚀</span> 立即提交</button>
+```
+
+推荐使用 `<button>`，灵活性更高。
+
+## 🎯 Label 与可访问性
+
+`<label>` 是表单可访问性的关键。它为控件提供文本说明，点击 label 可以聚焦/激活对应控件。
+
+### 显式关联（推荐）
+
+```html
+<label for="email">邮箱地址</label>
+<input type="email" id="email" name="email" />
+```
+
+`for` 属性值必须与 `input` 的 `id` 一致。
+
+### 隐式关联
+
+```html
+<label>
+  邮箱地址
+  <input type="email" name="email" />
+</label>
+```
+
+🤔 **为什么 label 重要？**
+
+1. **可访问性**：屏幕阅读器会朗读 label 文本
+2. **易用性**：点击 label 即可聚焦输入框，增大点击区域
+3. **复选框/单选框**：点击 label 可切换选中状态
+
+```html
+<!-- 没有 label：只能点击小方块 -->
+<input type="checkbox" /> 我同意
+
+<!-- 有 label：点击文字也能切换 -->
+<label> <input type="checkbox" /> 我同意服务条款 </label>
+```
+
+## 表单分组 `<fieldset>` 与 `<legend>`
+
+将相关控件分组，提升可读性和可访问性：
+
+```html
+<form>
+  <fieldset>
+    <legend>个人信息</legend>
+    <label for="name">姓名</label>
+    <input type="text" id="name" name="name" />
+
+    <label for="email">邮箱</label>
+    <input type="email" id="email" name="email" />
+  </fieldset>
+
+  <fieldset>
+    <legend>账户设置</legend>
+    <label for="username">用户名</label>
+    <input type="text" id="username" name="username" />
+
+    <label for="password">密码</label>
+    <input type="password" id="password" name="password" />
+  </fieldset>
+
+  <button type="submit">注册</button>
+</form>
+```
+
+视觉效果：
+
+```
+┌─ 个人信息 ───────────────────┐
+│  姓名：[          ]          │
+│  邮箱：[          ]          │
+└──────────────────────────────┘
+
+┌─ 账户设置 ───────────────────┐
+│  用户名：[          ]        │
+│  密码：  [          ]        │
+└──────────────────────────────┘
+
+        [ 注册 ]
+```
+
+### 禁用整组控件
+
+```html
+<fieldset disabled>
+  <legend>已锁定</legend>
+  <input type="text" name="locked" />
+  <button type="submit">提交</button>
+</fieldset>
+```
+
+`fieldset` 的 `disabled` 属性会禁用其内所有控件。
+
+## 数据列表 `<datalist>`
+
+为输入框提供预定义选项的自动补全：
+
+```html
+<label for="browser">选择浏览器</label>
+<input type="text" id="browser" name="browser" list="browsers" />
+
+<datalist id="browsers">
+  <option value="Chrome"></option>
+  <option value="Firefox"></option>
+  <option value="Safari"></option>
+  <option value="Edge"></option>
+</datalist>
+```
+
+用户可以输入任意值，也可以从下拉建议中选择。与 `<select>` 的区别是 `<datalist>` 不限制用户输入。
+
+## `<output>` 计算结果
+
+显示计算或操作的结果：
+
+```html
+<form oninput="result.value = parseInt(a.value) + parseInt(b.value)">
+  <input type="number" id="a" name="a" value="0" /> +
+  <input type="number" id="b" name="b" value="0" /> =
+  <output name="result" for="a b">0</output>
+</form>
+```
+
+## 🎯 实战：完整注册表单
+
+综合运用所学知识，构建一个功能完整的注册表单：
+
+```html
+<!doctype html>
+<html lang="zh-Hans">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>用户注册</title>
+    <style>
+      form {
+        max-width: 500px;
+        margin: 2rem auto;
+      }
+      fieldset {
+        margin-bottom: 1.5rem;
+        padding: 1rem;
+      }
+      label {
+        display: block;
+        margin-top: 1rem;
+        font-weight: bold;
+      }
+      input,
+      select,
+      textarea {
+        width: 100%;
+        padding: 0.5rem;
+        margin-top: 0.25rem;
+      }
+      button {
+        margin-top: 1.5rem;
+        padding: 0.75rem 2rem;
+      }
+      .checkbox-group label {
+        display: inline;
+        font-weight: normal;
+      }
+    </style>
+  </head>
+  <body>
+    <form action="/api/register" method="POST">
+      <h1>用户注册</h1>
+
+      <fieldset>
+        <legend>账户信息</legend>
+
+        <label for="username">用户名 *</label>
+        <input
+          type="text"
+          id="username"
+          name="username"
+          required
+          minlength="3"
+          maxlength="20"
+          placeholder="3-20 个字符"
+        />
+
+        <label for="email">邮箱 *</label>
+        <input
+          type="email"
+          id="email"
+          name="email"
+          required
+          placeholder="example@mail.com"
+        />
+
+        <label for="password">密码 *</label>
+        <input
+          type="password"
+          id="password"
+          name="password"
+          required
+          minlength="8"
+          placeholder="至少 8 个字符"
+        />
+      </fieldset>
+
+      <fieldset>
+        <legend>个人信息</legend>
+
+        <label for="nickname">昵称</label>
+        <input type="text" id="nickname" name="nickname" />
+
+        <label for="birthday">生日</label>
+        <input type="date" id="birthday" name="birthday" />
+
+        <label>性别</label>
+        <div class="checkbox-group">
+          <label> <input type="radio" name="gender" value="male" /> 男 </label>
+          <label>
+            <input type="radio" name="gender" value="female" /> 女
+          </label>
+          <label>
+            <input type="radio" name="gender" value="other" /> 其他
+          </label>
+        </div>
+
+        <label for="city">城市</label>
+        <input type="text" id="city" name="city" list="cities" />
+        <datalist id="cities">
+          <option value="北京"></option>
+          <option value="上海"></option>
+          <option value="广州"></option>
+          <option value="深圳"></option>
+          <option value="杭州"></option>
+        </datalist>
+
+        <label for="bio">个人简介</label>
+        <textarea
+          id="bio"
+          name="bio"
+          rows="4"
+          maxlength="200"
+          placeholder="介绍一下你自己..."
+        ></textarea>
+      </fieldset>
+
+      <fieldset>
+        <legend>偏好设置</legend>
+
+        <label for="theme">主题颜色</label>
+        <input type="color" id="theme" name="theme" value="#3b82f6" />
+
+        <label>感兴趣的领域</label>
+        <div class="checkbox-group">
+          <label>
+            <input type="checkbox" name="interests" value="tech" /> 科技
+          </label>
+          <label>
+            <input type="checkbox" name="interests" value="design" /> 设计
+          </label>
+          <label>
+            <input type="checkbox" name="interests" value="business" /> 商业
+          </label>
+        </div>
+      </fieldset>
+
+      <div class="checkbox-group">
+        <label>
+          <input type="checkbox" name="agree" required />
+          我已阅读并同意 <a href="/terms">服务条款</a>
+        </label>
+      </div>
+
+      <button type="submit">立即注册</button>
+      <button type="reset">重置表单</button>
+    </form>
+  </body>
+</html>
+```
+
+## 常见问题
+
+### 🤔 `name` 和 `id` 有什么区别？
+
+- `name`：表单提交时的字段名，服务端通过它获取数据
+- `id`：元素的唯一标识，用于 JavaScript 选取和 `<label>` 关联
+
+两者通常设为相同值，但功能不同。
+
+### 🤔 表单提交后页面刷新怎么办？
+
+传统表单提交会刷新页面。现代应用通常使用 JavaScript 拦截提交：
+
+```javascript
+form.addEventListener('submit', (e) => {
+  e.preventDefault() // 阻止默认提交
+  // 使用 fetch 或 axios 发送请求
+})
+```
+
+下一篇文章会详细讲解表单验证和异步提交。
+
+### 🤔 移动端键盘类型怎么控制？
+
+使用正确的 `type` 和 `inputmode` 属性：
+
+```html
+<!-- 数字键盘 -->
+<input type="text" inputmode="numeric" />
+
+<!-- 电话键盘 -->
+<input type="tel" />
+
+<!-- 邮箱键盘（带 @ 和 .） -->
+<input type="email" />
+
+<!-- URL 键盘（带 / 和 .com） -->
+<input type="url" />
+```
+
+## 参考资料
+
+- [MDN: Web 表单指南](https://developer.mozilla.org/zh-CN/docs/Learn/Forms)
+- [MDN: input 类型](https://developer.mozilla.org/zh-CN/docs/Web/HTML/Element/input)
+- [WebAIM: 创建可访问的表单](https://webaim.org/techniques/forms/)

@@ -1,0 +1,447 @@
+---
+title: '类型推断与断言'
+description: 'TypeScript 类型推断机制详解：自动类型推断、as 类型断言、非空断言、const 断言的使用方法与最佳实践'
+pubDate: 2024-01-20
+toc: true
+ogImage: true
+category: 'TypeScript'
+tags: ['TypeScript', '类型推断', '类型断言', 'as', 'const断言']
+---
+
+TypeScript 的类型系统既强大又灵活。它能自动推断大部分类型，同时也允许你在必要时手动指定类型。理解类型推断和类型断言是写出优雅 TypeScript 代码的关键。
+
+## 类型推断
+
+### 基础推断
+
+TypeScript 会根据初始化值自动推断变量类型：
+
+```typescript
+// TypeScript 5.x
+
+// 原始类型推断
+let name = '张三' // string
+let age = 25 // number
+let isActive = true // boolean
+
+// 数组推断
+let numbers = [1, 2, 3] // number[]
+let strings = ['a', 'b', 'c'] // string[]
+let mixed = [1, 'hello'] // (string | number)[]
+
+// 对象推断
+let user = {
+  name: '张三',
+  age: 25,
+} // { name: string; age: number }
+```
+
+### 最佳通用类型
+
+当推断多个表达式的类型时，TypeScript 会计算"最佳通用类型"：
+
+```typescript
+// 推断为 (number | string)[]
+let arr = [1, 'hello', 2, 'world']
+
+// 推断为 Animal[]（假设 Dog 和 Cat 都继承自 Animal）
+class Animal {}
+class Dog extends Animal {}
+class Cat extends Animal {}
+
+let pets = [new Dog(), new Cat()] // (Dog | Cat)[]
+
+// 如果想推断为父类数组，需要显式标注
+let animals: Animal[] = [new Dog(), new Cat()]
+```
+
+### 上下文类型推断
+
+TypeScript 根据上下文推断类型（从外向内推断）：
+
+```typescript
+// 根据回调函数的上下文推断参数类型
+const numbers = [1, 2, 3]
+
+// num 自动推断为 number
+numbers.forEach((num) => {
+  console.log(num.toFixed(2))
+})
+
+// 根据赋值目标推断
+const handler: (event: MouseEvent) => void = (e) => {
+  // e 自动推断为 MouseEvent
+  console.log(e.clientX, e.clientY)
+}
+
+// 根据返回类型推断
+function createArray<T>(length: number, value: T): T[] {
+  return Array(length).fill(value)
+}
+
+// 返回值推断为 string[]
+const arr = createArray(3, 'hello')
+```
+
+### let vs const 推断
+
+```typescript
+// let 推断为宽泛类型
+let x = 'hello' // string
+let y = 10 // number
+
+// const 推断为字面量类型
+const a = 'hello' // "hello"（字面量类型）
+const b = 10 // 10（字面量类型）
+
+// 对象和数组不同
+const obj = { name: '张三' } // { name: string }（属性仍是宽泛类型）
+const arr = [1, 2, 3] // number[]（元素仍是宽泛类型）
+```
+
+## 类型断言
+
+当你比 TypeScript 更了解某个值的类型时，可以使用类型断言。
+
+### as 语法（推荐）
+
+```typescript
+// DOM 元素断言
+const input = document.getElementById('myInput') as HTMLInputElement
+input.value = 'Hello'
+
+// 更通用的元素
+const element = document.querySelector('.container') as HTMLDivElement
+
+// API 响应断言
+interface User {
+  id: number
+  name: string
+}
+
+const response = await fetch('/api/user')
+const data = (await response.json()) as User
+console.log(data.name)
+```
+
+### 尖括号语法
+
+```typescript
+// 尖括号语法（不能在 JSX 中使用）
+const input = <HTMLInputElement>document.getElementById('myInput')
+
+// 在 .tsx 文件中只能用 as 语法
+// const input = document.getElementById('myInput') as HTMLInputElement;
+```
+
+### 断言的限制
+
+类型断言不是类型转换，需要两个类型"兼容"：
+
+```typescript
+// ❌ 不能直接将 string 断言为 number
+// const x = 'hello' as number;  // 错误
+
+// ✅ 可以通过 unknown 或 any 中转（双重断言）
+const x = 'hello' as unknown as number // 编译通过，但运行时仍是字符串
+
+// 🔶 双重断言很危险，尽量避免
+console.log(typeof x) // "string"，不是 "number"
+```
+
+### 断言 vs 类型注解
+
+```typescript
+// 类型注解：声明变量时指定类型
+const user: User = { id: 1, name: '张三' }
+
+// 类型断言：告诉编译器"相信我"
+const user2 = { id: 1, name: '张三' } as User
+
+// 区别：注解会检查值是否符合类型，断言不会
+interface User {
+  id: number
+  name: string
+  email: string // 必需属性
+}
+
+// ❌ 类型注解会报错：缺少 email
+// const user: User = { id: 1, name: '张三' };
+
+// ⚠️ 类型断言不会报错（危险！）
+const user2 = { id: 1, name: '张三' } as User // 编译通过
+```
+
+## 非空断言
+
+使用 `!` 告诉 TypeScript 某个值不是 `null` 或 `undefined`：
+
+```typescript
+// DOM 元素可能不存在
+const element = document.getElementById('myElement')
+// element 的类型是 HTMLElement | null
+
+// 使用非空断言
+const element2 = document.getElementById('myElement')!
+// element2 的类型是 HTMLElement
+
+// 等价于
+const element3 = document.getElementById('myElement') as HTMLElement
+```
+
+### 非空断言的场景
+
+```typescript
+// 场景1：确定 DOM 元素存在
+function setupApp() {
+  const root = document.getElementById('root')!
+  root.innerHTML = '<h1>Hello</h1>'
+}
+
+// 场景2：初始化后一定有值的属性
+class Component {
+  private element!: HTMLElement // 延迟初始化
+
+  constructor() {
+    this.init()
+  }
+
+  private init() {
+    this.element = document.createElement('div')
+  }
+
+  render() {
+    this.element.textContent = 'Hello'
+  }
+}
+
+// 场景3：Map 的 get 方法
+const map = new Map<string, number>()
+map.set('key', 42)
+
+const value = map.get('key')! // 确定 key 存在
+```
+
+🔶 警告：非空断言会绕过类型检查，如果判断错误会导致运行时错误：
+
+```typescript
+const element = document.getElementById('nonexistent')!
+element.innerHTML = 'Hello' // 运行时错误：Cannot set property 'innerHTML' of null
+```
+
+## const 断言
+
+`as const` 将值转换为最具体的字面量类型：
+
+### 基本用法
+
+```typescript
+// 普通声明
+let x = 'hello' // string
+const y = 'hello' // "hello"
+
+// as const 让 let 也具有字面量类型
+let z = 'hello' as const // "hello"
+
+// 数字
+let num = 42 as const // 42（不是 number）
+```
+
+### 对象的 as const
+
+```typescript
+// 普通对象
+const user = {
+  name: '张三',
+  age: 25,
+}
+// 类型：{ name: string; age: number }
+
+// as const 对象
+const userConst = {
+  name: '张三',
+  age: 25,
+} as const
+// 类型：{ readonly name: "张三"; readonly age: 25 }
+
+// userConst.name = '李四';  // ❌ 错误：只读属性
+```
+
+### 数组的 as const
+
+```typescript
+// 普通数组
+const colors = ['red', 'green', 'blue']
+// 类型：string[]
+
+// as const 数组 -> 只读元组
+const colorsConst = ['red', 'green', 'blue'] as const
+// 类型：readonly ["red", "green", "blue"]
+
+// colorsConst.push('yellow');  // ❌ 错误
+// colorsConst[0] = 'pink';     // ❌ 错误
+```
+
+### 实际应用
+
+```typescript
+// 应用1：从数组创建联合类型
+const METHODS = ['GET', 'POST', 'PUT', 'DELETE'] as const
+type Method = (typeof METHODS)[number] // "GET" | "POST" | "PUT" | "DELETE"
+
+// 应用2：枚举替代方案
+const STATUS = {
+  PENDING: 'pending',
+  SUCCESS: 'success',
+  ERROR: 'error',
+} as const
+
+type Status = (typeof STATUS)[keyof typeof STATUS]
+// "pending" | "success" | "error"
+
+// 应用3：配置对象
+const config = {
+  api: 'https://api.example.com',
+  timeout: 5000,
+  retries: 3,
+} as const
+
+// config 的所有属性都是只读的，值都是字面量类型
+```
+
+## satisfies 操作符（TypeScript 4.9+）
+
+`satisfies` 在验证类型的同时保留推断的更具体类型：
+
+```typescript
+// 问题：类型注解会丢失具体类型
+const palette1: Record<string, string | number[]> = {
+  red: '#ff0000',
+  green: '#00ff00',
+  blue: [0, 0, 255],
+}
+// palette1.red 的类型是 string | number[]，不是 string
+
+// 解决：使用 satisfies
+const palette2 = {
+  red: '#ff0000',
+  green: '#00ff00',
+  blue: [0, 0, 255],
+} satisfies Record<string, string | number[]>
+
+// palette2.red 的类型是 string
+// palette2.blue 的类型是 number[]
+
+palette2.red.toUpperCase() // ✅ 正确
+palette2.blue.map((x) => x * 2) // ✅ 正确
+```
+
+### satisfies vs as
+
+```typescript
+// as：可能丢失类型信息，且不验证
+const x = { name: '张三' } as { name: string; age: number }
+// 不会报错，即使缺少 age
+
+// satisfies：验证类型，保留推断
+const y = { name: '张三' } satisfies { name: string; age: number }
+// ❌ 错误：缺少属性 age
+```
+
+## 类型收窄
+
+TypeScript 通过控制流分析自动收窄类型：
+
+```typescript
+function process(value: string | number) {
+  // 这里 value 是 string | number
+
+  if (typeof value === 'string') {
+    // 这里 value 被收窄为 string
+    console.log(value.toUpperCase())
+  } else {
+    // 这里 value 被收窄为 number
+    console.log(value.toFixed(2))
+  }
+}
+
+// 使用 in 操作符
+interface Dog {
+  bark(): void
+}
+interface Cat {
+  meow(): void
+}
+
+function speak(animal: Dog | Cat) {
+  if ('bark' in animal) {
+    animal.bark() // Dog
+  } else {
+    animal.meow() // Cat
+  }
+}
+```
+
+## 常见问题
+
+### 🙋 什么时候需要类型断言？
+
+主要场景：
+
+1. DOM 操作时指定具体元素类型
+2. 处理 API 响应数据
+3. 第三方库类型不准确时
+
+```typescript
+// DOM 操作
+const canvas = document.getElementById('canvas') as HTMLCanvasElement
+const ctx = canvas.getContext('2d')!
+
+// API 响应
+interface ApiResponse<T> {
+  data: T
+  status: number
+}
+const res = (await fetch('/api/data').then((r) =>
+  r.json()
+)) as ApiResponse<User>
+```
+
+### 🙋 非空断言和可选链怎么选？
+
+```typescript
+// 可选链：安全访问，可能返回 undefined
+const value = obj?.prop?.nested // T | undefined
+
+// 非空断言：断言不为空，可能运行时错误
+const value2 = obj!.prop!.nested // T
+
+// 建议：优先使用可选链，除非确定值存在
+```
+
+### 🙋 as const 和 Object.freeze 有什么区别？
+
+```typescript
+// as const：只影响类型，编译时检查
+const x = { a: 1 } as const
+// 运行时仍可修改（虽然 TypeScript 报错）
+
+// Object.freeze：运行时冻结对象
+const y = Object.freeze({ a: 1 })
+// 运行时真的不能修改
+
+// 最安全：两者结合
+const z = Object.freeze({ a: 1 }) as const
+```
+
+## 总结
+
+| 特性       | 语法                   | 用途                    |
+| ---------- | ---------------------- | ----------------------- |
+| 类型推断   | 自动                   | 减少类型注解            |
+| 类型断言   | `value as Type`        | 手动指定类型            |
+| 非空断言   | `value!`               | 断言不为 null/undefined |
+| const 断言 | `value as const`       | 转为字面量类型          |
+| satisfies  | `value satisfies Type` | 验证类型同时保留推断    |
+
+下一篇我们将学习联合类型与交叉类型，了解如何组合多种类型。

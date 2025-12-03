@@ -1,0 +1,489 @@
+---
+title: 'Math 对象'
+description: '掌握 JavaScript Math 对象的数学方法，实现常见数学计算'
+pubDate: 2025-12-03
+toc: true
+ogImage: true
+category: 'JavaScript'
+tags: ['JavaScript', 'Math', '数学', '随机数']
+---
+
+Math 是 JavaScript 的内置对象，提供了常用的数学常量和方法。Math 不是构造函数，所有属性和方法都是静态的。
+
+## 🎯 数学常量
+
+```javascript
+// 圆周率
+Math.PI // 3.141592653589793
+
+// 自然对数的底数 e
+Math.E // 2.718281828459045
+
+// 2 的自然对数
+Math.LN2 // 0.6931471805599453
+
+// 10 的自然对数
+Math.LN10 // 2.302585092994046
+
+// 以 2 为底 e 的对数
+Math.LOG2E // 1.4426950408889634
+
+// 以 10 为底 e 的对数
+Math.LOG10E // 0.4342944819032518
+
+// 2 的平方根
+Math.SQRT2 // 1.4142135623730951
+
+// 1/2 的平方根
+Math.SQRT1_2 // 0.7071067811865476
+```
+
+## 取整方法
+
+### Math.floor - 向下取整
+
+```javascript
+// 返回小于或等于给定数字的最大整数
+Math.floor(4.9) // 4
+Math.floor(4.1) // 4
+Math.floor(4) // 4
+Math.floor(-4.1) // -5（向下，更小）
+Math.floor(-4.9) // -5
+```
+
+### Math.ceil - 向上取整
+
+```javascript
+// 返回大于或等于给定数字的最小整数
+Math.ceil(4.1) // 5
+Math.ceil(4.9) // 5
+Math.ceil(4) // 4
+Math.ceil(-4.1) // -4（向上，更大）
+Math.ceil(-4.9) // -4
+```
+
+### Math.round - 四舍五入
+
+```javascript
+// 返回最接近的整数
+Math.round(4.4) // 4
+Math.round(4.5) // 5
+Math.round(4.6) // 5
+Math.round(-4.5) // -4（特殊：-4.5 约到 -4）
+Math.round(-4.6) // -5
+```
+
+### Math.trunc - 截断小数
+
+```javascript
+// 直接去掉小数部分（ES6）
+Math.trunc(4.9) // 4
+Math.trunc(4.1) // 4
+Math.trunc(-4.9) // -4（直接截断）
+Math.trunc(-4.1) // -4
+
+// 与 parseInt 类似，但 trunc 只接受数字
+Math.trunc('4.9') // 4（会转换）
+parseInt('4.9px') // 4（能解析字符串）
+Math.trunc('4.9px') // NaN
+```
+
+### 取整对比
+
+```javascript
+const values = [4.2, 4.5, 4.8, -4.2, -4.5, -4.8]
+
+values.forEach((v) => {
+  console.log(
+    `${v}: floor=${Math.floor(v)}, ceil=${Math.ceil(v)}, round=${Math.round(v)}, trunc=${Math.trunc(v)}`
+  )
+})
+// 4.2:  floor=4,  ceil=5,  round=4,  trunc=4
+// 4.5:  floor=4,  ceil=5,  round=5,  trunc=4
+// 4.8:  floor=4,  ceil=5,  round=5,  trunc=4
+// -4.2: floor=-5, ceil=-4, round=-4, trunc=-4
+// -4.5: floor=-5, ceil=-4, round=-4, trunc=-4
+// -4.8: floor=-5, ceil=-4, round=-5, trunc=-4
+```
+
+## 最值与绝对值
+
+### Math.max / Math.min
+
+```javascript
+// 返回最大值
+Math.max(1, 2, 3) // 3
+Math.max(-1, -2, -3) // -1
+Math.max(1, 2, 'a') // NaN（包含非数字）
+Math.max() // -Infinity（无参数）
+
+// 返回最小值
+Math.min(1, 2, 3) // 1
+Math.min(-1, -2, -3) // -3
+Math.min() // Infinity
+
+// 数组中的最值
+const arr = [1, 5, 3, 9, 2]
+Math.max(...arr) // 9
+Math.min(...arr) // 1
+
+// 或使用 apply
+Math.max.apply(null, arr) // 9
+```
+
+### Math.abs - 绝对值
+
+```javascript
+Math.abs(-5) // 5
+Math.abs(5) // 5
+Math.abs(-3.14) // 3.14
+Math.abs(null) // 0
+Math.abs('') // 0
+Math.abs('abc') // NaN
+```
+
+## 幂与根
+
+### Math.pow - 幂运算
+
+```javascript
+// x 的 y 次方
+Math.pow(2, 3) // 8（2³）
+Math.pow(2, 0.5) // 1.414...（√2）
+Math.pow(2, -1) // 0.5（2⁻¹）
+
+// ES6 可以用 ** 运算符
+2 ** 3 // 8
+2 ** 0.5 // 1.414...
+```
+
+### Math.sqrt - 平方根
+
+```javascript
+Math.sqrt(9) // 3
+Math.sqrt(2) // 1.4142135623730951
+Math.sqrt(0) // 0
+Math.sqrt(-1) // NaN（负数没有实数平方根）
+```
+
+### Math.cbrt - 立方根（ES6）
+
+```javascript
+Math.cbrt(8) // 2
+Math.cbrt(27) // 3
+Math.cbrt(-8) // -2（负数有实数立方根）
+```
+
+### Math.hypot - 勾股定理（ES6）
+
+```javascript
+// 返回所有参数平方和的平方根
+Math.hypot(3, 4) // 5（√(3² + 4²)）
+Math.hypot(3, 4, 5) // 7.07...
+Math.hypot(5, 12) // 13
+
+// 计算两点距离
+function distance(x1, y1, x2, y2) {
+  return Math.hypot(x2 - x1, y2 - y1)
+}
+distance(0, 0, 3, 4) // 5
+```
+
+## 随机数
+
+### Math.random
+
+```javascript
+// 返回 [0, 1) 之间的随机数
+Math.random() // 0.123456789...
+
+// 生成 [0, n) 的随机整数
+function randomInt(n) {
+  return Math.floor(Math.random() * n)
+}
+randomInt(10) // 0-9
+
+// 生成 [min, max] 的随机整数
+function randomRange(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min
+}
+randomRange(1, 100) // 1-100
+
+// 生成随机小数（指定范围）
+function randomFloat(min, max) {
+  return Math.random() * (max - min) + min
+}
+randomFloat(1.5, 2.5) // 1.5-2.5
+```
+
+### 随机应用
+
+```javascript
+// 随机布尔值
+function randomBoolean() {
+  return Math.random() < 0.5
+}
+
+// 随机数组元素
+function randomItem(arr) {
+  return arr[Math.floor(Math.random() * arr.length)]
+}
+randomItem(['a', 'b', 'c'])
+
+// 打乱数组（Fisher-Yates 洗牌算法）
+function shuffle(arr) {
+  const result = [...arr]
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[result[i], result[j]] = [result[j], result[i]]
+  }
+  return result
+}
+shuffle([1, 2, 3, 4, 5])
+
+// 生成随机颜色
+function randomColor() {
+  return (
+    '#' +
+    Math.floor(Math.random() * 0xffffff)
+      .toString(16)
+      .padStart(6, '0')
+  )
+}
+randomColor() // '#a3f5c2'
+
+// 生成随机 ID
+function randomId(length = 8) {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+  let result = ''
+  for (let i = 0; i < length; i++) {
+    result += chars[Math.floor(Math.random() * chars.length)]
+  }
+  return result
+}
+randomId() // 'xK9mP2qL'
+```
+
+## 三角函数
+
+### 基本三角函数
+
+```javascript
+// 参数是弧度，不是角度！
+// 弧度 = 角度 × π / 180
+
+Math.sin(0) // 0
+Math.sin(Math.PI / 2) // 1（90°）
+Math.sin(Math.PI) // 0（180°，约为 0）
+
+Math.cos(0) // 1
+Math.cos(Math.PI / 2) // 0（约为 0）
+Math.cos(Math.PI) // -1
+
+Math.tan(0) // 0
+Math.tan(Math.PI / 4) // 1（45°）
+
+// 角度转弧度
+function toRadians(degrees) {
+  return (degrees * Math.PI) / 180
+}
+
+// 弧度转角度
+function toDegrees(radians) {
+  return (radians * 180) / Math.PI
+}
+
+Math.sin(toRadians(30)) // 0.5（30°的正弦）
+Math.cos(toRadians(60)) // 0.5（60°的余弦）
+```
+
+### 反三角函数
+
+```javascript
+// 返回弧度
+Math.asin(0.5) // 0.5235...（约 30°）
+Math.acos(0.5) // 1.0471...（约 60°）
+Math.atan(1) // 0.7853...（约 45°）
+
+// atan2：返回点 (x, y) 与正 x 轴的夹角
+Math.atan2(1, 1) // 0.7853...（45°）
+Math.atan2(1, 0) // 1.5707...（90°）
+Math.atan2(-1, 0) // -1.5707...（-90°）
+```
+
+## 对数函数
+
+```javascript
+// 自然对数（以 e 为底）
+Math.log(Math.E) // 1
+Math.log(1) // 0
+Math.log(10) // 2.302...
+
+// 以 10 为底的对数（ES6）
+Math.log10(100) // 2
+Math.log10(1000) // 3
+
+// 以 2 为底的对数（ES6）
+Math.log2(8) // 3
+Math.log2(1024) // 10
+
+// log(1 + x)，对于小 x 更精确（ES6）
+Math.log1p(0) // 0
+Math.log1p(1) // 0.693...
+
+// e^x（ES6）
+Math.exp(1) // 2.718...（e）
+Math.exp(2) // 7.389...（e²）
+
+// e^x - 1，对于小 x 更精确（ES6）
+Math.expm1(0) // 0
+Math.expm1(1) // 1.718...
+```
+
+## 符号与其他
+
+### Math.sign - 符号（ES6）
+
+```javascript
+// 返回数字的符号：1, -1, 或 0
+Math.sign(5) // 1
+Math.sign(-5) // -1
+Math.sign(0) // 0
+Math.sign(-0) // -0
+Math.sign(NaN) // NaN
+```
+
+### Math.fround - 32位浮点数（ES6）
+
+```javascript
+// 转为最接近的 32 位浮点数
+Math.fround(1.5) // 1.5
+Math.fround(1.337) // 1.3370000123977661
+Math.fround(2 ** 150) // Infinity
+```
+
+### Math.clz32 - 前导零个数（ES6）
+
+```javascript
+// 返回 32 位整数的前导零个数
+Math.clz32(1) // 31
+Math.clz32(2) // 30
+Math.clz32(4) // 29
+Math.clz32(0) // 32
+```
+
+### Math.imul - 32位整数乘法（ES6）
+
+```javascript
+// 返回两个 32 位整数相乘的结果
+Math.imul(2, 4) // 8
+Math.imul(-1, 8) // -8
+```
+
+## 实用函数
+
+### 精度处理
+
+```javascript
+// 🔶 浮点数精度问题
+0.1 + 0.2 // 0.30000000000000004
+
+// 四舍五入到指定小数位
+function round(num, decimals) {
+  return Math.round(num * 10 ** decimals) / 10 ** decimals
+}
+round(0.1 + 0.2, 2) // 0.3
+round(3.14159, 2) // 3.14
+
+// 向下取整到指定小数位
+function floorTo(num, decimals) {
+  return Math.floor(num * 10 ** decimals) / 10 ** decimals
+}
+floorTo(3.149, 2) // 3.14
+
+// 向上取整到指定小数位
+function ceilTo(num, decimals) {
+  return Math.ceil(num * 10 ** decimals) / 10 ** decimals
+}
+ceilTo(3.141, 2) // 3.15
+```
+
+### 范围限制
+
+```javascript
+// 将数值限制在范围内
+function clamp(num, min, max) {
+  return Math.min(Math.max(num, min), max)
+}
+
+clamp(5, 0, 10) // 5
+clamp(-5, 0, 10) // 0
+clamp(15, 0, 10) // 10
+
+// 线性插值
+function lerp(start, end, t) {
+  return start + (end - start) * t
+}
+
+lerp(0, 100, 0.5) // 50
+lerp(0, 100, 0.25) // 25
+
+// 映射范围
+function map(value, inMin, inMax, outMin, outMax) {
+  return ((value - inMin) * (outMax - outMin)) / (inMax - inMin) + outMin
+}
+
+map(50, 0, 100, 0, 1) // 0.5
+map(25, 0, 100, 0, 255) // 63.75
+```
+
+### 几何计算
+
+```javascript
+// 圆的面积
+function circleArea(radius) {
+  return Math.PI * radius ** 2
+}
+circleArea(5) // 78.539...
+
+// 圆的周长
+function circleCircumference(radius) {
+  return 2 * Math.PI * radius
+}
+circleCircumference(5) // 31.415...
+
+// 两点之间的距离
+function distance(x1, y1, x2, y2) {
+  return Math.hypot(x2 - x1, y2 - y1)
+}
+distance(0, 0, 3, 4) // 5
+
+// 计算角度（从 (x1,y1) 到 (x2,y2)）
+function angle(x1, y1, x2, y2) {
+  return (Math.atan2(y2 - y1, x2 - x1) * 180) / Math.PI
+}
+angle(0, 0, 1, 1) // 45
+```
+
+## 总结
+
+| 方法               | 说明         |
+| ------------------ | ------------ |
+| `Math.floor`       | 向下取整     |
+| `Math.ceil`        | 向上取整     |
+| `Math.round`       | 四舍五入     |
+| `Math.trunc`       | 截断小数     |
+| `Math.max/min`     | 最大/最小值  |
+| `Math.abs`         | 绝对值       |
+| `Math.pow`         | 幂运算       |
+| `Math.sqrt`        | 平方根       |
+| `Math.random`      | 随机数 [0,1) |
+| `Math.sin/cos/tan` | 三角函数     |
+
+**核心要点**：
+
+- Math 是静态对象，不能 new
+- 三角函数使用弧度，不是角度
+- random() 返回 [0, 1)，不包括 1
+- 注意浮点数精度问题
+- ES6 新增了 trunc、sign、cbrt、hypot 等方法

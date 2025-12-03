@@ -1,0 +1,481 @@
+---
+title: CSS 变量
+description: 掌握 CSS 自定义属性的定义与使用，实现动态主题切换和可维护的样式系统
+pubDate: 2025-12-03
+toc: true
+ogImage: true
+category: CSS
+---
+
+CSS 变量（自定义属性）让样式变得可编程。你可以定义可复用的值，在运行时动态修改，实现主题切换、响应式调整等高级功能。
+
+## 基本语法
+
+### 定义变量
+
+CSS 变量以 `--` 开头：
+
+```css
+:root {
+  --primary-color: #3b82f6;
+  --secondary-color: #10b981;
+  --spacing-unit: 8px;
+  --border-radius: 6px;
+}
+```
+
+### 使用变量
+
+使用 `var()` 函数引用变量：
+
+```css
+.button {
+  background-color: var(--primary-color);
+  padding: var(--spacing-unit);
+  border-radius: var(--border-radius);
+}
+```
+
+### 默认值
+
+`var()` 可以指定后备值：
+
+```css
+.box {
+  /* 如果 --custom-color 未定义，使用 #333 */
+  color: var(--custom-color, #333);
+
+  /* 后备值可以是另一个变量 */
+  background: var(--bg-color, var(--default-bg, white));
+}
+```
+
+## 作用域与继承
+
+### 全局作用域
+
+定义在 `:root` 上的变量全局可用：
+
+```css
+:root {
+  --global-color: blue;
+}
+
+/* 任何元素都可以使用 */
+.anywhere {
+  color: var(--global-color);
+}
+```
+
+### 局部作用域
+
+变量可以在任何选择器中定义，只在该元素及其后代中有效：
+
+```css
+.dark-theme {
+  --text-color: white;
+  --bg-color: #1f2937;
+}
+
+.light-theme {
+  --text-color: #1f2937;
+  --bg-color: white;
+}
+
+.card {
+  color: var(--text-color);
+  background: var(--bg-color);
+}
+```
+
+### 继承
+
+CSS 变量像其他属性一样继承：
+
+```css
+.parent {
+  --color: blue;
+}
+
+.child {
+  /* 继承父元素的 --color */
+  color: var(--color);
+}
+
+.child.special {
+  /* 可以覆盖 */
+  --color: red;
+}
+```
+
+## 与 calc() 结合
+
+变量可以参与计算：
+
+```css
+:root {
+  --base-size: 16px;
+  --scale: 1.25;
+}
+
+h1 {
+  font-size: calc(
+    var(--base-size) * var(--scale) * var(--scale) * var(--scale)
+  );
+}
+
+h2 {
+  font-size: calc(var(--base-size) * var(--scale) * var(--scale));
+}
+
+h3 {
+  font-size: calc(var(--base-size) * var(--scale));
+}
+```
+
+### 间距系统
+
+```css
+:root {
+  --spacing: 8px;
+}
+
+.m-1 {
+  margin: var(--spacing);
+}
+.m-2 {
+  margin: calc(var(--spacing) * 2);
+}
+.m-3 {
+  margin: calc(var(--spacing) * 3);
+}
+.m-4 {
+  margin: calc(var(--spacing) * 4);
+}
+```
+
+## @property 规则
+
+`@property` 让你可以定义变量的类型、继承性和初始值：
+
+```css
+@property --progress {
+  syntax: '<percentage>';
+  inherits: false;
+  initial-value: 0%;
+}
+
+.progress-bar {
+  --progress: 60%;
+  background: linear-gradient(
+    to right,
+    #3b82f6 var(--progress),
+    #e5e7eb var(--progress)
+  );
+}
+```
+
+### 可动画的变量
+
+普通 CSS 变量不能参与过渡动画，但用 `@property` 定义类型后可以：
+
+```css
+@property --gradient-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+
+.gradient-box {
+  --gradient-angle: 0deg;
+  background: linear-gradient(var(--gradient-angle), #3b82f6, #10b981);
+  transition: --gradient-angle 0.5s;
+}
+
+.gradient-box:hover {
+  --gradient-angle: 180deg;
+}
+```
+
+### 类型验证
+
+```css
+@property --main-color {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: black;
+}
+
+.element {
+  --main-color: blue; /* 有效 */
+  --main-color: 100px; /* 无效，会使用 initial-value */
+}
+```
+
+## JavaScript 交互
+
+### 读取变量
+
+```javascript
+// 获取计算后的值
+const element = document.querySelector('.box')
+const style = getComputedStyle(element)
+const color = style.getPropertyValue('--primary-color')
+```
+
+### 设置变量
+
+```javascript
+// 设置全局变量
+document.documentElement.style.setProperty('--primary-color', '#ef4444')
+
+// 设置元素级变量
+element.style.setProperty('--custom-color', 'green')
+```
+
+### 响应式主题切换
+
+```javascript
+function setTheme(isDark) {
+  const root = document.documentElement
+  if (isDark) {
+    root.style.setProperty('--bg-color', '#1f2937')
+    root.style.setProperty('--text-color', '#f9fafb')
+  } else {
+    root.style.setProperty('--bg-color', '#ffffff')
+    root.style.setProperty('--text-color', '#1f2937')
+  }
+}
+```
+
+## 实战案例
+
+### 设计令牌系统
+
+```css
+:root {
+  /* 颜色 */
+  --color-primary-50: #eff6ff;
+  --color-primary-100: #dbeafe;
+  --color-primary-500: #3b82f6;
+  --color-primary-600: #2563eb;
+  --color-primary-700: #1d4ed8;
+
+  --color-gray-50: #f9fafb;
+  --color-gray-100: #f3f4f6;
+  --color-gray-500: #6b7280;
+  --color-gray-900: #111827;
+
+  /* 间距 */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+
+  /* 字号 */
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+
+  /* 圆角 */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-full: 9999px;
+
+  /* 阴影 */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
+}
+```
+
+### 主题切换
+
+```css
+:root {
+  /* 语义化变量 */
+  --bg-primary: var(--color-white);
+  --bg-secondary: var(--color-gray-50);
+  --text-primary: var(--color-gray-900);
+  --text-secondary: var(--color-gray-500);
+  --border-color: var(--color-gray-200);
+}
+
+[data-theme='dark'] {
+  --bg-primary: var(--color-gray-900);
+  --bg-secondary: var(--color-gray-800);
+  --text-primary: var(--color-gray-50);
+  --text-secondary: var(--color-gray-400);
+  --border-color: var(--color-gray-700);
+}
+
+/* 使用语义化变量 */
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+}
+```
+
+```html
+<html data-theme="light">
+  <body>
+    <button onclick="toggleTheme()">切换主题</button>
+  </body>
+</html>
+
+<script>
+  function toggleTheme() {
+    const html = document.documentElement
+    const current = html.getAttribute('data-theme')
+    html.setAttribute('data-theme', current === 'dark' ? 'light' : 'dark')
+  }
+</script>
+```
+
+### 组件变体
+
+```css
+.button {
+  --btn-bg: var(--color-gray-100);
+  --btn-color: var(--color-gray-900);
+  --btn-border: var(--color-gray-300);
+
+  padding: var(--space-2) var(--space-4);
+  background: var(--btn-bg);
+  color: var(--btn-color);
+  border: 1px solid var(--btn-border);
+  border-radius: var(--radius-md);
+}
+
+.button:hover {
+  --btn-bg: var(--color-gray-200);
+}
+
+.button--primary {
+  --btn-bg: var(--color-primary-500);
+  --btn-color: white;
+  --btn-border: var(--color-primary-500);
+}
+
+.button--primary:hover {
+  --btn-bg: var(--color-primary-600);
+  --btn-border: var(--color-primary-600);
+}
+
+.button--danger {
+  --btn-bg: var(--color-red-500);
+  --btn-color: white;
+  --btn-border: var(--color-red-500);
+}
+```
+
+### 响应式变量
+
+```css
+:root {
+  --container-padding: var(--space-4);
+  --heading-size: var(--text-2xl);
+}
+
+@media (min-width: 768px) {
+  :root {
+    --container-padding: var(--space-6);
+    --heading-size: var(--text-3xl);
+  }
+}
+
+@media (min-width: 1024px) {
+  :root {
+    --container-padding: var(--space-8);
+    --heading-size: var(--text-4xl);
+  }
+}
+
+.container {
+  padding: var(--container-padding);
+}
+
+h1 {
+  font-size: var(--heading-size);
+}
+```
+
+### 用户偏好
+
+```css
+/* 跟随系统颜色方案 */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-primary: #1f2937;
+    --text-primary: #f9fafb;
+  }
+}
+
+/* 减少动画 */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --transition-duration: 0s;
+  }
+}
+
+.animated {
+  transition: all var(--transition-duration, 0.3s);
+}
+```
+
+## 最佳实践
+
+### 命名规范
+
+```css
+:root {
+  /* 全局设计令牌：使用通用名称 */
+  --color-blue-500: #3b82f6;
+  --spacing-md: 1rem;
+
+  /* 语义化变量：描述用途 */
+  --color-primary: var(--color-blue-500);
+  --color-text: var(--color-gray-900);
+  --color-border: var(--color-gray-200);
+
+  /* 组件变量：作用域限定 */
+  --button-bg: var(--color-primary);
+  --button-padding: var(--spacing-md);
+}
+```
+
+### 避免过度使用
+
+```css
+/* 不好：为每个值都创建变量 */
+.box {
+  --box-margin-top: 10px;
+  --box-margin-right: 20px;
+  margin-top: var(--box-margin-top);
+  margin-right: var(--box-margin-right);
+}
+
+/* 好：只为需要复用或动态变化的值创建变量 */
+:root {
+  --spacing: 1rem;
+}
+
+.box {
+  margin: var(--spacing);
+}
+```
+
+---
+
+CSS 变量是现代样式系统的基础。结合 `@property` 规则和 JavaScript，你可以构建强大的主题系统和动态样式。下一篇我们将学习 CSS 层叠层（@layer），它能帮助你更好地组织样式优先级。

@@ -1,0 +1,571 @@
+---
+title: '原型与原型链'
+description: '深入理解 JavaScript 原型机制，掌握 prototype、__proto__ 与继承原理'
+pubDate: 2025-12-03
+toc: true
+ogImage: true
+category: 'JavaScript'
+tags: ['JavaScript', '原型', '原型链', '继承']
+---
+
+原型是 JavaScript 实现继承的核心机制。理解原型链，是深入掌握 JavaScript 的关键。
+
+## 🎯 原型基础
+
+### 什么是原型
+
+每个对象都有一个内部链接指向另一个对象，这个对象就是它的原型。当访问对象的属性时，如果对象本身没有，就会沿着原型链向上查找。
+
+```javascript
+const person = {
+  name: '张三',
+  greet() {
+    return `你好，我是${this.name}`
+  },
+}
+
+const student = Object.create(person)
+student.grade = '高三'
+
+console.log(student.name) // "张三"（来自原型）
+console.log(student.grade) // "高三"（自身属性）
+console.log(student.greet()) // "你好，我是张三"
+```
+
+### prototype 和 **proto**
+
+```javascript
+// 函数有 prototype 属性
+function Person(name) {
+  this.name = name
+}
+Person.prototype.greet = function () {
+  return `你好，我是${this.name}`
+}
+
+// 实例有 __proto__（或 [[Prototype]]）
+const p = new Person('张三')
+
+console.log(p.__proto__ === Person.prototype) // true
+console.log(Object.getPrototypeOf(p) === Person.prototype) // true
+
+// 原型链
+console.log(Person.prototype.__proto__ === Object.prototype) // true
+console.log(Object.prototype.__proto__) // null（原型链顶端）
+```
+
+### 图解原型关系
+
+```javascript
+function Person(name) {
+  this.name = name
+}
+Person.prototype.sayHi = function () {}
+
+const p = new Person('张三')
+
+// 关系图：
+// p --__proto__--> Person.prototype --__proto__--> Object.prototype --__proto__--> null
+// Person --prototype--> Person.prototype
+// Person --__proto__--> Function.prototype --__proto__--> Object.prototype
+```
+
+## 原型链
+
+### 属性查找机制
+
+```javascript
+function Animal(name) {
+  this.name = name
+}
+Animal.prototype.eat = function () {
+  return `${this.name}在吃东西`
+}
+
+function Dog(name, breed) {
+  Animal.call(this, name)
+  this.breed = breed
+}
+Dog.prototype = Object.create(Animal.prototype)
+Dog.prototype.constructor = Dog
+Dog.prototype.bark = function () {
+  return '汪汪！'
+}
+
+const dog = new Dog('小黑', '拉布拉多')
+
+// 属性查找顺序：
+console.log(dog.name) // "小黑"（自身属性）
+console.log(dog.breed) // "拉布拉多"（自身属性）
+console.log(dog.bark()) // "汪汪！"（Dog.prototype）
+console.log(dog.eat()) // "小黑在吃东西"（Animal.prototype）
+console.log(dog.toString()) // "[object Object]"（Object.prototype）
+```
+
+### 原型链的终点
+
+```javascript
+const obj = { a: 1 }
+
+console.log(obj.__proto__) // Object.prototype
+console.log(obj.__proto__.__proto__) // null
+
+// 检查原型链
+console.log(obj.hasOwnProperty('a')) // true（自身属性）
+console.log(obj.hasOwnProperty('toString')) // false（原型属性）
+console.log('toString' in obj) // true（包含原型链）
+```
+
+## 构造函数与 new
+
+### new 的过程
+
+```javascript
+function Person(name, age) {
+  this.name = name
+  this.age = age
+}
+Person.prototype.greet = function () {
+  return `你好，我是${this.name}`
+}
+
+const p = new Person('张三', 25)
+
+// new 做了什么：
+// 1. 创建空对象
+// 2. 将空对象的 __proto__ 指向构造函数的 prototype
+// 3. 将构造函数的 this 绑定到新对象
+// 4. 执行构造函数
+// 5. 如果构造函数返回对象则返回该对象，否则返回新对象
+
+// 模拟 new
+function myNew(Constructor, ...args) {
+  // 1. 创建新对象，原型指向构造函数的 prototype
+  const obj = Object.create(Constructor.prototype)
+  // 2. 执行构造函数
+  const result = Constructor.apply(obj, args)
+  // 3. 返回对象
+  return result instanceof Object ? result : obj
+}
+
+const p2 = myNew(Person, '李四', 30)
+console.log(p2.greet()) // "你好，我是李四"
+```
+
+### constructor 属性
+
+```javascript
+function Person(name) {
+  this.name = name
+}
+
+const p = new Person('张三')
+
+console.log(p.constructor === Person) // true
+console.log(Person.prototype.constructor === Person) // true
+
+// 用 constructor 创建同类型对象
+const p2 = new p.constructor('李四')
+console.log(p2 instanceof Person) // true
+
+// 🔶 重写 prototype 会丢失 constructor
+function Dog(name) {
+  this.name = name
+}
+Dog.prototype = {
+  bark() {
+    return '汪！'
+  },
+}
+// Dog.prototype.constructor 变成了 Object
+
+// 修复
+Dog.prototype = {
+  constructor: Dog,
+  bark() {
+    return '汪！'
+  },
+}
+```
+
+## 原型方法
+
+### Object.getPrototypeOf
+
+```javascript
+const obj = { a: 1 }
+const proto = Object.getPrototypeOf(obj)
+console.log(proto === Object.prototype) // true
+
+// 获取实例的原型
+function Person() {}
+const p = new Person()
+console.log(Object.getPrototypeOf(p) === Person.prototype) // true
+```
+
+### Object.setPrototypeOf
+
+```javascript
+const animal = {
+  eat() {
+    return '吃东西'
+  },
+}
+
+const dog = {
+  bark() {
+    return '汪！'
+  },
+}
+
+// 设置 dog 的原型为 animal
+Object.setPrototypeOf(dog, animal)
+
+console.log(dog.bark()) // "汪！"
+console.log(dog.eat()) // "吃东西"
+
+// 🔶 修改原型链性能较差，推荐用 Object.create
+```
+
+### Object.create
+
+```javascript
+// 创建以指定对象��原型的新对象
+const proto = {
+  greet() {
+    return `你好，${this.name}`
+  },
+}
+
+const person = Object.create(proto)
+person.name = '张三'
+console.log(person.greet()) // "你好，张三"
+
+// 带属性描述符
+const user = Object.create(proto, {
+  name: {
+    value: '李四',
+    writable: true,
+    enumerable: true,
+    configurable: true,
+  },
+  age: {
+    value: 25,
+    writable: false,
+  },
+})
+
+// 创建没有原型的对象
+const pure = Object.create(null)
+console.log(pure.toString) // undefined
+```
+
+### isPrototypeOf
+
+```javascript
+function Person() {}
+const p = new Person()
+
+console.log(Person.prototype.isPrototypeOf(p)) // true
+console.log(Object.prototype.isPrototypeOf(p)) // true
+
+// 与 instanceof 区别
+console.log(p instanceof Person) // true（检查 constructor.prototype）
+console.log(Person.prototype.isPrototypeOf(p)) // true（检查原型链）
+```
+
+### hasOwnProperty 与 Object.hasOwn
+
+```javascript
+const obj = { a: 1 }
+
+// hasOwnProperty
+console.log(obj.hasOwnProperty('a')) // true
+console.log(obj.hasOwnProperty('toString')) // false
+
+// Object.hasOwn（ES2022，推荐）
+console.log(Object.hasOwn(obj, 'a')) // true
+
+// 为什么推荐 Object.hasOwn？
+const noProto = Object.create(null)
+noProto.x = 1
+// noProto.hasOwnProperty('x')  // TypeError（没有这个方法）
+console.log(Object.hasOwn(noProto, 'x')) // true
+```
+
+## 原型继承
+
+### 原型链继承
+
+```javascript
+function Animal(name) {
+  this.name = name
+  this.colors = ['black', 'white']
+}
+Animal.prototype.eat = function () {
+  return `${this.name}在吃东西`
+}
+
+function Dog(name) {
+  this.name = name
+}
+Dog.prototype = new Animal()
+
+const dog1 = new Dog('小黑')
+const dog2 = new Dog('小白')
+
+// 🔶 问题1：引用类型属性共享
+dog1.colors.push('brown')
+console.log(dog2.colors) // ["black", "white", "brown"]
+
+// 🔶 问题2：无法向父构造函数传参
+```
+
+### 借用构造函数
+
+```javascript
+function Animal(name) {
+  this.name = name
+  this.colors = ['black', 'white']
+}
+
+function Dog(name, breed) {
+  Animal.call(this, name) // 借用父构造函数
+  this.breed = breed
+}
+
+const dog1 = new Dog('小黑', '拉布拉多')
+const dog2 = new Dog('小白', '金毛')
+
+dog1.colors.push('brown')
+console.log(dog1.colors) // ["black", "white", "brown"]
+console.log(dog2.colors) // ["black", "white"]（独立副本）
+
+// 🔶 问题：不能继承原型上的方法
+```
+
+### 组合继承
+
+```javascript
+function Animal(name) {
+  this.name = name
+  this.colors = ['black', 'white']
+}
+Animal.prototype.eat = function () {
+  return `${this.name}在吃东西`
+}
+
+function Dog(name, breed) {
+  Animal.call(this, name) // 继承属性
+  this.breed = breed
+}
+Dog.prototype = new Animal() // 继承方法
+Dog.prototype.constructor = Dog
+Dog.prototype.bark = function () {
+  return '汪汪！'
+}
+
+const dog = new Dog('小黑', '拉布拉多')
+console.log(dog.eat()) // "小黑在吃东西"
+console.log(dog.bark()) // "汪汪！"
+
+// 🔶 问题：父构造函数调用了两次
+```
+
+### 寄生组合继承（最佳）
+
+```javascript
+function Animal(name) {
+  this.name = name
+  this.colors = ['black', 'white']
+}
+Animal.prototype.eat = function () {
+  return `${this.name}在吃东西`
+}
+
+function Dog(name, breed) {
+  Animal.call(this, name)
+  this.breed = breed
+}
+
+// 关键：使用 Object.create 避免调用父构造函数
+Dog.prototype = Object.create(Animal.prototype)
+Dog.prototype.constructor = Dog
+Dog.prototype.bark = function () {
+  return '汪汪！'
+}
+
+const dog = new Dog('小黑', '拉布拉多')
+console.log(dog.eat()) // "小黑在吃东西"
+console.log(dog.bark()) // "汪汪！"
+console.log(dog instanceof Dog) // true
+console.log(dog instanceof Animal) // true
+```
+
+### ES6 Class（语法糖）
+
+```javascript
+class Animal {
+  constructor(name) {
+    this.name = name
+    this.colors = ['black', 'white']
+  }
+
+  eat() {
+    return `${this.name}在吃东西`
+  }
+}
+
+class Dog extends Animal {
+  constructor(name, breed) {
+    super(name) // 调用父构造函数
+    this.breed = breed
+  }
+
+  bark() {
+    return '汪汪！'
+  }
+}
+
+const dog = new Dog('小黑', '拉布拉多')
+console.log(dog.eat()) // "小黑在吃东西"
+console.log(dog.bark()) // "汪汪！"
+
+// 本质还是原型继承
+console.log(Dog.prototype.__proto__ === Animal.prototype) // true
+```
+
+## 原型污染
+
+### 什么是原型污染
+
+```javascript
+// 修改内置对象原型（危险！）
+Array.prototype.first = function () {
+  return this[0]
+}
+
+const arr = [1, 2, 3]
+console.log(arr.first()) // 1
+
+// 🔶 问题：影响所有数组
+for (const key in arr) {
+  console.log(key) // 0, 1, 2, "first"（遍历到原型方法）
+}
+```
+
+### 防止原型污染
+
+```javascript
+// 使用 hasOwnProperty 或 Object.hasOwn
+for (const key in obj) {
+  if (Object.hasOwn(obj, key)) {
+    console.log(key)
+  }
+}
+
+// 使用 Object.keys/values/entries（不包含原型属性）
+Object.keys(obj).forEach((key) => {
+  console.log(key)
+})
+
+// 创建无原型对象
+const safeObj = Object.create(null)
+```
+
+### 安全合并对象
+
+```javascript
+// �� 不安全的合并
+function unsafeMerge(target, source) {
+  for (const key in source) {
+    target[key] = source[key]
+  }
+}
+
+// 攻击示例
+const malicious = JSON.parse('{"__proto__": {"isAdmin": true}}')
+const user = {}
+unsafeMerge(user, malicious)
+console.log({}.isAdmin) // true（原型被污染）
+
+// ✅ 安全的合并
+function safeMerge(target, source) {
+  for (const key of Object.keys(source)) {
+    if (key === '__proto__' || key === 'constructor') continue
+    target[key] = source[key]
+  }
+}
+```
+
+## 常见面试题
+
+### 🙋 实现 instanceof
+
+```javascript
+function myInstanceof(obj, Constructor) {
+  if (obj === null || typeof obj !== 'object') return false
+
+  let proto = Object.getPrototypeOf(obj)
+  while (proto !== null) {
+    if (proto === Constructor.prototype) return true
+    proto = Object.getPrototypeOf(proto)
+  }
+  return false
+}
+
+console.log(myInstanceof([], Array)) // true
+console.log(myInstanceof({}, Array)) // false
+```
+
+### 🙋 Function 和 Object 的关系
+
+```javascript
+// Function 是自己的实例
+console.log(Function instanceof Function) // true
+console.log(Function.__proto__ === Function.prototype) // true
+
+// Object 是 Function 的实例
+console.log(Object instanceof Function) // true
+console.log(Object.__proto__ === Function.prototype) // true
+
+// Function.prototype 是 Object 的实例
+console.log(Function.prototype instanceof Object) // true
+console.log(Function.prototype.__proto__ === Object.prototype) // true
+```
+
+### 🙋 画出完整原型链
+
+```javascript
+function Foo() {}
+const f = new Foo()
+
+// f 的原型链
+// f --> Foo.prototype --> Object.prototype --> null
+
+// Foo 的原型链
+// Foo --> Function.prototype --> Object.prototype --> null
+
+// Object 的原型链
+// Object --> Function.prototype --> Object.prototype --> null
+
+// Function 的原型链
+// Function --> Function.prototype --> Object.prototype --> null
+```
+
+## 总结
+
+| 概念          | 说明                           |
+| ------------- | ------------------------------ |
+| `__proto__`   | 对象的原型链接（实际指向原型） |
+| `prototype`   | 函数的原型对象                 |
+| `constructor` | 原型的构造函数引用             |
+| 原型链        | 属性查找的链式结构             |
+
+**核心要点**：
+
+- 每个对象都有 `__proto__`，指向其原型
+- 只有函数才有 `prototype`，用于创建实例的原型
+- 属性查找沿原型链向上直到 `null`
+- ES6 class 是原型继承的语法糖
+- 避免修改内置对象原型，防止原型污染

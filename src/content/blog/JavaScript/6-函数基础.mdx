@@ -1,0 +1,687 @@
+---
+title: '函数基础'
+description: '全面掌握 JavaScript 函数的声明、参数、返回值与作用域，理解函数是一等公民'
+pubDate: 2025-12-03
+toc: true
+ogImage: true
+category: 'JavaScript'
+tags: ['JavaScript', '函数', '作用域', '参数']
+---
+
+函数是 JavaScript 的核心。它不仅是代码复用的基本单位，更是一等公民——可以像普通值一样传递和操作。
+
+## 🎯 定义函数
+
+### 函数声明
+
+```javascript
+// 函数声明（Function Declaration）
+function greet(name) {
+  return `你好，${name}！`
+}
+
+console.log(greet('张三')) // "你好，张三！"
+
+// 函数声明会被提升（hoisting）
+sayHello() // "Hello!"（可以在声明前调用）
+
+function sayHello() {
+  console.log('Hello!')
+}
+```
+
+### 函数表达式
+
+```javascript
+// 函数表达式（Function Expression）
+const greet = function (name) {
+  return `你好，${name}！`
+}
+
+// 不会被提升
+// sayHi()  // ReferenceError
+const sayHi = function () {
+  console.log('Hi!')
+}
+
+// 命名函数表达式（用于递归和调试）
+const factorial = function fact(n) {
+  if (n <= 1) return 1
+  return n * fact(n - 1) // 内部可以用 fact
+}
+// fact(5)  // ReferenceError（外部不能用 fact）
+```
+
+### 箭头函数
+
+```javascript
+// 箭头函数（ES6）
+const add = (a, b) => a + b
+
+// 单参数可省略括号
+const double = (n) => n * 2
+
+// 无参数需要括号
+const random = () => Math.random()
+
+// 多行需要花括号和 return
+const greet = (name) => {
+  const greeting = `你好，${name}！`
+  return greeting
+}
+
+// 返回对象字面量需要包在括号里
+const createUser = (name) => ({ name, createdAt: Date.now() })
+```
+
+### 构造函数
+
+```javascript
+// 使用 Function 构造函数（不推荐）
+const add = new Function('a', 'b', 'return a + b')
+console.log(add(1, 2)) // 3
+
+// 🔶 有安全和性能问题，极少使用
+```
+
+## 函数参数
+
+### 基本参数
+
+```javascript
+function add(a, b) {
+  return a + b
+}
+
+add(1, 2) // 3
+add(1) // NaN（b 是 undefined）
+add(1, 2, 3) // 3（多余参数被忽略）
+```
+
+### 默认参数
+
+```javascript
+// ES6 默认参数
+function greet(name = '游客', greeting = '你好') {
+  return `${greeting}，${name}！`
+}
+
+greet() // "你好，游客！"
+greet('张三') // "你好，张三！"
+greet('张三', '早上好') // "早上好，张三！"
+
+// 只传第二个参数
+greet(undefined, '晚上好') // "晚上好，游客！"
+
+// 默认值可以是表达式
+function getTimestamp(date = new Date()) {
+  return date.getTime()
+}
+
+// 默认值可以引用前面的参数
+function createRect(width, height = width) {
+  return { width, height }
+}
+createRect(10) // { width: 10, height: 10 }
+```
+
+### 剩余参数
+
+```javascript
+// 收集剩余参数到数组
+function sum(...numbers) {
+  return numbers.reduce((a, b) => a + b, 0)
+}
+
+sum(1, 2, 3) // 6
+sum(1, 2, 3, 4, 5) // 15
+
+// 与普通参数结合
+function log(level, ...messages) {
+  console.log(`[${level}]`, ...messages)
+}
+
+log('INFO', '用户登录', '用户ID: 123')
+// [INFO] 用户登录 用户ID: 123
+
+// 🔶 剩余参数必须是最后一个
+// function bad(...rest, last) {}  // SyntaxError
+```
+
+### arguments 对象
+
+```javascript
+// 传统方式（非箭头函数）
+function sum() {
+  let total = 0
+  for (let i = 0; i < arguments.length; i++) {
+    total += arguments[i]
+  }
+  return total
+}
+
+sum(1, 2, 3) // 6
+
+// arguments 是类数组，不是真正的数组
+function showArgs() {
+  console.log(arguments.length) // 3
+  console.log(arguments[0]) // 'a'
+  // arguments.map(...)  // TypeError
+
+  // 转为数组
+  const args = Array.from(arguments)
+  // 或
+  const args2 = [...arguments]
+}
+
+showArgs('a', 'b', 'c')
+
+// 🔶 箭头函数没有 arguments
+const arrowFn = () => {
+  // console.log(arguments)  // ReferenceError
+}
+
+// 在箭头函数中使用剩余参数代替
+const arrowSum = (...args) => args.reduce((a, b) => a + b, 0)
+```
+
+### 解构参数
+
+```javascript
+// 对象解构
+function createUser({ name, age, city = '未知' }) {
+  return { name, age, city }
+}
+
+createUser({ name: '张三', age: 25 })
+// { name: "张三", age: 25, city: "未知" }
+
+// 数组解构
+function swap([a, b]) {
+  return [b, a]
+}
+swap([1, 2]) // [2, 1]
+
+// 配合默认值
+function config({ host = 'localhost', port = 3000 } = {}) {
+  return { host, port }
+}
+
+config() // { host: "localhost", port: 3000 }
+config({ port: 8080 }) // { host: "localhost", port: 8080 }
+```
+
+## 返回值
+
+### return 语句
+
+```javascript
+// 返回值
+function add(a, b) {
+  return a + b // 返回结果并结束函数
+}
+
+// 提前返回
+function divide(a, b) {
+  if (b === 0) {
+    return null // 提前返回，下面的代码不执行
+  }
+  return a / b
+}
+
+// 没有 return 或 return 后没有值，返回 undefined
+function noReturn() {
+  console.log('执行')
+}
+console.log(noReturn()) // undefined
+
+function emptyReturn() {
+  return
+}
+console.log(emptyReturn()) // undefined
+```
+
+### 返回多个值
+
+```javascript
+// 返回数组
+function minMax(arr) {
+  return [Math.min(...arr), Math.max(...arr)]
+}
+const [min, max] = minMax([3, 1, 4, 1, 5])
+
+// 返回对象
+function getUser() {
+  return {
+    name: '张三',
+    age: 25,
+    city: '北京',
+  }
+}
+const { name, age } = getUser()
+
+// 返回函数
+function createMultiplier(factor) {
+  return function (number) {
+    return number * factor
+  }
+}
+const double = createMultiplier(2)
+double(5) // 10
+```
+
+### 换行陷阱
+
+```javascript
+// 🔶 return 后换行会自动插入分号
+function bad() {
+  return
+  {
+    value: 1
+  }
+}
+bad() // undefined（不是对象！）
+
+// ✅ 正确写法
+function good() {
+  return {
+    value: 1,
+  }
+}
+// 或者
+function good2() {
+  return {
+    value: 1,
+  }
+}
+```
+
+## 函数作用域
+
+### 词法作用域
+
+```javascript
+// 函数作用域由定义位置决定，不是调用位置
+const x = 10
+
+function outer() {
+  const x = 20
+
+  function inner() {
+    console.log(x) // 查找最近的 x
+  }
+
+  return inner
+}
+
+const fn = outer()
+fn() // 20（不是 10）
+```
+
+### 变量遮蔽
+
+```javascript
+const name = '全局'
+
+function showName() {
+  const name = '局部' // 遮蔽全局变量
+  console.log(name)
+}
+
+showName() // "局部"
+console.log(name) // "全局"
+```
+
+### 闭包预览
+
+```javascript
+// 函数可以记住创建时的作用域
+function createCounter() {
+  let count = 0 // 私有变量
+  return function () {
+    count++
+    return count
+  }
+}
+
+const counter = createCounter()
+console.log(counter()) // 1
+console.log(counter()) // 2
+console.log(counter()) // 3
+
+// count 对外部不可见，但函数可以访问
+```
+
+## 函数是一等公民
+
+### 赋值给变量
+
+```javascript
+const greet = function (name) {
+  return `你好，${name}`
+}
+
+// 可以重新赋值
+let fn = greet
+console.log(fn('张三')) // "你好，张三"
+```
+
+### 作为参数传递
+
+```javascript
+// 回调函数
+function processArray(arr, callback) {
+  const result = []
+  for (const item of arr) {
+    result.push(callback(item))
+  }
+  return result
+}
+
+const numbers = [1, 2, 3]
+const doubled = processArray(numbers, (n) => n * 2)
+console.log(doubled) // [2, 4, 6]
+
+// 数组方法
+numbers.map((n) => n * 2)
+numbers.filter((n) => n > 1)
+numbers.forEach((n) => console.log(n))
+```
+
+### 作为返回值
+
+```javascript
+// 高阶函数
+function withLogging(fn) {
+  return function (...args) {
+    console.log('调用参数:', args)
+    const result = fn(...args)
+    console.log('返回结果:', result)
+    return result
+  }
+}
+
+const add = (a, b) => a + b
+const loggedAdd = withLogging(add)
+
+loggedAdd(1, 2)
+// 调用参数: [1, 2]
+// 返回结果: 3
+```
+
+### 存储在数据结构中
+
+```javascript
+// 存储在数组中
+const operations = [(x) => x + 1, (x) => x * 2, (x) => x ** 2]
+
+let value = 2
+for (const op of operations) {
+  value = op(value)
+}
+console.log(value) // ((2 + 1) * 2) ** 2 = 36
+
+// 存储在对象中
+const calculator = {
+  add: (a, b) => a + b,
+  subtract: (a, b) => a - b,
+  multiply: (a, b) => a * b,
+  divide: (a, b) => a / b,
+}
+
+calculator.add(5, 3) // 8
+```
+
+## 立即执行函数（IIFE）
+
+```javascript
+// 定义后立即执行
+;(function () {
+  const private = '私有变量'
+  console.log(private)
+})()
+
+// 箭头函数版本
+;(() => {
+  console.log('立即执行')
+})()
+
+// 传递参数
+;(function (name) {
+  console.log(`你好，${name}`)
+})('张三')
+
+// 返回值
+const result = (function () {
+  return 42
+})()
+
+// 用于创建私有作用域（ES6 前的模块化）
+const counter = (function () {
+  let count = 0
+  return {
+    increment() {
+      count++
+    },
+    getCount() {
+      return count
+    },
+  }
+})()
+```
+
+## 递归函数
+
+```javascript
+// 阶乘
+function factorial(n) {
+  if (n <= 1) return 1
+  return n * factorial(n - 1)
+}
+factorial(5) // 120
+
+// 斐波那契数列
+function fibonacci(n) {
+  if (n <= 1) return n
+  return fibonacci(n - 1) + fibonacci(n - 2)
+}
+fibonacci(10) // 55
+
+// 🔶 简单递归效率低，可以用记忆化优化
+function memoizedFib() {
+  const cache = {}
+  return function fib(n) {
+    if (n in cache) return cache[n]
+    if (n <= 1) return n
+    cache[n] = fib(n - 1) + fib(n - 2)
+    return cache[n]
+  }
+}
+const fib = memoizedFib()
+fib(50) // 快速计算
+
+// 深度遍历对象
+function deepClone(obj) {
+  if (obj === null || typeof obj !== 'object') {
+    return obj
+  }
+  const clone = Array.isArray(obj) ? [] : {}
+  for (const key in obj) {
+    if (obj.hasOwnProperty(key)) {
+      clone[key] = deepClone(obj[key])
+    }
+  }
+  return clone
+}
+```
+
+## 函数的属性和方法
+
+### name 属性
+
+```javascript
+function foo() {}
+console.log(foo.name) // "foo"
+
+const bar = function () {}
+console.log(bar.name) // "bar"
+
+const baz = function qux() {}
+console.log(baz.name) // "qux"
+
+console.log((() => {}).name) // ""
+```
+
+### length 属性
+
+```javascript
+// 形参数量（不含默认值和剩余参数）
+function fn1(a) {}
+function fn2(a, b) {}
+function fn3(a, b = 1) {}
+function fn4(a, ...rest) {}
+
+console.log(fn1.length) // 1
+console.log(fn2.length) // 2
+console.log(fn3.length) // 1（默认参数不计入）
+console.log(fn4.length) // 1（剩余参数不计入）
+```
+
+### call 和 apply
+
+```javascript
+function greet(greeting, punctuation) {
+  return `${greeting}，${this.name}${punctuation}`
+}
+
+const person = { name: '张三' }
+
+// call：参数逐个传递
+greet.call(person, '你好', '！') // "你好，张三！"
+
+// apply：参数作为数组传递
+greet.apply(person, ['你好', '！']) // "你好，张三！"
+
+// 实际应用：借用数组方法
+const arrayLike = { 0: 'a', 1: 'b', length: 2 }
+Array.prototype.slice.call(arrayLike) // ["a", "b"]
+```
+
+### bind
+
+```javascript
+const person = { name: '张三' }
+
+function greet() {
+  return `你好，${this.name}`
+}
+
+// 创建绑定 this 的新函数
+const boundGreet = greet.bind(person)
+boundGreet() // "你好，张三"
+
+// 预设参数（柯里化）
+function add(a, b, c) {
+  return a + b + c
+}
+
+const add5 = add.bind(null, 5) // 预设 a = 5
+add5(3, 2) // 10
+
+const add5and3 = add.bind(null, 5, 3) // 预设 a = 5, b = 3
+add5and3(2) // 10
+```
+
+## 最佳实践
+
+### 函数命名
+
+```javascript
+// 动词开头，描述行为
+function getUserById(id) {}
+function validateEmail(email) {}
+function calculateTotal(items) {}
+
+// 布尔返回值用 is/has/can
+function isValid(value) {}
+function hasPermission(user) {}
+function canEdit(document) {}
+
+// 事件处理用 handle/on
+function handleClick(event) {}
+function onSubmit(data) {}
+```
+
+### 单一职责
+
+```javascript
+// 🔶 做太多事
+function processUser(user) {
+  // 验证
+  if (!user.name) throw new Error('名字必填')
+  // 格式化
+  user.name = user.name.trim()
+  // 保存
+  database.save(user)
+  // 发送邮件
+  email.send(user.email, '欢迎')
+}
+
+// ✅ 拆分职责
+function validateUser(user) {
+  if (!user.name) throw new Error('名字必填')
+}
+
+function formatUser(user) {
+  return { ...user, name: user.name.trim() }
+}
+
+function saveUser(user) {
+  return database.save(user)
+}
+
+function sendWelcomeEmail(email) {
+  return email.send(email, '欢迎')
+}
+```
+
+### 避免副作用
+
+```javascript
+// 🔶 有副作用：修改外部状态
+let total = 0
+function addToTotal(value) {
+  total += value
+}
+
+// ✅ 纯函数：相同输入总是相同输出
+function add(a, b) {
+  return a + b
+}
+
+// 🔶 修改参数
+function addItem(arr, item) {
+  arr.push(item) // 修改了原数组
+  return arr
+}
+
+// ✅ 不修改参数
+function addItem(arr, item) {
+  return [...arr, item] // 返回新数组
+}
+```
+
+## 总结
+
+| 定义方式   | 提升 | this 绑定 | arguments | 适用场景       |
+| ---------- | ---- | --------- | --------- | -------------- |
+| 函数声明   | 是   | 动态      | 有        | 通用           |
+| 函数表达式 | 否   | 动态      | 有        | 回调、条件定义 |
+| 箭头函数   | 否   | 继承      | 无        | 回调、简短函数 |
+
+**核心要点**：
+
+- 函数是一等公民，可以像值一样传递
+- 使用默认参数和剩余参数处理可变参数
+- 箭头函数没有自己的 `this` 和 `arguments`
+- 保持函数简短、单一职责、无副作用

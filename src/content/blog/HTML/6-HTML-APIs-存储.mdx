@@ -1,0 +1,825 @@
+---
+title: 'HTML APIs（上）：客户端存储完全指南'
+description: '深入掌握 Web Storage、IndexedDB 和 Cache API，实现高效的客户端数据存储与离线缓存'
+pubDate: 2025-12-03
+toc: true
+ogImage: true
+category: 'HTML'
+tags: ['HTML', 'JavaScript', 'Web Storage', 'IndexedDB', '离线存储']
+---
+
+现代 Web 应用需要在客户端存储数据——用户偏好、缓存内容、离线数据等。浏览器提供了多种存储 API，各有特点和适用场景。
+
+## 🎯 存储方案概览
+
+| 方案           | 容量     | 类型      | 生命周期   | 同步/异步 |
+| -------------- | -------- | --------- | ---------- | --------- |
+| Cookie         | ~4KB     | 字符串    | 可设置过期 | 同步      |
+| localStorage   | ~5-10MB  | 字符串    | 永久       | 同步      |
+| sessionStorage | ~5-10MB  | 字符串    | 会话       | 同步      |
+| IndexedDB      | 无限制\* | 结构化    | 永久       | 异步      |
+| Cache API      | 无限制\* | 请求/响应 | 永久       | 异步      |
+
+\*实际受磁盘空间和浏览器配额限制
+
+## Web Storage
+
+Web Storage 提供简单的键值对存储，包括 `localStorage` 和 `sessionStorage`。
+
+### localStorage
+
+数据永久保存，除非主动清除：
+
+```javascript
+// 存储数据
+localStorage.setItem('username', '张三')
+localStorage.setItem('settings', JSON.stringify({ theme: 'dark', lang: 'zh' }))
+
+// 读取数据
+const username = localStorage.getItem('username') // "张三"
+const settings = JSON.parse(localStorage.getItem('settings'))
+
+// 删除数据
+localStorage.removeItem('username')
+
+// 清空所有数据
+localStorage.clear()
+
+// 获取数据条数
+console.log(localStorage.length)
+
+// 获取第 n 个键名
+console.log(localStorage.key(0))
+```
+
+### sessionStorage
+
+数据仅在当前会话（标签页）有效，关闭标签页后清除：
+
+```javascript
+// API 与 localStorage 完全相同
+sessionStorage.setItem('tempData', 'value')
+sessionStorage.getItem('tempData')
+sessionStorage.removeItem('tempData')
+sessionStorage.clear()
+```
+
+### 使用场景对比
+
+| 场景           | 推荐方案       | 原因               |
+| -------------- | -------------- | ------------------ |
+| 用户偏好设置   | localStorage   | 需要持久化         |
+| 登录状态 Token | localStorage   | 需要跨会话保持     |
+| 表单草稿       | sessionStorage | 关闭页面后无需保留 |
+| 一次性操作状态 | sessionStorage | 仅当前会话有效     |
+| 购物车数据     | localStorage   | 需要持久化         |
+
+### 存储事件
+
+当 **其他标签页** 修改 localStorage 时，可以监听到：
+
+```javascript
+window.addEventListener('storage', (event) => {
+  console.log('Key:', event.key)
+  console.log('旧值:', event.oldValue)
+  console.log('新值:', event.newValue)
+  console.log('来源:', event.url)
+})
+```
+
+🔶 **注意**：storage 事件不会在当前页面触发，只在同源的其他标签页触发。
+
+### 封装工具函数
+
+```javascript
+const storage = {
+  set(key, value, expires) {
+    const data = {
+      value,
+      expires: expires ? Date.now() + expires : null,
+    }
+    localStorage.setItem(key, JSON.stringify(data))
+  },
+
+  get(key) {
+    const item = localStorage.getItem(key)
+    if (!item) return null
+
+    const data = JSON.parse(item)
+
+    // 检查过期
+    if (data.expires && Date.now() > data.expires) {
+      localStorage.removeItem(key)
+      return null
+    }
+
+    return data.value
+  },
+
+  remove(key) {
+    localStorage.removeItem(key)
+  },
+
+  clear() {
+    localStorage.clear()
+  },
+}
+
+// 使用
+storage.set('token', 'abc123', 7 * 24 * 60 * 60 * 1000) // 7天过期
+storage.get('token')
+```
+
+## IndexedDB
+
+IndexedDB 是浏览器内置的**完整数据库**，支持事务、索引、大容量存储。
+
+### 核心概念
+
+```
+┌─────────────────────────────────────────┐
+│              IndexedDB                   │
+│  ┌────────────────────────────────────┐ │
+│  │           Database                  │ │
+│  │  ┌──────────────┬───────────────┐  │ │
+│  │  │ Object Store │ Object Store  │  │ │
+│  │  │   (users)    │   (posts)     │  │ │
+│  │  │  ┌────────┐  │  ┌─────────┐  │  │ │
+│  │  │  │ Record │  │  │ Record  │  │  │ │
+│  │  │  │ Record │  │  │ Record  │  │  │ │
+│  │  │  │ Record │  │  │ Record  │  │  │ │
+│  │  │  └────────┘  │  └─────────┘  │  │ │
+│  │  └──────────────┴───────────────┘  │ │
+│  └────────────────────────────────────┘ │
+└─────────────────────────────────────────┘
+```
+
+- **Database**：数据库，可创建多个
+- **Object Store**：类似表，存储同类数据
+- **Record**：一条记录（JavaScript 对象）
+- **Index**：索引，加速查询
+- **Transaction**：事务，保证数据一致性
+
+### 打开数据库
+
+```javascript
+const request = indexedDB.open('MyDatabase', 1)
+
+request.onerror = (event) => {
+  console.error('数据库打开失败:', event.target.error)
+}
+
+request.onsuccess = (event) => {
+  const db = event.target.result
+  console.log('数据库打开成功')
+}
+
+// 首次创建或版本升级时触发
+request.onupgradeneeded = (event) => {
+  const db = event.target.result
+
+  // 创建 Object Store
+  if (!db.objectStoreNames.contains('users')) {
+    const store = db.createObjectStore('users', {
+      keyPath: 'id',
+      autoIncrement: true,
+    })
+
+    // 创建索引
+    store.createIndex('email', 'email', { unique: true })
+    store.createIndex('name', 'name', { unique: false })
+  }
+}
+```
+
+### 增删改查（CRUD）
+
+```javascript
+// 假设 db 是已打开的数据库实例
+
+// ===== 添加数据 =====
+function addUser(user) {
+  const transaction = db.transaction(['users'], 'readwrite')
+  const store = transaction.objectStore('users')
+
+  const request = store.add(user)
+
+  request.onsuccess = () => {
+    console.log('添加成功，ID:', request.result)
+  }
+
+  request.onerror = () => {
+    console.error('添加失败:', request.error)
+  }
+}
+
+addUser({ name: '张三', email: 'zhang@example.com', age: 25 })
+
+// ===== 读取数据 =====
+function getUser(id) {
+  const transaction = db.transaction(['users'], 'readonly')
+  const store = transaction.objectStore('users')
+
+  const request = store.get(id)
+
+  request.onsuccess = () => {
+    console.log('用户:', request.result)
+  }
+}
+
+// ===== 更新数据 =====
+function updateUser(user) {
+  const transaction = db.transaction(['users'], 'readwrite')
+  const store = transaction.objectStore('users')
+
+  const request = store.put(user) // put 会更新或插入
+
+  request.onsuccess = () => {
+    console.log('更新成功')
+  }
+}
+
+updateUser({ id: 1, name: '张三', email: 'zhangsan@example.com', age: 26 })
+
+// ===== 删除数据 =====
+function deleteUser(id) {
+  const transaction = db.transaction(['users'], 'readwrite')
+  const store = transaction.objectStore('users')
+
+  const request = store.delete(id)
+
+  request.onsuccess = () => {
+    console.log('删除成功')
+  }
+}
+```
+
+### 查询所有数据
+
+```javascript
+function getAllUsers() {
+  const transaction = db.transaction(['users'], 'readonly')
+  const store = transaction.objectStore('users')
+
+  const request = store.getAll()
+
+  request.onsuccess = () => {
+    console.log('所有用户:', request.result)
+  }
+}
+```
+
+### 使用游标遍历
+
+```javascript
+function iterateUsers() {
+  const transaction = db.transaction(['users'], 'readonly')
+  const store = transaction.objectStore('users')
+
+  const request = store.openCursor()
+
+  request.onsuccess = (event) => {
+    const cursor = event.target.result
+    if (cursor) {
+      console.log('用户:', cursor.value)
+      cursor.continue() // 移动到下一条
+    } else {
+      console.log('遍历完成')
+    }
+  }
+}
+```
+
+### 使用索引查询
+
+```javascript
+function getUserByEmail(email) {
+  const transaction = db.transaction(['users'], 'readonly')
+  const store = transaction.objectStore('users')
+  const index = store.index('email')
+
+  const request = index.get(email)
+
+  request.onsuccess = () => {
+    console.log('查询结果:', request.result)
+  }
+}
+
+getUserByEmail('zhang@example.com')
+```
+
+### Promise 封装
+
+原生 API 基于回调，封装成 Promise 更易用：
+
+```javascript
+class IDBHelper {
+  constructor(dbName, version) {
+    this.dbName = dbName
+    this.version = version
+    this.db = null
+  }
+
+  async open(upgradeCallback) {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open(this.dbName, this.version)
+
+      request.onerror = () => reject(request.error)
+      request.onsuccess = () => {
+        this.db = request.result
+        resolve(this.db)
+      }
+
+      request.onupgradeneeded = (event) => {
+        upgradeCallback(event.target.result)
+      }
+    })
+  }
+
+  async add(storeName, data) {
+    return new Promise((resolve, reject) => {
+      const transaction = this.db.transaction([storeName], 'readwrite')
+      const store = transaction.objectStore(storeName)
+      const request = store.add(data)
+
+      request.onsuccess = () => resolve(request.result)
+      request.onerror = () => reject(request.error)
+    })
+  }
+
+  async get(storeName, key) {
+    return new Promise((resolve, reject) => {
+      const transaction = this.db.transaction([storeName], 'readonly')
+      const store = transaction.objectStore(storeName)
+      const request = store.get(key)
+
+      request.onsuccess = () => resolve(request.result)
+      request.onerror = () => reject(request.error)
+    })
+  }
+
+  async getAll(storeName) {
+    return new Promise((resolve, reject) => {
+      const transaction = this.db.transaction([storeName], 'readonly')
+      const store = transaction.objectStore(storeName)
+      const request = store.getAll()
+
+      request.onsuccess = () => resolve(request.result)
+      request.onerror = () => reject(request.error)
+    })
+  }
+
+  async put(storeName, data) {
+    return new Promise((resolve, reject) => {
+      const transaction = this.db.transaction([storeName], 'readwrite')
+      const store = transaction.objectStore(storeName)
+      const request = store.put(data)
+
+      request.onsuccess = () => resolve(request.result)
+      request.onerror = () => reject(request.error)
+    })
+  }
+
+  async delete(storeName, key) {
+    return new Promise((resolve, reject) => {
+      const transaction = this.db.transaction([storeName], 'readwrite')
+      const store = transaction.objectStore(storeName)
+      const request = store.delete(key)
+
+      request.onsuccess = () => resolve()
+      request.onerror = () => reject(request.error)
+    })
+  }
+}
+
+// 使用
+const db = new IDBHelper('MyApp', 1)
+
+await db.open((database) => {
+  database.createObjectStore('todos', { keyPath: 'id', autoIncrement: true })
+})
+
+await db.add('todos', { title: '学习 IndexedDB', completed: false })
+const todos = await db.getAll('todos')
+console.log(todos)
+```
+
+## Cache API
+
+Cache API 主要用于缓存网络请求，是 Service Worker 的核心能力。
+
+### 基础用法
+
+```javascript
+// 打开缓存
+const cache = await caches.open('my-cache-v1')
+
+// 缓存请求
+await cache.add('/api/data') // 发起请求并缓存
+await cache.addAll(['/style.css', '/app.js', '/logo.png'])
+
+// 手动存入
+await cache.put('/api/user', new Response(JSON.stringify({ name: '张三' })))
+
+// 读取缓存
+const response = await cache.match('/api/data')
+if (response) {
+  const data = await response.json()
+  console.log(data)
+}
+
+// 删除缓存
+await cache.delete('/api/data')
+
+// 列出所有缓存的请求
+const keys = await cache.keys()
+console.log(keys)
+```
+
+### 缓存策略
+
+```javascript
+// 缓存优先（适合静态资源）
+async function cacheFirst(request) {
+  const cached = await caches.match(request)
+  if (cached) return cached
+
+  const response = await fetch(request)
+  const cache = await caches.open('static-v1')
+  cache.put(request, response.clone())
+  return response
+}
+
+// 网络优先（适合 API 数据）
+async function networkFirst(request) {
+  try {
+    const response = await fetch(request)
+    const cache = await caches.open('api-v1')
+    cache.put(request, response.clone())
+    return response
+  } catch (error) {
+    return caches.match(request)
+  }
+}
+
+// 仅缓存
+async function cacheOnly(request) {
+  return caches.match(request)
+}
+
+// 仅网络
+async function networkOnly(request) {
+  return fetch(request)
+}
+```
+
+### 管理缓存版本
+
+```javascript
+const CACHE_NAME = 'my-cache-v2'
+
+// 删除旧版本缓存
+async function cleanOldCaches() {
+  const keys = await caches.keys()
+  const oldCaches = keys.filter((key) => key !== CACHE_NAME)
+
+  await Promise.all(oldCaches.map((key) => caches.delete(key)))
+}
+```
+
+## 🎯 实战：离线 Todo 应用
+
+综合运用 IndexedDB 实现一个可离线使用的 Todo 应用：
+
+```html
+<!doctype html>
+<html lang="zh-Hans">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>离线 Todo</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family: system-ui, sans-serif;
+        padding: 2rem;
+        max-width: 500px;
+        margin: 0 auto;
+      }
+      h1 {
+        margin-bottom: 1.5rem;
+      }
+      .input-group {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 1.5rem;
+      }
+      input[type='text'] {
+        flex: 1;
+        padding: 0.75rem;
+        border: 2px solid #e2e8f0;
+        border-radius: 0.5rem;
+      }
+      button {
+        padding: 0.75rem 1.5rem;
+        background: #3b82f6;
+        color: white;
+        border: none;
+        border-radius: 0.5rem;
+        cursor: pointer;
+      }
+      button:hover {
+        background: #2563eb;
+      }
+      .todo-list {
+        list-style: none;
+      }
+      .todo-item {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 1rem;
+        border-bottom: 1px solid #e2e8f0;
+      }
+      .todo-item.completed span {
+        text-decoration: line-through;
+        color: #94a3b8;
+      }
+      .todo-item span {
+        flex: 1;
+      }
+      .todo-item input[type='checkbox'] {
+        width: 1.25rem;
+        height: 1.25rem;
+      }
+      .delete-btn {
+        background: #ef4444;
+        padding: 0.5rem 1rem;
+      }
+      .status {
+        margin-top: 1rem;
+        padding: 0.75rem;
+        border-radius: 0.5rem;
+        font-size: 0.875rem;
+      }
+      .online {
+        background: #dcfce7;
+        color: #166534;
+      }
+      .offline {
+        background: #fef3c7;
+        color: #92400e;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>📝 离线 Todo</h1>
+
+    <div class="input-group">
+      <input type="text" id="todoInput" placeholder="添加新任务..." />
+      <button onclick="addTodo()">添加</button>
+    </div>
+
+    <ul class="todo-list" id="todoList"></ul>
+
+    <div class="status" id="status"></div>
+
+    <script>
+      let db
+
+      // 初始化数据库
+      async function initDB() {
+        return new Promise((resolve, reject) => {
+          const request = indexedDB.open('TodoApp', 1)
+
+          request.onerror = () => reject(request.error)
+
+          request.onsuccess = () => {
+            db = request.result
+            resolve(db)
+          }
+
+          request.onupgradeneeded = (event) => {
+            const database = event.target.result
+            if (!database.objectStoreNames.contains('todos')) {
+              const store = database.createObjectStore('todos', {
+                keyPath: 'id',
+                autoIncrement: true,
+              })
+              store.createIndex('createdAt', 'createdAt')
+            }
+          }
+        })
+      }
+
+      // 添加 Todo
+      async function addTodo() {
+        const input = document.getElementById('todoInput')
+        const text = input.value.trim()
+        if (!text) return
+
+        const todo = {
+          text,
+          completed: false,
+          createdAt: Date.now(),
+        }
+
+        await new Promise((resolve, reject) => {
+          const transaction = db.transaction(['todos'], 'readwrite')
+          const store = transaction.objectStore('todos')
+          const request = store.add(todo)
+          request.onsuccess = () => resolve(request.result)
+          request.onerror = () => reject(request.error)
+        })
+
+        input.value = ''
+        renderTodos()
+      }
+
+      // 切换完成状态
+      async function toggleTodo(id) {
+        const transaction = db.transaction(['todos'], 'readwrite')
+        const store = transaction.objectStore('todos')
+
+        const todo = await new Promise((resolve) => {
+          store.get(id).onsuccess = (e) => resolve(e.target.result)
+        })
+
+        todo.completed = !todo.completed
+
+        await new Promise((resolve) => {
+          store.put(todo).onsuccess = () => resolve()
+        })
+
+        renderTodos()
+      }
+
+      // 删除 Todo
+      async function deleteTodo(id) {
+        await new Promise((resolve, reject) => {
+          const transaction = db.transaction(['todos'], 'readwrite')
+          const store = transaction.objectStore('todos')
+          const request = store.delete(id)
+          request.onsuccess = () => resolve()
+          request.onerror = () => reject(request.error)
+        })
+
+        renderTodos()
+      }
+
+      // 获取所有 Todo
+      async function getAllTodos() {
+        return new Promise((resolve, reject) => {
+          const transaction = db.transaction(['todos'], 'readonly')
+          const store = transaction.objectStore('todos')
+          const request = store.getAll()
+          request.onsuccess = () => resolve(request.result)
+          request.onerror = () => reject(request.error)
+        })
+      }
+
+      // 渲染列表
+      async function renderTodos() {
+        const todos = await getAllTodos()
+        const list = document.getElementById('todoList')
+
+        // 按创建时间倒序
+        todos.sort((a, b) => b.createdAt - a.createdAt)
+
+        list.innerHTML = todos
+          .map(
+            (todo) => `
+        <li class="todo-item ${todo.completed ? 'completed' : ''}">
+          <input
+            type="checkbox"
+            ${todo.completed ? 'checked' : ''}
+            onchange="toggleTodo(${todo.id})"
+          />
+          <span>${escapeHtml(todo.text)}</span>
+          <button class="delete-btn" onclick="deleteTodo(${todo.id})">删除</button>
+        </li>
+      `
+          )
+          .join('')
+      }
+
+      // 转义 HTML
+      function escapeHtml(text) {
+        const div = document.createElement('div')
+        div.textContent = text
+        return div.innerHTML
+      }
+
+      // 更新网络状态
+      function updateNetworkStatus() {
+        const status = document.getElementById('status')
+        if (navigator.onLine) {
+          status.textContent = '🟢 在线 - 数据已保存到本地'
+          status.className = 'status online'
+        } else {
+          status.textContent = '🟡 离线 - 数据仅保存在本地'
+          status.className = 'status offline'
+        }
+      }
+
+      // 监听键盘事件
+      document.getElementById('todoInput').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') addTodo()
+      })
+
+      // 监听网络状态
+      window.addEventListener('online', updateNetworkStatus)
+      window.addEventListener('offline', updateNetworkStatus)
+
+      // 初始化
+      initDB().then(() => {
+        renderTodos()
+        updateNetworkStatus()
+      })
+    </script>
+  </body>
+</html>
+```
+
+## 存储方案选型
+
+🙋 如何选择存储方案？
+
+```
+需要存储什么？
+│
+├─ 少量简单数据（<1MB）
+│  ├─ 需要持久化 → localStorage
+│  └─ 仅当前会话 → sessionStorage
+│
+├─ 大量结构化数据
+│  └─ IndexedDB
+│
+├─ 网络请求缓存
+│  └─ Cache API
+│
+└─ 需要服务端读取
+   └─ Cookie（但考虑 HttpOnly）
+```
+
+## 常见问题
+
+### 🤔 localStorage 被禁用怎么办？
+
+某些隐私模式或设置会禁用 localStorage：
+
+```javascript
+function isStorageAvailable() {
+  try {
+    const test = '__storage_test__'
+    localStorage.setItem(test, test)
+    localStorage.removeItem(test)
+    return true
+  } catch (e) {
+    return false
+  }
+}
+
+if (!isStorageAvailable()) {
+  // 降级方案：使用内存存储
+  const memoryStorage = new Map()
+}
+```
+
+### 🤔 存储配额是多少？
+
+各浏览器不同，一般规则：
+
+- localStorage/sessionStorage：5-10MB
+- IndexedDB：通常是可用磁盘空间的 50%
+- 可通过 Storage API 查询：
+
+```javascript
+if (navigator.storage && navigator.storage.estimate) {
+  const { usage, quota } = await navigator.storage.estimate()
+  console.log(`已使用: ${(usage / 1024 / 1024).toFixed(2)} MB`)
+  console.log(`总配额: ${(quota / 1024 / 1024).toFixed(2)} MB`)
+}
+```
+
+### 🤔 数据会被清除吗？
+
+浏览器在存储压力大时可能清除数据。请求持久化存储：
+
+```javascript
+if (navigator.storage && navigator.storage.persist) {
+  const persistent = await navigator.storage.persist()
+  console.log(persistent ? '持久化存储已授权' : '可能被清除')
+}
+```
+
+## 参考资料
+
+- [MDN: Web Storage API](https://developer.mozilla.org/zh-CN/docs/Web/API/Web_Storage_API)
+- [MDN: IndexedDB](https://developer.mozilla.org/zh-CN/docs/Web/API/IndexedDB_API)
+- [MDN: Cache API](https://developer.mozilla.org/zh-CN/docs/Web/API/Cache)
+- [web.dev: 存储概述](https://web.dev/storage-for-the-web/)

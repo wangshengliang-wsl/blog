@@ -1,0 +1,383 @@
+---
+title: App Router 概述
+description: 深入理解 Next.js App Router 与 Pages Router 的核心区别，掌握 App Router 的设计理念与迁移策略
+pubDate: 2025-12-03
+toc: true
+ogImage: true
+category: Next
+tags: ['Next.js', 'App Router', 'Pages Router', '路由']
+---
+
+🙋 Next.js 有两套路由系统：App Router 和 Pages Router。新项目该选哪个？老项目要不要迁移？
+
+## 两种路由器的定位
+
+Next.js 目前同时支持两种路由系统：
+
+| 特性         | App Router         | Pages Router               |
+| ------------ | ------------------ | -------------------------- |
+| 引入版本     | Next.js 13         | Next.js 1.0                |
+| 目录         | `app/`             | `pages/`                   |
+| 组件默认类型 | Server Components  | Client Components          |
+| 数据获取     | async 组件 / fetch | getServerSideProps 等      |
+| 布局         | 嵌套 layout.tsx    | \_app.tsx / \_document.tsx |
+| 状态         | 稳定（推荐）       | 持续维护                   |
+
+🎯 **结论**：新项目使用 App Router，老项目可以渐进式迁移。
+
+## App Router 核心优势
+
+### 1. React Server Components
+
+App Router 构建在 React Server Components（RSC）之上。组件默认在服务端执行，只有必要时才发送到客户端。
+
+```tsx
+// app/users/page.tsx - Server Component（默认）
+// Next.js 15.x
+
+// 直接在组件中 await 数据
+async function getUsers() {
+  const res = await fetch('https://api.example.com/users')
+  return res.json()
+}
+
+export default async function UsersPage() {
+  const users = await getUsers()
+
+  return (
+    <ul>
+      {users.map((user: { id: number; name: string }) => (
+        <li key={user.id}>{user.name}</li>
+      ))}
+    </ul>
+  )
+}
+```
+
+✅ **优势**：
+
+- 减少客户端 JavaScript 体积
+- 可以直接访问后端资源（数据库、文件系统）
+- 更快的首屏渲染
+
+### 2. 嵌套布局
+
+App Router 支持真正的嵌套布局，父布局不会因为子路由变化而重新渲染。
+
+```
+app/
+├── layout.tsx          # 根布局（应用到所有页面）
+├── page.tsx            # 首页
+└── dashboard/
+    ├── layout.tsx      # Dashboard 布局（嵌套）
+    ├── page.tsx        # /dashboard
+    └── settings/
+        └── page.tsx    # /dashboard/settings
+```
+
+```tsx
+// app/layout.tsx - 根布局
+// Next.js 15.x
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="zh-CN">
+      <body>
+        <header>全站导航</header>
+        <main>{children}</main>
+        <footer>全站页脚</footer>
+      </body>
+    </html>
+  )
+}
+```
+
+```tsx
+// app/dashboard/layout.tsx - 嵌套布局
+// Next.js 15.x
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <div className="flex">
+      <aside>侧边栏导航</aside>
+      <section className="flex-1">{children}</section>
+    </div>
+  )
+}
+```
+
+访问 `/dashboard/settings` 时，两个布局会嵌套渲染。导航时，根布局保持不变，只有内容区域更新。
+
+### 3. 内置加载与错误状态
+
+App Router 通过特殊文件约定，自动处理加载和错误状态：
+
+```
+app/
+└── dashboard/
+    ├── layout.tsx
+    ├── page.tsx
+    ├── loading.tsx     # 加载状态
+    ├── error.tsx       # 错误边界
+    └── not-found.tsx   # 404 页面
+```
+
+```tsx
+// app/dashboard/loading.tsx
+// Next.js 15.x
+export default function Loading() {
+  return (
+    <div className="animate-pulse">
+      <div className="h-4 bg-gray-200 rounded w-3/4 mb-4"></div>
+      <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+    </div>
+  )
+}
+```
+
+```tsx
+// app/dashboard/error.tsx
+// Next.js 15.x
+'use client' // 错误边界必须是 Client Component
+
+export default function Error({
+  error,
+  reset,
+}: {
+  error: Error & { digest?: string }
+  reset: () => void
+}) {
+  return (
+    <div>
+      <h2>出错了！</h2>
+      <p>{error.message}</p>
+      <button onClick={() => reset()}>重试</button>
+    </div>
+  )
+}
+```
+
+## Pages Router 回顾
+
+Pages Router 是 Next.js 的原始路由系统，采用不同的约定：
+
+```
+pages/
+├── _app.tsx           # 全局布局
+├── _document.tsx      # HTML 文档结构
+├── index.tsx          # 首页 /
+├── about.tsx          # /about
+└── users/
+    ├── index.tsx      # /users
+    └── [id].tsx       # /users/:id
+```
+
+数据获取使用专门的函数：
+
+```tsx
+// pages/users/index.tsx - Pages Router
+// Next.js 15.x (Pages Router)
+import type { GetServerSideProps } from 'next'
+
+interface User {
+  id: number
+  name: string
+}
+
+interface Props {
+  users: User[]
+}
+
+export const getServerSideProps: GetServerSideProps<Props> = async () => {
+  const res = await fetch('https://api.example.com/users')
+  const users = await res.json()
+
+  return { props: { users } }
+}
+
+export default function UsersPage({ users }: Props) {
+  return (
+    <ul>
+      {users.map((user) => (
+        <li key={user.id}>{user.name}</li>
+      ))}
+    </ul>
+  )
+}
+```
+
+🔶 **局限性**：
+
+- 布局能力有限，\_app.tsx 是唯一的顶层布局
+- 数据获取只能在页面级别，不能在组件中
+- 所有组件默认是客户端组件
+
+## 功能对比
+
+### 数据获取
+
+| Pages Router         | App Router             | 说明             |
+| -------------------- | ---------------------- | ---------------- |
+| `getStaticProps`     | 带缓存的 fetch         | 构建时获取       |
+| `getServerSideProps` | 无缓存的 fetch         | 请求时获取       |
+| `getStaticPaths`     | `generateStaticParams` | 动态路由静态生成 |
+| `getInitialProps`    | 不推荐使用             | 已废弃           |
+
+```tsx
+// App Router 方式
+// Next.js 15.x
+
+// 等同于 getStaticProps（构建时缓存）
+async function getData() {
+  const res = await fetch('https://api.example.com/data', {
+    cache: 'force-cache', // 默认行为
+  })
+  return res.json()
+}
+
+// 等同于 getServerSideProps（每次请求）
+async function getFreshData() {
+  const res = await fetch('https://api.example.com/data', {
+    cache: 'no-store',
+  })
+  return res.json()
+}
+
+// ISR（增量静态再生成）
+async function getRevalidatedData() {
+  const res = await fetch('https://api.example.com/data', {
+    next: { revalidate: 60 }, // 60 秒后重新验证
+  })
+  return res.json()
+}
+```
+
+### 路由钩子
+
+```tsx
+// Pages Router
+import { useRouter } from 'next/router'
+
+function Component() {
+  const router = useRouter()
+  const { pathname, query } = router
+
+  return (
+    <p>
+      Path: {pathname}, ID: {query.id}
+    </p>
+  )
+}
+```
+
+```tsx
+// App Router
+// Next.js 15.x
+'use client'
+
+import { useRouter, usePathname, useSearchParams } from 'next/navigation'
+
+function Component() {
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+
+  return (
+    <p>
+      Path: {pathname}, Query: {searchParams.get('q')}
+    </p>
+  )
+}
+```
+
+🔶 **注意**：App Router 的 `useRouter` 来自 `next/navigation`，而不是 `next/router`。
+
+## 迁移策略
+
+### 渐进式迁移
+
+App Router 和 Pages Router 可以共存，支持逐页迁移：
+
+```
+src/
+├── app/                    # App Router（新页面）
+│   ├── layout.tsx
+│   └── dashboard/
+│       └── page.tsx        # /dashboard
+└── pages/                  # Pages Router（旧页面）
+    ├── _app.tsx
+    └── users/
+        └── index.tsx       # /users
+```
+
+🎯 **迁移步骤**：
+
+1. **保持 pages 目录运行**：现有功能不受影响
+2. **新功能使用 app 目录**：新页面直接用 App Router
+3. **逐步迁移旧页面**：按优先级迁移
+4. **共享组件兼容处理**：使用 `next/compat/router`
+
+### 共享组件兼容
+
+如果有组件需要同时在两种路由器中使用：
+
+```tsx
+// components/SharedComponent.tsx
+// Next.js 15.x
+'use client'
+
+import { useRouter } from 'next/compat/router'
+
+export default function SharedComponent() {
+  const router = useRouter()
+
+  // 兼容两种路由器
+  const handleClick = () => {
+    router?.push('/new-page')
+  }
+
+  return <button onClick={handleClick}>导航</button>
+}
+```
+
+### 迁移检查清单
+
+迁移一个页面时，需要处理：
+
+- [ ] 将 `getServerSideProps` / `getStaticProps` 改为 async 组件
+- [ ] 将 `useRouter` 从 `next/router` 改为 `next/navigation`
+- [ ] 添加 `"use client"` 指令到需要交互的组件
+- [ ] 创建对应的 `layout.tsx`（如果需要布局）
+- [ ] 处理 `loading.tsx` 和 `error.tsx`
+
+## 选择建议
+
+🎯 **使用 App Router**：
+
+- 新项目
+- 需要嵌套布局
+- 希望利用 Server Components 减少 JS 体积
+- 团队愿意学习新概念
+
+🔶 **继续使用 Pages Router**：
+
+- 大型遗留项目，迁移成本高
+- 依赖大量 Pages Router 特定的库
+- 团队对新模式不熟悉，时间紧迫
+
+🤔 **渐进式迁移**：
+
+- 中型项目，可以逐步过渡
+- 新功能用 App Router，旧功能保持不变
+
+---
+
+下一篇将动手创建第一个页面，深入理解 `page.tsx` 和 `layout.tsx` 的协作关系。
+
+-EOF-

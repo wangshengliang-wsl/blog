@@ -1,0 +1,625 @@
+---
+title: 测试策略
+description: 掌握 Next.js 应用的测试方法，使用 Vitest 和 Playwright 进行单元测试与端到端测试
+pubDate: 2025-12-03
+toc: true
+ogImage: true
+category: Next
+tags: ['Next.js', '测试', 'Vitest', 'Playwright', 'Testing Library']
+---
+
+🙋 如何确保代码质量？测试是开发流程中不可或缺的一环。
+
+## 测试类型
+
+| 类型     | 范围       | 速度 | 工具                     |
+| -------- | ---------- | ---- | ------------------------ |
+| 单元测试 | 函数/组件  | 快   | Vitest                   |
+| 集成测试 | 多组件交互 | 中   | Vitest + Testing Library |
+| E2E 测试 | 完整流程   | 慢   | Playwright               |
+
+## Vitest 配置
+
+### 安装
+
+```bash
+pnpm add -D vitest @vitejs/plugin-react jsdom @testing-library/react @testing-library/jest-dom
+```
+
+### 配置文件
+
+```tsx
+// vitest.config.ts
+import { defineConfig } from 'vitest/config'
+import react from '@vitejs/plugin-react'
+import { resolve } from 'path'
+
+export default defineConfig({
+  plugins: [react()],
+  test: {
+    environment: 'jsdom',
+    setupFiles: ['./vitest.setup.ts'],
+    include: ['**/*.test.{ts,tsx}'],
+    globals: true,
+  },
+  resolve: {
+    alias: {
+      '@': resolve(__dirname, './src'),
+    },
+  },
+})
+```
+
+### 设置文件
+
+```tsx
+// vitest.setup.ts
+import '@testing-library/jest-dom/vitest'
+import { cleanup } from '@testing-library/react'
+import { afterEach, vi } from 'vitest'
+
+// 每个测试后清理
+afterEach(() => {
+  cleanup()
+})
+
+// Mock next/navigation
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({
+    push: vi.fn(),
+    replace: vi.fn(),
+    prefetch: vi.fn(),
+    back: vi.fn(),
+  }),
+  usePathname: () => '/',
+  useSearchParams: () => new URLSearchParams(),
+}))
+
+// Mock next/image
+vi.mock('next/image', () => ({
+  default: ({ src, alt, ...props }: any) => (
+    <img src={src} alt={alt} {...props} />
+  ),
+}))
+```
+
+### package.json 脚本
+
+```json
+{
+  "scripts": {
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:coverage": "vitest run --coverage"
+  }
+}
+```
+
+## 单元测试
+
+### 测试工具函数
+
+```tsx
+// lib/utils.ts
+export function formatPrice(price: number): string {
+  return `¥${price.toFixed(2)}`
+}
+
+export function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/[^\w-]+/g, '')
+}
+```
+
+```tsx
+// lib/utils.test.ts
+import { describe, it, expect } from 'vitest'
+import { formatPrice, slugify } from './utils'
+
+describe('formatPrice', () => {
+  it('formats integer prices', () => {
+    expect(formatPrice(100)).toBe('¥100.00')
+  })
+
+  it('formats decimal prices', () => {
+    expect(formatPrice(99.9)).toBe('¥99.90')
+  })
+
+  it('handles zero', () => {
+    expect(formatPrice(0)).toBe('¥0.00')
+  })
+})
+
+describe('slugify', () => {
+  it('converts spaces to hyphens', () => {
+    expect(slugify('Hello World')).toBe('hello-world')
+  })
+
+  it('removes special characters', () => {
+    expect(slugify('Hello, World!')).toBe('hello-world')
+  })
+
+  it('handles multiple spaces', () => {
+    expect(slugify('hello   world')).toBe('hello-world')
+  })
+})
+```
+
+### 测试 Server Actions
+
+```tsx
+// app/actions.ts
+'use server'
+
+import { z } from 'zod'
+
+const schema = z.object({
+  email: z.string().email(),
+  name: z.string().min(2),
+})
+
+export async function createUser(formData: FormData) {
+  const data = {
+    email: formData.get('email'),
+    name: formData.get('name'),
+  }
+
+  const result = schema.safeParse(data)
+
+  if (!result.success) {
+    return { error: result.error.flatten().fieldErrors }
+  }
+
+  // 创建用户...
+  return { success: true }
+}
+```
+
+```tsx
+// app/actions.test.ts
+import { describe, it, expect, vi } from 'vitest'
+import { createUser } from './actions'
+
+describe('createUser', () => {
+  it('validates email format', async () => {
+    const formData = new FormData()
+    formData.set('email', 'invalid-email')
+    formData.set('name', 'John')
+
+    const result = await createUser(formData)
+
+    expect(result.error?.email).toBeDefined()
+  })
+
+  it('validates name length', async () => {
+    const formData = new FormData()
+    formData.set('email', 'test@example.com')
+    formData.set('name', 'J')
+
+    const result = await createUser(formData)
+
+    expect(result.error?.name).toBeDefined()
+  })
+
+  it('succeeds with valid data', async () => {
+    const formData = new FormData()
+    formData.set('email', 'test@example.com')
+    formData.set('name', 'John Doe')
+
+    const result = await createUser(formData)
+
+    expect(result.success).toBe(true)
+  })
+})
+```
+
+## 组件测试
+
+### 基础组件测试
+
+```tsx
+// components/Button.tsx
+interface ButtonProps {
+  children: React.ReactNode
+  onClick?: () => void
+  disabled?: boolean
+  loading?: boolean
+}
+
+export function Button({ children, onClick, disabled, loading }: ButtonProps) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled || loading}
+      className="px-4 py-2 bg-blue-600 text-white rounded disabled:opacity-50"
+    >
+      {loading ? '加载中...' : children}
+    </button>
+  )
+}
+```
+
+```tsx
+// components/Button.test.tsx
+import { describe, it, expect, vi } from 'vitest'
+import { render, screen, fireEvent } from '@testing-library/react'
+import { Button } from './Button'
+
+describe('Button', () => {
+  it('renders children', () => {
+    render(<Button>Click me</Button>)
+    expect(screen.getByText('Click me')).toBeInTheDocument()
+  })
+
+  it('calls onClick when clicked', () => {
+    const handleClick = vi.fn()
+    render(<Button onClick={handleClick}>Click me</Button>)
+
+    fireEvent.click(screen.getByRole('button'))
+    expect(handleClick).toHaveBeenCalledTimes(1)
+  })
+
+  it('is disabled when disabled prop is true', () => {
+    render(<Button disabled>Click me</Button>)
+    expect(screen.getByRole('button')).toBeDisabled()
+  })
+
+  it('shows loading text when loading', () => {
+    render(<Button loading>Click me</Button>)
+    expect(screen.getByText('加载中...')).toBeInTheDocument()
+  })
+})
+```
+
+### 测试表单组件
+
+```tsx
+// components/LoginForm.test.tsx
+import { describe, it, expect, vi } from 'vitest'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { LoginForm } from './LoginForm'
+
+describe('LoginForm', () => {
+  it('renders email and password inputs', () => {
+    render(<LoginForm />)
+
+    expect(screen.getByLabelText(/邮箱/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/密码/i)).toBeInTheDocument()
+  })
+
+  it('submits form with valid data', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    render(<LoginForm onSubmit={onSubmit} />)
+
+    await user.type(screen.getByLabelText(/邮箱/i), 'test@example.com')
+    await user.type(screen.getByLabelText(/密码/i), 'password123')
+    await user.click(screen.getByRole('button', { name: /登录/i }))
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith({
+        email: 'test@example.com',
+        password: 'password123',
+      })
+    })
+  })
+
+  it('shows validation errors', async () => {
+    const user = userEvent.setup()
+    render(<LoginForm />)
+
+    await user.click(screen.getByRole('button', { name: /登录/i }))
+
+    await waitFor(() => {
+      expect(screen.getByText(/请输入邮箱/i)).toBeInTheDocument()
+    })
+  })
+})
+```
+
+### 测试异步组件
+
+```tsx
+// components/UserProfile.test.tsx
+import { describe, it, expect, vi } from 'vitest'
+import { render, screen, waitFor } from '@testing-library/react'
+import { UserProfile } from './UserProfile'
+
+// Mock fetch
+global.fetch = vi.fn()
+
+describe('UserProfile', () => {
+  it('shows loading state initially', () => {
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ name: 'John', email: 'john@example.com' }),
+    } as Response)
+
+    render(<UserProfile userId="1" />)
+    expect(screen.getByText(/加载中/i)).toBeInTheDocument()
+  })
+
+  it('displays user data after loading', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ name: 'John', email: 'john@example.com' }),
+    } as Response)
+
+    render(<UserProfile userId="1" />)
+
+    await waitFor(() => {
+      expect(screen.getByText('John')).toBeInTheDocument()
+      expect(screen.getByText('john@example.com')).toBeInTheDocument()
+    })
+  })
+
+  it('shows error message on fetch failure', async () => {
+    vi.mocked(fetch).mockRejectedValueOnce(new Error('Network error'))
+
+    render(<UserProfile userId="1" />)
+
+    await waitFor(() => {
+      expect(screen.getByText(/加载失败/i)).toBeInTheDocument()
+    })
+  })
+})
+```
+
+## Playwright E2E 测试
+
+### 安装
+
+```bash
+pnpm add -D @playwright/test
+npx playwright install
+```
+
+### 配置
+
+```tsx
+// playwright.config.ts
+import { defineConfig, devices } from '@playwright/test'
+
+export default defineConfig({
+  testDir: './e2e',
+  fullyParallel: true,
+  forbidOnly: !!process.env.CI,
+  retries: process.env.CI ? 2 : 0,
+  workers: process.env.CI ? 1 : undefined,
+  reporter: 'html',
+  use: {
+    baseURL: 'http://localhost:3000',
+    trace: 'on-first-retry',
+  },
+  projects: [
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
+    { name: 'webkit', use: { ...devices['Desktop Safari'] } },
+  ],
+  webServer: {
+    command: 'pnpm dev',
+    url: 'http://localhost:3000',
+    reuseExistingServer: !process.env.CI,
+  },
+})
+```
+
+### 编写 E2E 测试
+
+```tsx
+// e2e/auth.spec.ts
+import { test, expect } from '@playwright/test'
+
+test.describe('Authentication', () => {
+  test('can login with valid credentials', async ({ page }) => {
+    await page.goto('/login')
+
+    await page.fill('input[name="email"]', 'test@example.com')
+    await page.fill('input[name="password"]', 'password123')
+    await page.click('button[type="submit"]')
+
+    await expect(page).toHaveURL('/dashboard')
+    await expect(page.locator('text=欢迎')).toBeVisible()
+  })
+
+  test('shows error with invalid credentials', async ({ page }) => {
+    await page.goto('/login')
+
+    await page.fill('input[name="email"]', 'wrong@example.com')
+    await page.fill('input[name="password"]', 'wrongpassword')
+    await page.click('button[type="submit"]')
+
+    await expect(page.locator('text=邮箱或密码错误')).toBeVisible()
+  })
+
+  test('redirects to login when accessing protected route', async ({
+    page,
+  }) => {
+    await page.goto('/dashboard')
+    await expect(page).toHaveURL('/login')
+  })
+})
+```
+
+### 测试用户流程
+
+```tsx
+// e2e/checkout.spec.ts
+import { test, expect } from '@playwright/test'
+
+test.describe('Checkout Flow', () => {
+  test.beforeEach(async ({ page }) => {
+    // 登录
+    await page.goto('/login')
+    await page.fill('input[name="email"]', 'test@example.com')
+    await page.fill('input[name="password"]', 'password123')
+    await page.click('button[type="submit"]')
+    await page.waitForURL('/dashboard')
+  })
+
+  test('complete purchase flow', async ({ page }) => {
+    // 浏览商品
+    await page.goto('/products')
+    await page.click('text=商品 A')
+
+    // 添加到购物车
+    await page.click('text=加入购物车')
+    await expect(page.locator('.cart-count')).toHaveText('1')
+
+    // 进入购物车
+    await page.click('text=购物车')
+    await expect(page).toHaveURL('/cart')
+
+    // 结账
+    await page.click('text=结账')
+    await page.fill('input[name="address"]', '北京市朝阳区xxx')
+    await page.click('text=提交订单')
+
+    // 验证订单成功
+    await expect(page.locator('text=订单提交成功')).toBeVisible()
+  })
+})
+```
+
+## API 路由测试
+
+```tsx
+// app/api/users/route.test.ts
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { GET, POST } from './route'
+import { NextRequest } from 'next/server'
+
+// Mock 数据库
+vi.mock('@/lib/db', () => ({
+  db: {
+    user: {
+      findMany: vi.fn(),
+      create: vi.fn(),
+    },
+  },
+}))
+
+import { db } from '@/lib/db'
+
+describe('Users API', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  describe('GET /api/users', () => {
+    it('returns users list', async () => {
+      const mockUsers = [
+        { id: '1', name: 'John', email: 'john@example.com' },
+        { id: '2', name: 'Jane', email: 'jane@example.com' },
+      ]
+
+      vi.mocked(db.user.findMany).mockResolvedValue(mockUsers)
+
+      const response = await GET()
+      const data = await response.json()
+
+      expect(data).toEqual(mockUsers)
+      expect(response.status).toBe(200)
+    })
+  })
+
+  describe('POST /api/users', () => {
+    it('creates a new user', async () => {
+      const newUser = { id: '1', name: 'John', email: 'john@example.com' }
+      vi.mocked(db.user.create).mockResolvedValue(newUser)
+
+      const request = new NextRequest('http://localhost/api/users', {
+        method: 'POST',
+        body: JSON.stringify({ name: 'John', email: 'john@example.com' }),
+      })
+
+      const response = await POST(request)
+      const data = await response.json()
+
+      expect(data).toEqual(newUser)
+      expect(response.status).toBe(201)
+    })
+
+    it('returns 400 for invalid data', async () => {
+      const request = new NextRequest('http://localhost/api/users', {
+        method: 'POST',
+        body: JSON.stringify({ name: '' }),
+      })
+
+      const response = await POST(request)
+      expect(response.status).toBe(400)
+    })
+  })
+})
+```
+
+## 测试最佳实践
+
+### 测试覆盖率
+
+```tsx
+// vitest.config.ts
+export default defineConfig({
+  test: {
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json', 'html'],
+      exclude: ['node_modules/', 'e2e/', '*.config.*'],
+    },
+  },
+})
+```
+
+### CI 集成
+
+```yaml
+# .github/workflows/test.yml
+name: Test
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - run: pnpm install
+      - run: pnpm test:run
+      - run: pnpm test:e2e
+```
+
+## 常见问题
+
+🤔 **Q: 测试中如何处理环境变量？**
+
+创建 `.env.test` 文件或在测试设置中 mock：
+
+```tsx
+// vitest.setup.ts
+process.env.DATABASE_URL = 'test-database-url'
+```
+
+🤔 **Q: 如何测试需要认证的页面？**
+
+在 E2E 测试中先执行登录，或使用 `storageState` 保存认证状态。
+
+🤔 **Q: 单元测试和 E2E 测试比例？**
+
+通常遵循测试金字塔：70% 单元测试，20% 集成测试，10% E2E 测试。
+
+---
+
+下一篇将介绍部署方案，学习如何将应用部署到生产环境。
+
+-EOF-

@@ -1,0 +1,425 @@
+---
+title: 路由组
+description: 使用 Next.js 路由组 (folder) 语法组织代码结构，实现多布局、权限分离与逻辑分组
+pubDate: 2025-12-03
+toc: true
+ogImage: true
+category: Next
+tags: ['Next.js', '路由组', '布局', '代码组织']
+---
+
+🙋 登录页面不想要侧边栏，后台页面需要侧边栏。如何让不同页面使用不同布局，而不影响 URL 结构？
+
+## 路由组语法
+
+使用圆括号 `(folderName)` 创建路由组：
+
+```
+app/
+├── (marketing)/
+│   ├── layout.tsx      # 营销页布局
+│   ├── page.tsx        # / (首页)
+│   ├── about/
+│   │   └── page.tsx    # /about
+│   └── pricing/
+│       └── page.tsx    # /pricing
+└── (dashboard)/
+    ├── layout.tsx      # 后台布局
+    ├── overview/
+    │   └── page.tsx    # /overview
+    └── settings/
+        └── page.tsx    # /settings
+```
+
+🎯 **关键**：`(marketing)` 和 `(dashboard)` 不会出现在 URL 中。
+
+## 多布局模式
+
+### 营销页布局（无侧边栏）
+
+```tsx
+// app/(marketing)/layout.tsx
+// Next.js 15.x
+import { Header } from '@/components/Header'
+import { Footer } from '@/components/Footer'
+
+export default function MarketingLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <div className="min-h-screen flex flex-col">
+      <Header />
+      <main className="flex-1">{children}</main>
+      <Footer />
+    </div>
+  )
+}
+```
+
+### 后台布局（有侧边栏）
+
+```tsx
+// app/(dashboard)/layout.tsx
+// Next.js 15.x
+import { Sidebar } from '@/components/Sidebar'
+import { TopNav } from '@/components/TopNav'
+
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <div className="min-h-screen flex">
+      <Sidebar className="w-64" />
+      <div className="flex-1">
+        <TopNav />
+        <main className="p-6">{children}</main>
+      </div>
+    </div>
+  )
+}
+```
+
+### 认证页布局（居中卡片）
+
+```tsx
+// app/(auth)/layout.tsx
+// Next.js 15.x
+
+export default function AuthLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-100">
+      <div className="w-full max-w-md p-8 bg-white rounded-lg shadow">
+        {children}
+      </div>
+    </div>
+  )
+}
+```
+
+完整结构：
+
+```
+app/
+├── layout.tsx           # 根布局（只有 html/body）
+├── (marketing)/
+│   ├── layout.tsx       # Header + Footer
+│   ├── page.tsx         # /
+│   ├── about/page.tsx   # /about
+│   └── pricing/page.tsx # /pricing
+├── (auth)/
+│   ├── layout.tsx       # 居中卡片
+│   ├── login/page.tsx   # /login
+│   └── register/page.tsx# /register
+└── (dashboard)/
+    ├── layout.tsx       # Sidebar + TopNav
+    ├── overview/page.tsx# /overview
+    └── settings/page.tsx# /settings
+```
+
+## 代码组织
+
+### 按功能分组
+
+```
+app/
+├── (shop)/
+│   ├── products/
+│   ├── cart/
+│   ├── checkout/
+│   └── _components/     # 商店专用组件
+│       ├── ProductCard.tsx
+│       └── CartItem.tsx
+├── (blog)/
+│   ├── posts/
+│   ├── categories/
+│   └── _components/     # 博客专用组件
+│       ├── PostCard.tsx
+│       └── Sidebar.tsx
+└── (account)/
+    ├── profile/
+    ├── orders/
+    └── _components/
+        └── AccountNav.tsx
+```
+
+### 按访问权限分组
+
+```
+app/
+├── (public)/            # 公开页面
+│   ├── page.tsx
+│   ├── about/
+│   └── contact/
+├── (protected)/         # 需要登录
+│   ├── layout.tsx       # 包含认证检查
+│   ├── dashboard/
+│   └── profile/
+└── (admin)/             # 管理员专属
+    ├── layout.tsx       # 包含权限检查
+    ├── users/
+    └── settings/
+```
+
+```tsx
+// app/(protected)/layout.tsx
+// Next.js 15.x
+import { redirect } from 'next/navigation'
+import { getSession } from '@/lib/auth'
+
+export default async function ProtectedLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  const session = await getSession()
+
+  if (!session) {
+    redirect('/login')
+  }
+
+  return <>{children}</>
+}
+```
+
+```tsx
+// app/(admin)/layout.tsx
+// Next.js 15.x
+import { redirect } from 'next/navigation'
+import { getSession } from '@/lib/auth'
+
+export default async function AdminLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  const session = await getSession()
+
+  if (!session) {
+    redirect('/login')
+  }
+
+  if (session.role !== 'admin') {
+    redirect('/unauthorized')
+  }
+
+  return (
+    <div className="flex">
+      <aside>管理员侧边栏</aside>
+      <main>{children}</main>
+    </div>
+  )
+}
+```
+
+## 多根布局
+
+每个路由组可以有自己的根布局，包含 `<html>` 和 `<body>`：
+
+```
+app/
+├── (marketing)/
+│   ├── layout.tsx       # 包含 <html><body>
+│   └── page.tsx
+└── (dashboard)/
+    ├── layout.tsx       # 包含 <html><body>
+    └── overview/page.tsx
+```
+
+```tsx
+// app/(marketing)/layout.tsx
+// Next.js 15.x
+
+export default function MarketingRootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="zh-CN">
+      <body className="bg-white">{children}</body>
+    </html>
+  )
+}
+```
+
+```tsx
+// app/(dashboard)/layout.tsx
+// Next.js 15.x
+
+export default function DashboardRootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="zh-CN">
+      <body className="bg-gray-100">{children}</body>
+    </html>
+  )
+}
+```
+
+🔶 **注意**：使用多根布局时，从 `(marketing)` 导航到 `(dashboard)` 会触发完整页面加载。
+
+## 处理根路径冲突
+
+如果多个路由组都想定义根路径 `/`：
+
+```
+app/
+├── (marketing)/
+│   └── page.tsx         # / ❓
+└── (dashboard)/
+    └── page.tsx         # / ❓ 冲突！
+```
+
+解决方案：
+
+```
+app/
+├── (marketing)/
+│   ├── page.tsx         # /
+│   └── about/page.tsx   # /about
+└── (dashboard)/
+    ├── overview/page.tsx # /overview（不是根路径）
+    └── settings/page.tsx # /settings
+```
+
+或使用重定向：
+
+```tsx
+// app/(dashboard)/page.tsx
+import { redirect } from 'next/navigation'
+
+export default function DashboardRoot() {
+  redirect('/overview')
+}
+```
+
+## 嵌套路由组
+
+路由组可以嵌套使用：
+
+```
+app/
+└── (dashboard)/
+    ├── layout.tsx            # 后台通用布局
+    ├── (overview)/
+    │   └── page.tsx          # /
+    └── (settings)/
+        ├── layout.tsx        # 设置专用布局
+        ├── general/page.tsx  # /general
+        └── security/page.tsx # /security
+```
+
+## 实战示例
+
+### SaaS 应用结构
+
+```
+app/
+├── layout.tsx                 # 根布局（字体、全局样式）
+│
+├── (marketing)/               # 营销页面
+│   ├── layout.tsx             # Header + Footer
+│   ├── page.tsx               # 首页 /
+│   ├── features/page.tsx      # /features
+│   ├── pricing/page.tsx       # /pricing
+│   └── blog/
+│       ├── page.tsx           # /blog
+│       └── [slug]/page.tsx    # /blog/:slug
+│
+├── (auth)/                    # 认证页面
+│   ├── layout.tsx             # 居中卡片布局
+│   ├── login/page.tsx         # /login
+│   ├── register/page.tsx      # /register
+│   └── forgot-password/page.tsx # /forgot-password
+│
+├── (app)/                     # 应用主体（需登录）
+│   ├── layout.tsx             # Sidebar + 认证检查
+│   ├── dashboard/page.tsx     # /dashboard
+│   ├── projects/
+│   │   ├── page.tsx           # /projects
+│   │   └── [id]/page.tsx      # /projects/:id
+│   └── settings/
+│       ├── layout.tsx         # 设置选项卡
+│       ├── page.tsx           # /settings
+│       └── billing/page.tsx   # /settings/billing
+│
+└── (admin)/                   # 管理后台
+    ├── layout.tsx             # 管理员布局 + 权限检查
+    ├── admin/page.tsx         # /admin
+    └── admin/users/page.tsx   # /admin/users
+```
+
+### 电商应用结构
+
+```
+app/
+├── (storefront)/              # 商城前台
+│   ├── layout.tsx
+│   ├── page.tsx               # /
+│   ├── products/
+│   ├── cart/
+│   └── checkout/
+│
+├── (account)/                 # 用户中心
+│   ├── layout.tsx
+│   ├── orders/
+│   └── profile/
+│
+└── (seller)/                  # 商家后台
+    ├── layout.tsx
+    ├── seller/dashboard/
+    └── seller/products/
+```
+
+## 常见问题
+
+🤔 **Q: 路由组会影响性能吗？**
+
+不会。路由组只是代码组织方式，不影响运行时性能。
+
+🤔 **Q: 可以在路由组内使用动态路由吗？**
+
+可以：
+
+```
+app/
+└── (blog)/
+    └── posts/
+        └── [slug]/
+            └── page.tsx  # /posts/:slug
+```
+
+🤔 **Q: 路由组名有什么限制？**
+
+- 必须用圆括号包裹
+- 不能包含特殊字符（如 `.`、`/`）
+- 建议使用小写字母和连字符
+
+🤔 **Q: 如何在路由组之间共享组件？**
+
+放在 `app` 外部或使用 `_components` 私有文件夹：
+
+```
+app/
+├── _components/         # 所有路由组共享
+│   └── Button.tsx
+├── (marketing)/
+└── (dashboard)/
+```
+
+---
+
+下一篇将介绍并行路由，学习如何使用 `@folder` 插槽同时渲染多个页面。
+
+-EOF-

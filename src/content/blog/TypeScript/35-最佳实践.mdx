@@ -1,0 +1,492 @@
+---
+title: 'TypeScript 最佳实践'
+description: 'TypeScript 最佳实践：类型设计原则、常见陷阱、性能优化、代码组织建议'
+pubDate: 2024-02-18
+toc: true
+ogImage: true
+category: 'TypeScript'
+tags: ['TypeScript', '最佳实践', '类型设计', '性能优化', '代码规范']
+---
+
+本篇总结 TypeScript 开发中的最佳实践，帮助你写出更安全、更易维护的代码。
+
+## 类型设计原则
+
+### 优先使用 interface
+
+```typescript
+// TypeScript 5.x
+
+// ✅ 推荐：对象类型使用 interface
+interface User {
+  id: number
+  name: string
+  email: string
+}
+
+// ✅ interface 可以扩展和合并
+interface User {
+  age?: number
+}
+
+// ✅ type 用于联合类型、映射类型等
+type Status = 'pending' | 'active' | 'inactive'
+type UserKeys = keyof User
+type PartialUser = Partial<User>
+
+// 🔶 避免：简单对象类型使用 type
+type UserType = {
+  id: number
+  name: string
+}
+```
+
+### 避免使用 any
+
+```typescript
+// ❌ 避免
+function processData(data: any) {
+  return data.value // 失去类型检查
+}
+
+// ✅ 使用 unknown + 类型守卫
+function processData(data: unknown) {
+  if (typeof data === 'object' && data !== null && 'value' in data) {
+    return (data as { value: string }).value
+  }
+  throw new Error('Invalid data')
+}
+
+// ✅ 使用泛型保持类型信息
+function processData<T extends { value: string }>(data: T): string {
+  return data.value
+}
+```
+
+### 使用字面量类型
+
+```typescript
+// ❌ 太宽泛
+function setStatus(status: string) {}
+
+// ✅ 精确的字面量类型
+type Status = 'pending' | 'processing' | 'completed' | 'failed'
+
+function setStatus(status: Status) {}
+
+// ✅ 使用 const 断言
+const config = {
+  endpoint: '/api',
+  method: 'GET',
+} as const
+// { readonly endpoint: "/api"; readonly method: "GET" }
+```
+
+### 类型收窄而非断言
+
+```typescript
+// ❌ 类型断言可能隐藏错误
+const value = data as string
+
+// ✅ 使用类型守卫
+function isString(value: unknown): value is string {
+  return typeof value === 'string'
+}
+
+if (isString(data)) {
+  console.log(data.toUpperCase())
+}
+
+// ✅ 使用可辨识联合
+type Result = { success: true; data: string } | { success: false; error: Error }
+
+function handleResult(result: Result) {
+  if (result.success) {
+    console.log(result.data)
+  } else {
+    console.error(result.error)
+  }
+}
+```
+
+## 函数设计
+
+### 返回类型注解
+
+```typescript
+// ❌ 依赖推断可能导致意外
+function getUser(id: number) {
+  // 返回类型可能随实现变化
+  return fetch(`/api/users/${id}`).then((r) => r.json())
+}
+
+// ✅ 显式声明返回类型
+interface User {
+  id: number
+  name: string
+}
+
+async function getUser(id: number): Promise<User> {
+  const response = await fetch(`/api/users/${id}`)
+  return response.json()
+}
+```
+
+### 函数重载要简洁
+
+```typescript
+// ❌ 过多重载难以维护
+function process(value: string): string
+function process(value: number): number
+function process(value: boolean): boolean
+function process(value: string | number | boolean) {
+  return value
+}
+
+// ✅ 使用泛型简化
+function process<T extends string | number | boolean>(value: T): T {
+  return value
+}
+
+// ✅ 必要时使用重载
+function createElement(tag: 'div'): HTMLDivElement
+function createElement(tag: 'span'): HTMLSpanElement
+function createElement(tag: string): HTMLElement {
+  return document.createElement(tag)
+}
+```
+
+### 参数对象模式
+
+```typescript
+// ❌ 参数过多
+function createUser(
+  name: string,
+  email: string,
+  age: number,
+  role: string,
+  active: boolean
+) {}
+
+// ✅ 使用参数对象
+interface CreateUserOptions {
+  name: string
+  email: string
+  age?: number
+  role?: string
+  active?: boolean
+}
+
+function createUser(options: CreateUserOptions) {
+  const { name, email, age = 0, role = 'user', active = true } = options
+}
+
+// 调用更清晰
+createUser({
+  name: '张三',
+  email: 'test@test.com',
+  role: 'admin',
+})
+```
+
+## 类型导出
+
+### 统一导出类型
+
+```typescript
+// types/index.ts
+export type { User, UserRole, CreateUserInput } from './user'
+export type { Product, ProductCategory } from './product'
+export type { Order, OrderStatus } from './order'
+
+// 使用
+import type { User, Product, Order } from '@/types'
+```
+
+### 类型与实现分离
+
+```typescript
+// types/api.ts
+export interface ApiResponse<T> {
+  code: number
+  message: string
+  data: T
+}
+
+export interface PaginatedResponse<T> extends ApiResponse<T[]> {
+  total: number
+  page: number
+  pageSize: number
+}
+
+// services/api.ts
+import type { ApiResponse, PaginatedResponse } from '@/types/api'
+
+export async function fetchUser(id: number): Promise<ApiResponse<User>> {
+  // 实现
+}
+```
+
+## 常见陷阱
+
+### 对象字面量多余属性
+
+```typescript
+interface User {
+  name: string
+  email: string
+}
+
+// ✅ 直接赋值会检查多余属性
+const user: User = {
+  name: '张三',
+  email: 'test@test.com',
+  // age: 25  // ❌ 错误：多余属性
+}
+
+// 🔶 通过变量赋值不检查
+const data = { name: '张三', email: 'test@test.com', age: 25 }
+const user2: User = data // ✅ 不报错，但丢失了 age 类型信息
+
+// ✅ 使用精确类型
+type ExactUser = {
+  [K in keyof User]: User[K]
+} & { [K: string]: never }
+```
+
+### 可选属性与 undefined
+
+```typescript
+interface Config {
+  timeout?: number
+}
+
+// 🔶 可选属性可能是 undefined
+function getTimeout(config: Config) {
+  // config.timeout 类型是 number | undefined
+  return config.timeout.toFixed(2) // ❌ 可能报错
+}
+
+// ✅ 正确处理
+function getTimeout(config: Config) {
+  return config.timeout?.toFixed(2) ?? '0.00'
+}
+
+// ✅ 使用 exactOptionalPropertyTypes
+// tsconfig.json: "exactOptionalPropertyTypes": true
+// 区分 undefined 和缺失
+```
+
+### 类型推断陷阱
+
+```typescript
+// 🔶 数组元素类型过宽
+const arr = [1, 2, 3] // number[]
+arr.push('string') // ❌ 期望报错，实际可能不报
+
+// ✅ 使用 as const
+const arr = [1, 2, 3] as const // readonly [1, 2, 3]
+
+// 🔶 对象属性推断
+const config = {
+  mode: 'development', // string，不是 'development'
+}
+
+// ✅ 使用 as const 或类型注解
+const config = {
+  mode: 'development' as const,
+}
+
+// 或
+const config: { mode: 'development' | 'production' } = {
+  mode: 'development',
+}
+```
+
+### this 类型问题
+
+```typescript
+class Counter {
+  count = 0
+
+  // ❌ this 可能丢失
+  increment() {
+    this.count++
+  }
+}
+
+const counter = new Counter()
+const fn = counter.increment
+fn() // ❌ this 是 undefined
+
+// ✅ 使用箭头函数
+class Counter {
+  count = 0
+
+  increment = () => {
+    this.count++
+  }
+}
+
+// ✅ 或声明 this 类型
+class Counter {
+  count = 0
+
+  increment(this: Counter) {
+    this.count++
+  }
+}
+```
+
+## 性能优化
+
+### 避免过度使用泛型
+
+```typescript
+// ❌ 不必要的泛型
+function getValue<T extends string>(key: T): string {
+  return localStorage.getItem(key) ?? ''
+}
+
+// ✅ 简化
+function getValue(key: string): string {
+  return localStorage.getItem(key) ?? ''
+}
+
+// ✅ 泛型用在真正需要的地方
+function identity<T>(value: T): T {
+  return value
+}
+```
+
+### 减少类型计算
+
+```typescript
+// ❌ 复杂的类型计算影响编译速度
+type DeepReadonly<T> = {
+  readonly [K in keyof T]: T[K] extends object ? DeepReadonly<T[K]> : T[K]
+}
+
+// ✅ 按需使用，或缓存类型
+type CachedDeepReadonly = DeepReadonly<MyComplexType>
+
+// ✅ 简化复杂类型
+type SimpleReadonly<T> = {
+  readonly [K in keyof T]: T[K]
+}
+```
+
+### 使用 skipLibCheck
+
+```typescript
+// tsconfig.json
+{
+  "compilerOptions": {
+    // 跳过第三方库的类型检查，加快编译
+    "skipLibCheck": true
+  }
+}
+```
+
+## 代码组织
+
+### 项目结构
+
+```
+src/
+├── types/           # 全局类型定义
+│   ├── index.ts
+│   ├── api.ts
+│   └── models.ts
+├── utils/           # 工具函数
+│   ├── index.ts
+│   └── helpers.ts
+├── services/        # 服务层
+│   ├── index.ts
+│   └── api.ts
+├── components/      # 组件
+│   └── index.ts
+└── index.ts         # 入口
+```
+
+### 类型组织
+
+```typescript
+// types/user.ts
+export interface User {
+  id: number
+  name: string
+  email: string
+}
+
+export type UserRole = 'admin' | 'user' | 'guest'
+
+export interface CreateUserInput {
+  name: string
+  email: string
+  role?: UserRole
+}
+
+export interface UpdateUserInput extends Partial<CreateUserInput> {
+  id: number
+}
+
+// types/index.ts
+export * from './user'
+export * from './product'
+export * from './order'
+```
+
+## 工具推荐
+
+### ESLint 规则
+
+```json
+{
+  "rules": {
+    "@typescript-eslint/no-explicit-any": "error",
+    "@typescript-eslint/explicit-function-return-type": "warn",
+    "@typescript-eslint/no-unused-vars": "error",
+    "@typescript-eslint/prefer-nullish-coalescing": "warn",
+    "@typescript-eslint/prefer-optional-chain": "warn",
+    "@typescript-eslint/strict-boolean-expressions": "warn"
+  }
+}
+```
+
+### 推荐的 tsconfig 选项
+
+```json
+{
+  "compilerOptions": {
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "exactOptionalPropertyTypes": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "forceConsistentCasingInFileNames": true
+  }
+}
+```
+
+## 总结
+
+### 类型设计清单
+
+- ✅ 优先使用 interface 定义对象类型
+- ✅ 避免使用 any，使用 unknown + 类型守卫
+- ✅ 使用字面量类型代替宽泛的原始类型
+- ✅ 优先使用类型收窄而非类型断言
+- ✅ 为公共 API 显式声明返回类型
+- ✅ 使用参数对象代替多个参数
+- ✅ 统一导出和组织类型
+
+### 避免的模式
+
+- ❌ 滥用 any 类型
+- ❌ 过度使用类型断言
+- ❌ 忽略 null/undefined 检查
+- ❌ 过于复杂的泛型
+- ❌ 不必要的类型重复
+
+TypeScript 是一个强大的工具，合理使用可以显著提高代码质量和开发效率。希望这个系列教程能帮助你更好地掌握 TypeScript！

@@ -1,0 +1,800 @@
+---
+title: 'Canvas 与 SVG：Web 图形绘制入门'
+description: '掌握 Canvas 2D 绑制和 SVG 矢量图形，理解两者差异与适用场景，实现简单图表和动画效果'
+pubDate: 2025-12-03
+toc: true
+ogImage: true
+category: 'HTML'
+tags: ['HTML', 'Canvas', 'SVG', '图形', '可视化']
+---
+
+Web 上绑制图形有两种主要技术：Canvas（位图）和 SVG（矢量）。它们各有所长，选择哪个取决于具体场景。
+
+## 🎯 Canvas vs SVG 对比
+
+| 特性     | Canvas                       | SVG                       |
+| -------- | ---------------------------- | ------------------------- |
+| 类型     | 位图（像素）                 | 矢量（数学描述）          |
+| 缩放     | 放大会模糊                   | 无限缩放不失真            |
+| DOM      | 单个元素                     | 每个图形都是 DOM 元素     |
+| 事件     | 需手动计算坐标               | 原生支持事件绑定          |
+| 动画     | 需手动重绘                   | CSS/SMIL 动画支持         |
+| 性能     | 大量元素时更优               | 少量复杂图形时更优        |
+| 适用场景 | 游戏、图像处理、大数据可视化 | 图标、图表、地图、UI 图形 |
+
+```
+选择指南：
+│
+├─ 需要大量图形（>1000）？ → Canvas
+├─ 需要缩放不失真？ → SVG
+├─ 需要交互（点击、悬停）？ → SVG
+├─ 实时动画/游戏？ → Canvas
+├─ 图标/Logo？ → SVG
+└─ 复杂数据图表？ → Canvas（性能）或 SVG（交互）
+```
+
+## Canvas 基础
+
+### 创建画布
+
+```html
+<canvas id="myCanvas" width="400" height="300">
+  您的浏览器不支持 Canvas
+</canvas>
+
+<script>
+  const canvas = document.getElementById('myCanvas')
+  const ctx = canvas.getContext('2d') // 获取 2D 上下文
+</script>
+```
+
+🔶 **注意**：Canvas 尺寸通过 HTML 属性设置，不要用 CSS（会导致缩放模糊）。
+
+```javascript
+// ✅ 正确：通过属性设置
+canvas.width = 800
+canvas.height = 600
+
+// ❌ 错误：通过 CSS 设置会导致缩放
+// canvas.style.width = '800px';
+```
+
+### 坐标系统
+
+```
+(0,0) ──────────────────→ x
+  │
+  │    Canvas 坐标系
+  │    原点在左上角
+  │
+  ↓
+  y
+```
+
+### 绑制基本图形
+
+#### 矩形
+
+```javascript
+const ctx = canvas.getContext('2d')
+
+// 填充矩形
+ctx.fillStyle = '#3b82f6'
+ctx.fillRect(10, 10, 100, 50) // x, y, width, height
+
+// 描边矩形
+ctx.strokeStyle = '#ef4444'
+ctx.lineWidth = 2
+ctx.strokeRect(130, 10, 100, 50)
+
+// 清除矩形区域
+ctx.clearRect(20, 20, 30, 30)
+```
+
+#### 路径
+
+路径是 Canvas 绑制复杂图形的核心：
+
+```javascript
+// 开始新路径
+ctx.beginPath()
+
+// 移动画笔（不绑线）
+ctx.moveTo(50, 50)
+
+// 绑直线
+ctx.lineTo(150, 50)
+ctx.lineTo(100, 100)
+
+// 闭合路径
+ctx.closePath()
+
+// 描边
+ctx.strokeStyle = '#000'
+ctx.stroke()
+
+// 或填充
+ctx.fillStyle = '#3b82f6'
+ctx.fill()
+```
+
+#### 圆形和弧线
+
+```javascript
+ctx.beginPath()
+// arc(x, y, radius, startAngle, endAngle, counterclockwise)
+ctx.arc(100, 100, 50, 0, Math.PI * 2) // 完整圆
+ctx.fill()
+
+// 半圆
+ctx.beginPath()
+ctx.arc(250, 100, 50, 0, Math.PI)
+ctx.stroke()
+
+// 扇形
+ctx.beginPath()
+ctx.moveTo(400, 100) // 移动到圆心
+ctx.arc(400, 100, 50, 0, Math.PI / 2)
+ctx.closePath()
+ctx.fill()
+```
+
+#### 贝塞尔曲线
+
+```javascript
+// 二次贝塞尔曲线
+ctx.beginPath()
+ctx.moveTo(50, 200)
+ctx.quadraticCurveTo(100, 100, 150, 200) // 控制点, 终点
+ctx.stroke()
+
+// 三次贝塞尔曲线
+ctx.beginPath()
+ctx.moveTo(200, 200)
+ctx.bezierCurveTo(220, 100, 280, 100, 300, 200) // 控制点1, 控制点2, 终点
+ctx.stroke()
+```
+
+### 样式与颜色
+
+```javascript
+// 填充色
+ctx.fillStyle = '#3b82f6'
+ctx.fillStyle = 'rgb(59, 130, 246)'
+ctx.fillStyle = 'rgba(59, 130, 246, 0.5)'
+
+// 描边色
+ctx.strokeStyle = '#ef4444'
+
+// 线宽
+ctx.lineWidth = 5
+
+// 线端点样式
+ctx.lineCap = 'butt' // 默认
+ctx.lineCap = 'round' // 圆角
+ctx.lineCap = 'square' // 方形
+
+// 线连接样式
+ctx.lineJoin = 'miter' // 默认，尖角
+ctx.lineJoin = 'round' // 圆角
+ctx.lineJoin = 'bevel' // 斜角
+
+// 虚线
+ctx.setLineDash([10, 5]) // 线长, 间隔
+ctx.lineDashOffset = 0 // 偏移
+```
+
+### 渐变
+
+```javascript
+// 线性渐变
+const linearGradient = ctx.createLinearGradient(0, 0, 200, 0)
+linearGradient.addColorStop(0, '#3b82f6')
+linearGradient.addColorStop(1, '#8b5cf6')
+ctx.fillStyle = linearGradient
+ctx.fillRect(10, 10, 200, 100)
+
+// 径向渐变
+const radialGradient = ctx.createRadialGradient(100, 200, 10, 100, 200, 80)
+radialGradient.addColorStop(0, '#fbbf24')
+radialGradient.addColorStop(1, '#f59e0b')
+ctx.fillStyle = radialGradient
+ctx.beginPath()
+ctx.arc(100, 200, 80, 0, Math.PI * 2)
+ctx.fill()
+```
+
+### 文本
+
+```javascript
+ctx.font = '24px Arial'
+ctx.fillStyle = '#000'
+ctx.textAlign = 'center' // left, center, right
+ctx.textBaseline = 'middle' // top, middle, bottom
+
+// 填充文本
+ctx.fillText('Hello Canvas!', 200, 50)
+
+// 描边文本
+ctx.strokeText('Hello Canvas!', 200, 100)
+
+// 测量文本宽度
+const metrics = ctx.measureText('Hello')
+console.log('文本宽度:', metrics.width)
+```
+
+### 图像
+
+```javascript
+const img = new Image()
+img.src = 'photo.jpg'
+
+img.onload = () => {
+  // 绘制图像
+  ctx.drawImage(img, 10, 10)
+
+  // 指定尺寸
+  ctx.drawImage(img, 10, 10, 200, 150)
+
+  // 裁剪并绘制
+  // drawImage(img, sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight)
+  ctx.drawImage(img, 0, 0, 100, 100, 10, 10, 200, 200)
+}
+```
+
+### 变换
+
+```javascript
+// 保存当前状态
+ctx.save()
+
+// 平移
+ctx.translate(100, 100)
+
+// 旋转（弧度）
+ctx.rotate(Math.PI / 4) // 45度
+
+// 缩放
+ctx.scale(2, 2)
+
+// 绘制
+ctx.fillRect(-25, -25, 50, 50)
+
+// 恢复状态
+ctx.restore()
+```
+
+### 动画
+
+Canvas 动画的基本原理：清除画布 → 绘制新帧 → 重复
+
+```javascript
+const canvas = document.getElementById('myCanvas')
+const ctx = canvas.getContext('2d')
+
+let x = 0
+
+function animate() {
+  // 清除画布
+  ctx.clearRect(0, 0, canvas.width, canvas.height)
+
+  // 绘制小球
+  ctx.beginPath()
+  ctx.arc(x, 150, 20, 0, Math.PI * 2)
+  ctx.fillStyle = '#3b82f6'
+  ctx.fill()
+
+  // 更新位置
+  x += 2
+  if (x > canvas.width + 20) x = -20
+
+  // 下一帧
+  requestAnimationFrame(animate)
+}
+
+animate()
+```
+
+## SVG 基础
+
+### 内联 SVG
+
+```html
+<svg width="200" height="200" viewBox="0 0 200 200">
+  <circle cx="100" cy="100" r="50" fill="#3b82f6" />
+</svg>
+```
+
+### viewBox 详解
+
+`viewBox` 定义了 SVG 的坐标系统：
+
+```html
+<!-- viewBox="x y width height" -->
+<svg width="400" height="200" viewBox="0 0 100 50">
+  <!-- 内部坐标系是 100x50，但显示为 400x200 -->
+  <rect x="0" y="0" width="100" height="50" fill="#eee" />
+  <circle cx="50" cy="25" r="20" fill="#3b82f6" />
+</svg>
+```
+
+这实现了**响应式缩放**：内部图形会自动缩放以适应外部尺寸。
+
+### 基本图形
+
+```html
+<svg width="500" height="400" xmlns="http://www.w3.org/2000/svg">
+  <!-- 矩形 -->
+  <rect x="10" y="10" width="100" height="50" fill="#3b82f6" />
+
+  <!-- 圆角矩形 -->
+  <rect x="130" y="10" width="100" height="50" rx="10" ry="10" fill="#8b5cf6" />
+
+  <!-- 圆形 -->
+  <circle cx="60" cy="120" r="40" fill="#22c55e" />
+
+  <!-- 椭圆 -->
+  <ellipse cx="180" cy="120" rx="60" ry="30" fill="#f59e0b" />
+
+  <!-- 直线 -->
+  <line x1="10" y1="200" x2="200" y2="200" stroke="#000" stroke-width="2" />
+
+  <!-- 折线 -->
+  <polyline
+    points="10,250 50,230 90,270 130,220 170,260"
+    fill="none"
+    stroke="#ef4444"
+    stroke-width="2"
+  />
+
+  <!-- 多边形 -->
+  <polygon
+    points="60,310 10,370 110,370"
+    fill="#06b6d4"
+    stroke="#0891b2"
+    stroke-width="2"
+  />
+</svg>
+```
+
+### 路径 `<path>`
+
+`<path>` 是 SVG 最强大的元素，可以绑制任意形状：
+
+```html
+<svg width="300" height="200">
+  <path
+    d="M 10 80 L 50 10 L 90 80 Z"
+    fill="#3b82f6"
+    stroke="#1d4ed8"
+    stroke-width="2"
+  />
+</svg>
+```
+
+#### 路径命令
+
+| 命令 | 说明           | 参数                               |
+| ---- | -------------- | ---------------------------------- |
+| M/m  | 移动到         | x y                                |
+| L/l  | 直线到         | x y                                |
+| H/h  | 水平线到       | x                                  |
+| V/v  | 垂直线到       | y                                  |
+| Z    | 闭合路径       | 无                                 |
+| Q/q  | 二次贝塞尔曲线 | cx cy x y                          |
+| C/c  | 三次贝塞尔曲线 | cx1 cy1 cx2 cy2 x y                |
+| A/a  | 弧线           | rx ry rotation large-arc sweep x y |
+
+大写为绝对坐标，小写为相对坐标。
+
+```html
+<!-- 心形 -->
+<svg width="100" height="100" viewBox="0 0 32 32">
+  <path
+    d="M16 28 C4 18 4 8 12 6 C16 6 16 10 16 10 C16 10 16 6 20 6 C28 8 28 18 16 28"
+    fill="#ef4444"
+  />
+</svg>
+```
+
+### 样式
+
+```html
+<svg width="200" height="200">
+  <!-- 内联样式 -->
+  <circle
+    cx="50"
+    cy="50"
+    r="30"
+    fill="#3b82f6"
+    stroke="#1d4ed8"
+    stroke-width="3"
+    fill-opacity="0.5"
+    stroke-dasharray="5,3"
+  />
+
+  <!-- CSS 样式 -->
+  <style>
+    .my-rect {
+      fill: #22c55e;
+      stroke: #16a34a;
+      stroke-width: 2;
+      transition: fill 0.3s;
+    }
+    .my-rect:hover {
+      fill: #16a34a;
+    }
+  </style>
+  <rect class="my-rect" x="100" y="20" width="60" height="60" />
+</svg>
+```
+
+### 渐变和滤镜
+
+```html
+<svg width="200" height="200">
+  <defs>
+    <!-- 线性渐变 -->
+    <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#3b82f6" />
+      <stop offset="100%" style="stop-color:#8b5cf6" />
+    </linearGradient>
+
+    <!-- 径向渐变 -->
+    <radialGradient id="grad2" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" style="stop-color:#fbbf24" />
+      <stop offset="100%" style="stop-color:#f59e0b" />
+    </radialGradient>
+
+    <!-- 投影滤镜 -->
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="2" dy="2" stdDeviation="3" flood-opacity="0.3" />
+    </filter>
+  </defs>
+
+  <rect x="10" y="10" width="80" height="60" fill="url(#grad1)" />
+  <circle cx="150" cy="40" r="30" fill="url(#grad2)" />
+  <rect
+    x="10"
+    y="100"
+    width="80"
+    height="60"
+    fill="#3b82f6"
+    filter="url(#shadow)"
+  />
+</svg>
+```
+
+### 文本
+
+```html
+<svg width="300" height="100">
+  <text x="10" y="40" font-size="24" fill="#000">Hello SVG!</text>
+
+  <!-- 文本路径 -->
+  <defs>
+    <path id="textPath" d="M 20 80 Q 150 20 280 80" fill="none" />
+  </defs>
+  <text font-size="16" fill="#3b82f6">
+    <textPath href="#textPath">沿着曲线排列的文字</textPath>
+  </text>
+</svg>
+```
+
+### 分组和复用
+
+```html
+<svg width="300" height="200">
+  <defs>
+    <!-- 定义可复用的图形 -->
+    <g id="star">
+      <polygon
+        points="25,0 31,18 50,18 35,29 40,47 25,36 10,47 15,29 0,18 19,18"
+        fill="currentColor"
+      />
+    </g>
+  </defs>
+
+  <!-- 复用 -->
+  <use href="#star" x="10" y="10" fill="#fbbf24" />
+  <use href="#star" x="70" y="10" fill="#f59e0b" />
+  <use href="#star" x="130" y="10" fill="#ef4444" />
+
+  <!-- 分组 -->
+  <g fill="#3b82f6" stroke="#1d4ed8" stroke-width="2">
+    <rect x="10" y="100" width="50" height="50" />
+    <rect x="70" y="100" width="50" height="50" />
+  </g>
+</svg>
+```
+
+### SVG 动画
+
+#### CSS 动画
+
+```html
+<style>
+  @keyframes rotate {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  .spinner {
+    animation: rotate 2s linear infinite;
+    transform-origin: center;
+  }
+</style>
+
+<svg width="100" height="100">
+  <circle
+    class="spinner"
+    cx="50"
+    cy="50"
+    r="40"
+    fill="none"
+    stroke="#3b82f6"
+    stroke-width="4"
+    stroke-dasharray="60 200"
+  />
+</svg>
+```
+
+#### SMIL 动画
+
+```html
+<svg width="200" height="100">
+  <circle cx="30" cy="50" r="20" fill="#3b82f6">
+    <!-- 位置动画 -->
+    <animate
+      attributeName="cx"
+      from="30"
+      to="170"
+      dur="2s"
+      repeatCount="indefinite"
+    />
+  </circle>
+
+  <rect x="10" y="70" width="30" height="20" fill="#22c55e">
+    <!-- 颜色动画 -->
+    <animate
+      attributeName="fill"
+      values="#22c55e;#16a34a;#22c55e"
+      dur="1s"
+      repeatCount="indefinite"
+    />
+  </rect>
+</svg>
+```
+
+## 🎯 实战：简单柱状图
+
+用 Canvas 实现一个柱状图：
+
+```html
+<!doctype html>
+<html lang="zh-Hans">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>柱状图</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        padding: 2rem;
+      }
+      canvas {
+        border: 1px solid #e2e8f0;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>月度销售数据</h1>
+    <canvas id="chart" width="600" height="400"></canvas>
+
+    <script>
+      const canvas = document.getElementById('chart')
+      const ctx = canvas.getContext('2d')
+
+      const data = [
+        { label: '1月', value: 65 },
+        { label: '2月', value: 78 },
+        { label: '3月', value: 90 },
+        { label: '4月', value: 81 },
+        { label: '5月', value: 95 },
+        { label: '6月', value: 110 },
+      ]
+
+      const padding = 50
+      const chartWidth = canvas.width - padding * 2
+      const chartHeight = canvas.height - padding * 2
+      const barWidth = (chartWidth / data.length) * 0.6
+      const barGap = (chartWidth / data.length) * 0.4
+      const maxValue = Math.max(...data.map((d) => d.value))
+
+      // 绘制坐标轴
+      ctx.beginPath()
+      ctx.moveTo(padding, padding)
+      ctx.lineTo(padding, canvas.height - padding)
+      ctx.lineTo(canvas.width - padding, canvas.height - padding)
+      ctx.strokeStyle = '#64748b'
+      ctx.lineWidth = 2
+      ctx.stroke()
+
+      // 绘制刻度线和标签
+      ctx.font = '12px Arial'
+      ctx.fillStyle = '#64748b'
+      ctx.textAlign = 'right'
+
+      for (let i = 0; i <= 5; i++) {
+        const y = canvas.height - padding - (chartHeight / 5) * i
+        const value = Math.round((maxValue / 5) * i)
+
+        // 刻度线
+        ctx.beginPath()
+        ctx.moveTo(padding - 5, y)
+        ctx.lineTo(padding, y)
+        ctx.stroke()
+
+        // 标签
+        ctx.fillText(value.toString(), padding - 10, y + 4)
+
+        // 网格线
+        ctx.beginPath()
+        ctx.moveTo(padding, y)
+        ctx.lineTo(canvas.width - padding, y)
+        ctx.strokeStyle = '#e2e8f0'
+        ctx.lineWidth = 1
+        ctx.stroke()
+        ctx.strokeStyle = '#64748b'
+        ctx.lineWidth = 2
+      }
+
+      // 绘制柱子
+      const colors = [
+        '#3b82f6',
+        '#22c55e',
+        '#f59e0b',
+        '#ef4444',
+        '#8b5cf6',
+        '#06b6d4',
+      ]
+
+      data.forEach((item, index) => {
+        const x = padding + index * (barWidth + barGap) + barGap / 2
+        const height = (item.value / maxValue) * chartHeight
+        const y = canvas.height - padding - height
+
+        // 渐变填充
+        const gradient = ctx.createLinearGradient(x, y, x, y + height)
+        gradient.addColorStop(0, colors[index])
+        gradient.addColorStop(1, colors[index] + '99')
+
+        ctx.fillStyle = gradient
+        ctx.fillRect(x, y, barWidth, height)
+
+        // 数值标签
+        ctx.fillStyle = '#1f2937'
+        ctx.font = 'bold 14px Arial'
+        ctx.textAlign = 'center'
+        ctx.fillText(item.value.toString(), x + barWidth / 2, y - 10)
+
+        // X轴标签
+        ctx.fillStyle = '#64748b'
+        ctx.font = '12px Arial'
+        ctx.fillText(item.label, x + barWidth / 2, canvas.height - padding + 20)
+      })
+
+      // 标题
+      ctx.fillStyle = '#1f2937'
+      ctx.font = 'bold 16px Arial'
+      ctx.textAlign = 'center'
+      ctx.fillText('2024年上半年销售额（万元）', canvas.width / 2, 25)
+    </script>
+  </body>
+</html>
+```
+
+## SVG 图标示例
+
+```html
+<!-- 首页图标 -->
+<svg
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+  <polyline points="9 22 9 12 15 12 15 22" />
+</svg>
+
+<!-- 搜索图标 -->
+<svg
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <circle cx="11" cy="11" r="8" />
+  <line x1="21" y1="21" x2="16.65" y2="16.65" />
+</svg>
+
+<!-- 关闭图标 -->
+<svg
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <line x1="18" y1="6" x2="6" y2="18" />
+  <line x1="6" y1="6" x2="18" y2="18" />
+</svg>
+```
+
+## 常见问题
+
+### 🤔 Canvas 模糊怎么解决？
+
+高 DPI 屏幕需要处理设备像素比：
+
+```javascript
+const dpr = window.devicePixelRatio || 1
+canvas.width = 400 * dpr
+canvas.height = 300 * dpr
+canvas.style.width = '400px'
+canvas.style.height = '300px'
+ctx.scale(dpr, dpr)
+```
+
+### 🤔 如何在 Canvas 上实现点击事件？
+
+Canvas 是一个整体，需要手动计算坐标：
+
+```javascript
+canvas.addEventListener('click', (e) => {
+  const rect = canvas.getBoundingClientRect()
+  const x = e.clientX - rect.left
+  const y = e.clientY - rect.top
+
+  // 判断是否在某个图形内
+  if (x > 10 && x < 110 && y > 10 && y < 60) {
+    console.log('点击了矩形区域')
+  }
+})
+```
+
+### 🤔 SVG 作为背景图怎么用？
+
+```css
+/* 外部文件 */
+.icon {
+  background-image: url('icon.svg');
+}
+
+/* 内联（需要 URL 编码） */
+.icon {
+  background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg">...</svg>');
+}
+```
+
+## 参考资料
+
+- [MDN: Canvas API](https://developer.mozilla.org/zh-CN/docs/Web/API/Canvas_API)
+- [MDN: SVG 教程](https://developer.mozilla.org/zh-CN/docs/Web/SVG/Tutorial)
+- [SVG Path Editor](https://yqnn.github.io/svg-path-editor/) - 可视化路径编辑器
+- [Feather Icons](https://feathericons.com/) - 开源 SVG 图标库

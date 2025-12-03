@@ -1,0 +1,603 @@
+---
+title: 裁剪与遮罩
+description: 掌握 CSS clip-path 和 mask 属性，创建独特的图形裁剪和遮罩效果
+pubDate: 2025-12-03
+toc: true
+ogImage: true
+category: CSS
+---
+
+CSS 裁剪和遮罩让你可以将元素裁剪成任意形状，或使用图像作为遮罩控制元素的可见区域。这些特性为创意设计提供了无限可能。
+
+## clip-path 裁剪路径
+
+### 基本形状
+
+#### inset 矩形裁剪
+
+```css
+.inset-basic {
+  clip-path: inset(20px);
+} /* 四边各裁剪 20px */
+
+.inset-separate {
+  clip-path: inset(10px 20px 30px 40px);
+} /* 上 右 下 左 */
+
+.inset-rounded {
+  clip-path: inset(20px round 10px);
+} /* 带圆角 */
+
+.inset-different-radius {
+  clip-path: inset(20px round 10px 20px);
+} /* 不同圆角 */
+```
+
+#### circle 圆形裁剪
+
+```css
+.circle-center {
+  clip-path: circle(50%);
+} /* 居中圆形 */
+
+.circle-custom {
+  clip-path: circle(100px at 50% 50%);
+} /* 指定半径和圆心 */
+
+.circle-top-left {
+  clip-path: circle(30% at 0 0);
+} /* 左上角圆形 */
+```
+
+#### ellipse 椭圆裁剪
+
+```css
+.ellipse-basic {
+  clip-path: ellipse(50% 30% at center);
+}
+
+.ellipse-custom {
+  clip-path: ellipse(100px 50px at 25% 75%);
+}
+```
+
+#### polygon 多边形裁剪
+
+```css
+/* 三角形 */
+.triangle {
+  clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+}
+
+/* 菱形 */
+.diamond {
+  clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+}
+
+/* 五边形 */
+.pentagon {
+  clip-path: polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%);
+}
+
+/* 六边形 */
+.hexagon {
+  clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+}
+
+/* 八边形 */
+.octagon {
+  clip-path: polygon(
+    30% 0%,
+    70% 0%,
+    100% 30%,
+    100% 70%,
+    70% 100%,
+    30% 100%,
+    0% 70%,
+    0% 30%
+  );
+}
+
+/* 星形 */
+.star {
+  clip-path: polygon(
+    50% 0%,
+    61% 35%,
+    98% 35%,
+    68% 57%,
+    79% 91%,
+    50% 70%,
+    21% 91%,
+    32% 57%,
+    2% 35%,
+    39% 35%
+  );
+}
+
+/* 箭头 */
+.arrow-right {
+  clip-path: polygon(
+    0% 20%,
+    60% 20%,
+    60% 0%,
+    100% 50%,
+    60% 100%,
+    60% 80%,
+    0% 80%
+  );
+}
+
+/* 消息气泡 */
+.message-bubble {
+  clip-path: polygon(
+    0% 0%,
+    100% 0%,
+    100% 75%,
+    75% 75%,
+    75% 100%,
+    50% 75%,
+    0% 75%
+  );
+}
+```
+
+### path() SVG 路径
+
+```css
+.svg-path {
+  clip-path: path(
+    'M 10,30 A 20,20 0,0,1 50,30 A 20,20 0,0,1 90,30 Q 90,60 50,90 Q 10,60 10,30 Z'
+  );
+}
+
+/* 心形 */
+.heart {
+  clip-path: path('M 50,20 C 20,0 0,30 50,80 C 100,30 80,0 50,20');
+}
+```
+
+### clip-path 动画
+
+```css
+.morph {
+  clip-path: circle(50%);
+  transition: clip-path 0.5s ease;
+}
+
+.morph:hover {
+  clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+}
+```
+
+## mask 遮罩
+
+### mask-image
+
+使用图像作为遮罩：
+
+```css
+.gradient-mask {
+  mask-image: linear-gradient(to bottom, black, transparent);
+}
+
+.radial-mask {
+  mask-image: radial-gradient(circle, black 50%, transparent 50%);
+}
+
+.image-mask {
+  mask-image: url('/images/mask.svg');
+}
+
+/* 多重遮罩 */
+.multi-mask {
+  mask-image: linear-gradient(black, transparent), url('/images/pattern.svg');
+}
+```
+
+🎯 遮罩原理：黑色区域完全显示，白色/透明区域完全隐藏，灰色区域半透明。
+
+### mask-size
+
+```css
+.mask-cover {
+  mask-size: cover;
+}
+
+.mask-contain {
+  mask-size: contain;
+}
+
+.mask-fixed {
+  mask-size: 100px 100px;
+}
+
+.mask-percent {
+  mask-size: 50% 50%;
+}
+```
+
+### mask-position
+
+```css
+.mask-center {
+  mask-position: center;
+}
+
+.mask-top-right {
+  mask-position: top right;
+}
+
+.mask-custom {
+  mask-position: 20px 30px;
+}
+```
+
+### mask-repeat
+
+```css
+.mask-no-repeat {
+  mask-repeat: no-repeat;
+}
+
+.mask-repeat-x {
+  mask-repeat: repeat-x;
+}
+
+.mask-space {
+  mask-repeat: space;
+}
+```
+
+### mask-origin 和 mask-clip
+
+```css
+.mask-origin-content {
+  mask-origin: content-box;
+}
+
+.mask-clip-padding {
+  mask-clip: padding-box;
+}
+```
+
+### mask-composite
+
+多个遮罩的合成方式：
+
+```css
+.composite {
+  mask-image:
+    linear-gradient(black, black),
+    radial-gradient(circle, black 50%, transparent 50%);
+  mask-composite: subtract; /* add | subtract | intersect | exclude */
+}
+```
+
+### mask 简写
+
+```css
+.mask-shorthand {
+  mask: url('/mask.svg') center / cover no-repeat;
+}
+```
+
+## 实战案例
+
+### 图片悬停揭示
+
+```css
+.reveal-image {
+  position: relative;
+  overflow: hidden;
+}
+
+.reveal-image img {
+  clip-path: circle(0% at 50% 50%);
+  transition: clip-path 0.8s ease;
+}
+
+.reveal-image:hover img {
+  clip-path: circle(100% at 50% 50%);
+}
+```
+
+### 文字渐隐效果
+
+```css
+.fade-text {
+  mask-image: linear-gradient(to bottom, black 0%, black 70%, transparent 100%);
+}
+
+/* 左右渐隐 */
+.fade-sides {
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    black 10%,
+    black 90%,
+    transparent
+  );
+}
+```
+
+### 斜角切割卡片
+
+```css
+.slant-card {
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 30px), 0 100%);
+}
+
+.double-slant {
+  clip-path: polygon(0 20px, 100% 0, 100% calc(100% - 20px), 0 100%);
+}
+```
+
+### 图片画廊形状
+
+```css
+.gallery-item:nth-child(1) {
+  clip-path: polygon(0% 0%, 100% 0%, 100% 100%, 0% 80%);
+}
+
+.gallery-item:nth-child(2) {
+  clip-path: circle(45%);
+}
+
+.gallery-item:nth-child(3) {
+  clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+}
+
+.gallery-item:nth-child(4) {
+  clip-path: polygon(25% 0%, 100% 0%, 75% 100%, 0% 100%);
+}
+```
+
+### 波浪分隔
+
+```css
+.wave-section {
+  position: relative;
+  padding-bottom: 50px;
+}
+
+.wave-section::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 50px;
+  background: white;
+  clip-path: polygon(
+    0% 100%,
+    0% 50%,
+    10% 60%,
+    20% 50%,
+    30% 60%,
+    40% 50%,
+    50% 60%,
+    60% 50%,
+    70% 60%,
+    80% 50%,
+    90% 60%,
+    100% 50%,
+    100% 100%
+  );
+}
+
+/* 或使用 SVG path 实现平滑波浪 */
+.smooth-wave::after {
+  clip-path: path('M 0 50 Q 25 0 50 50 T 100 50 L 100 100 L 0 100 Z');
+}
+```
+
+### 聚光灯效果
+
+```css
+.spotlight {
+  position: relative;
+}
+
+.spotlight::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.8);
+  mask-image: radial-gradient(
+    circle 100px at var(--x, 50%) var(--y, 50%),
+    transparent 0%,
+    black 100%
+  );
+}
+```
+
+```javascript
+// 配合 JavaScript 跟踪鼠标
+element.addEventListener('mousemove', (e) => {
+  const rect = element.getBoundingClientRect()
+  element.style.setProperty('--x', `${e.clientX - rect.left}px`)
+  element.style.setProperty('--y', `${e.clientY - rect.top}px`)
+})
+```
+
+### 图片对比滑块
+
+```css
+.image-compare {
+  position: relative;
+  overflow: hidden;
+}
+
+.image-compare .before,
+.image-compare .after {
+  position: absolute;
+  inset: 0;
+}
+
+.image-compare .before {
+  clip-path: inset(0 50% 0 0);
+}
+
+/* 使用 CSS 变量动态控制 */
+.image-compare .before {
+  clip-path: inset(0 var(--clip, 50%) 0 0);
+}
+```
+
+### 头像边框
+
+```css
+.avatar-hex {
+  clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+}
+
+/* 带边框效果 */
+.avatar-hex-border {
+  position: relative;
+  padding: 4px;
+  background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+  clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+}
+
+.avatar-hex-border img {
+  clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+}
+```
+
+### 加载动画遮罩
+
+```css
+@keyframes loading-mask {
+  0% {
+    mask-position: 200% 0;
+  }
+  100% {
+    mask-position: -200% 0;
+  }
+}
+
+.skeleton-mask {
+  background: #e5e7eb;
+  mask-image: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.6) 0%,
+    rgba(0, 0, 0, 1) 50%,
+    rgba(0, 0, 0, 0.6) 100%
+  );
+  mask-size: 50% 100%;
+  animation: loading-mask 1.5s infinite;
+}
+```
+
+### 渐显文字
+
+```css
+@keyframes reveal-text {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+.reveal-text {
+  animation: reveal-text 1s ease forwards;
+}
+```
+
+## shape-outside 文字环绕
+
+让文字环绕自定义形状：
+
+```css
+.float-circle {
+  float: left;
+  width: 200px;
+  height: 200px;
+  shape-outside: circle(50%);
+  clip-path: circle(50%);
+  margin-right: 20px;
+}
+
+.float-polygon {
+  float: left;
+  width: 200px;
+  height: 200px;
+  shape-outside: polygon(0 0, 100% 0, 100% 100%);
+  clip-path: polygon(0 0, 100% 0, 100% 100%);
+}
+
+/* 使用图片轮廓 */
+.float-image {
+  float: left;
+  shape-outside: url('/images/shape.png');
+  shape-margin: 20px;
+}
+```
+
+## 浏览器兼容性
+
+### clip-path
+
+```css
+/* 降级方案 */
+.clipped {
+  /* 旧浏览器 */
+  border-radius: 50%;
+}
+
+@supports (clip-path: circle(50%)) {
+  .clipped {
+    border-radius: 0;
+    clip-path: circle(50%);
+  }
+}
+```
+
+### mask
+
+```css
+.masked {
+  /* 带前缀版本 */
+  -webkit-mask-image: linear-gradient(black, transparent);
+  mask-image: linear-gradient(black, transparent);
+}
+```
+
+## 性能注意
+
+```css
+/* clip-path 动画性能较好 */
+.animate-clip {
+  transition: clip-path 0.3s ease;
+}
+
+/* 复杂遮罩可能影响性能 */
+.complex-mask {
+  /* 避免在大量元素上使用复杂遮罩 */
+  will-change: mask;
+}
+```
+
+## 常见问题
+
+🤔 **clip-path 和 mask 的区别？**
+
+- `clip-path`：裁剪成几何形状，边缘锐利
+- `mask`：使用图像/渐变控制透明度，可实现柔和边缘
+
+🤔 **为什么 mask 不生效？**
+
+检查是否添加了 `-webkit-` 前缀，Safari 仍需要前缀。
+
+🤔 **如何生成复杂的 clip-path？**
+
+推荐使用在线工具：
+
+- Clippy (bennettfeely.com/clippy)
+- CSS clip-path maker
+
+---
+
+CSS 裁剪和遮罩为创意设计打开了大门。从简单的圆形裁剪到复杂的 SVG 路径，从渐变遮罩到图像遮罩，这些技术让你能够创建独特的视觉效果。至此，CSS 系列 19 篇文章全部完成，希望能帮助你全面掌握现代 CSS 技术！

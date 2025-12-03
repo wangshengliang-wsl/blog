@@ -1,0 +1,553 @@
+---
+title: TypeScript 配置
+description: 深入配置 Next.js 15 的 TypeScript 支持，包括路径别名、严格模式、类型增强与最佳实践
+pubDate: 2025-12-03
+toc: true
+ogImage: true
+category: Next
+tags: ['Next.js', 'TypeScript', '配置', '类型安全']
+---
+
+🙋 Next.js 对 TypeScript 有一流的支持。如何配置才能获得最佳的类型安全和开发体验？
+
+## 默认配置
+
+使用 `create-next-app` 创建的 TypeScript 项目包含完整配置：
+
+```json
+// tsconfig.json
+// Next.js 15.x 默认配置
+{
+  "compilerOptions": {
+    "target": "ES2017",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "incremental": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "exclude": ["node_modules"]
+}
+```
+
+🎯 **关键配置**：
+
+- `strict: true` - 启用所有严格类型检查
+- `plugins` - Next.js 类型插件
+- `paths` - 路径别名
+
+## 路径别名
+
+### 基础配置
+
+```json
+// tsconfig.json
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@/components/*": ["./src/components/*"],
+      "@/lib/*": ["./src/lib/*"],
+      "@/hooks/*": ["./src/hooks/*"],
+      "@/types/*": ["./src/types/*"]
+    }
+  }
+}
+```
+
+使用方式：
+
+```tsx
+// 之前
+import { Button } from '../../../components/ui/Button'
+import { cn } from '../../../lib/utils'
+
+// 之后
+import { Button } from '@/components/ui/Button'
+import { cn } from '@/lib/utils'
+```
+
+### 多根路径
+
+```json
+{
+  "compilerOptions": {
+    "paths": {
+      "@/*": ["./src/*"],
+      "~/*": ["./public/*"],
+      "#/*": ["./types/*"]
+    }
+  }
+}
+```
+
+🔶 **注意**：修改 `paths` 后需要重启开发服务器。
+
+## 严格模式详解
+
+### 推荐的严格配置
+
+```json
+// tsconfig.json
+{
+  "compilerOptions": {
+    "strict": true,
+    // strict 包含以下所有选项：
+    // "noImplicitAny": true,
+    // "strictNullChecks": true,
+    // "strictFunctionTypes": true,
+    // "strictBindCallApply": true,
+    // "strictPropertyInitialization": true,
+    // "noImplicitThis": true,
+    // "alwaysStrict": true,
+
+    // 额外推荐的严格选项
+    "noUncheckedIndexedAccess": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
+  }
+}
+```
+
+### noUncheckedIndexedAccess
+
+这是最有价值的额外严格选项：
+
+```tsx
+// 没有 noUncheckedIndexedAccess
+const arr = [1, 2, 3]
+const first = arr[0] // number
+
+// 有 noUncheckedIndexedAccess
+const arr = [1, 2, 3]
+const first = arr[0] // number | undefined
+
+// 必须处理 undefined
+if (first !== undefined) {
+  console.log(first * 2)
+}
+
+// 或使用非空断言（确定存在时）
+console.log(arr[0]! * 2)
+```
+
+## 类型定义文件
+
+### next-env.d.ts
+
+Next.js 自动生成的类型声明文件：
+
+```typescript
+// next-env.d.ts
+// 不要手动编辑此文件
+/// <reference types="next" />
+/// <reference types="next/image-types/global" />
+```
+
+🔶 **警告**：不要修改此文件，它会被自动更新。
+
+### 自定义类型
+
+```typescript
+// types/index.ts
+// 业务类型定义
+
+export interface User {
+  id: string
+  name: string
+  email: string
+  avatar?: string
+  createdAt: Date
+}
+
+export interface Post {
+  id: string
+  title: string
+  content: string
+  author: User
+  publishedAt: Date
+}
+
+export interface ApiResponse<T> {
+  data: T
+  message: string
+  success: boolean
+}
+```
+
+### 全局类型扩展
+
+```typescript
+// types/global.d.ts
+
+// 扩展 Window 对象
+declare global {
+  interface Window {
+    gtag: (...args: unknown[]) => void
+    dataLayer: unknown[]
+  }
+}
+
+// 扩展环境变量类型
+declare global {
+  namespace NodeJS {
+    interface ProcessEnv {
+      DATABASE_URL: string
+      NEXT_PUBLIC_API_URL: string
+      API_SECRET: string
+    }
+  }
+}
+
+export {}
+```
+
+## 组件类型
+
+### 页面组件
+
+```tsx
+// app/users/[id]/page.tsx
+// Next.js 15.x
+
+interface PageProps {
+  params: Promise<{ id: string }>
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
+}
+
+export default async function UserPage({ params, searchParams }: PageProps) {
+  const { id } = await params
+  const { tab } = await searchParams
+
+  return (
+    <div>
+      User {id}, Tab: {tab}
+    </div>
+  )
+}
+```
+
+### 布局组件
+
+```tsx
+// app/dashboard/layout.tsx
+// Next.js 15.x
+import type { ReactNode } from 'react'
+
+interface LayoutProps {
+  children: ReactNode
+  params: Promise<{ slug: string }>
+}
+
+export default async function DashboardLayout({
+  children,
+  params,
+}: LayoutProps) {
+  const { slug } = await params
+
+  return (
+    <div>
+      <nav>Dashboard: {slug}</nav>
+      {children}
+    </div>
+  )
+}
+```
+
+### 服务端组件
+
+```tsx
+// components/UserList.tsx
+// Next.js 15.x
+
+interface User {
+  id: string
+  name: string
+}
+
+interface UserListProps {
+  initialUsers?: User[]
+}
+
+// 异步服务端组件
+export default async function UserList({ initialUsers }: UserListProps) {
+  const users = initialUsers ?? (await fetchUsers())
+
+  return (
+    <ul>
+      {users.map((user) => (
+        <li key={user.id}>{user.name}</li>
+      ))}
+    </ul>
+  )
+}
+
+async function fetchUsers(): Promise<User[]> {
+  const res = await fetch('https://api.example.com/users')
+  return res.json()
+}
+```
+
+### 客户端组件
+
+```tsx
+// components/Counter.tsx
+// Next.js 15.x
+'use client'
+
+import { useState, type FC, type MouseEvent } from 'react'
+
+interface CounterProps {
+  initialValue?: number
+  step?: number
+  onCountChange?: (count: number) => void
+}
+
+const Counter: FC<CounterProps> = ({
+  initialValue = 0,
+  step = 1,
+  onCountChange,
+}) => {
+  const [count, setCount] = useState(initialValue)
+
+  const handleClick = (e: MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault()
+    const newCount = count + step
+    setCount(newCount)
+    onCountChange?.(newCount)
+  }
+
+  return <button onClick={handleClick}>计数: {count}</button>
+}
+
+export default Counter
+```
+
+## API 类型
+
+### Route Handler
+
+```typescript
+// app/api/users/route.ts
+// Next.js 15.x
+import { NextRequest, NextResponse } from 'next/server'
+
+interface User {
+  id: string
+  name: string
+  email: string
+}
+
+interface CreateUserBody {
+  name: string
+  email: string
+}
+
+export async function GET(request: NextRequest) {
+  const searchParams = request.nextUrl.searchParams
+  const page = searchParams.get('page') ?? '1'
+
+  const users: User[] = [{ id: '1', name: 'Alice', email: 'alice@example.com' }]
+
+  return NextResponse.json({ users, page: parseInt(page) })
+}
+
+export async function POST(request: NextRequest) {
+  const body: CreateUserBody = await request.json()
+
+  const newUser: User = {
+    id: crypto.randomUUID(),
+    name: body.name,
+    email: body.email,
+  }
+
+  return NextResponse.json(newUser, { status: 201 })
+}
+```
+
+### Server Action
+
+```typescript
+// app/actions/user.ts
+// Next.js 15.x
+'use server'
+
+import { z } from 'zod'
+
+const CreateUserSchema = z.object({
+  name: z.string().min(2).max(50),
+  email: z.string().email(),
+})
+
+type CreateUserInput = z.infer<typeof CreateUserSchema>
+
+interface ActionResult<T> {
+  success: boolean
+  data?: T
+  error?: string
+}
+
+export async function createUser(
+  formData: FormData
+): Promise<ActionResult<{ id: string }>> {
+  const rawData = {
+    name: formData.get('name'),
+    email: formData.get('email'),
+  }
+
+  const result = CreateUserSchema.safeParse(rawData)
+
+  if (!result.success) {
+    return {
+      success: false,
+      error: result.error.errors[0].message,
+    }
+  }
+
+  // 创建用户...
+  const id = crypto.randomUUID()
+
+  return {
+    success: true,
+    data: { id },
+  }
+}
+```
+
+## 实用类型工具
+
+### 常用辅助类型
+
+```typescript
+// types/utils.ts
+
+// 使对象所有属性可选（深层）
+type DeepPartial<T> = {
+  [P in keyof T]?: T[P] extends object ? DeepPartial<T[P]> : T[P]
+}
+
+// 提取 Promise 返回类型
+type Awaited<T> = T extends Promise<infer U> ? U : T
+
+// 联合类型转交叉类型
+type UnionToIntersection<U> = (
+  U extends unknown ? (k: U) => void : never
+) extends (k: infer I) => void
+  ? I
+  : never
+
+// 获取对象所有值的类型
+type ValueOf<T> = T[keyof T]
+
+// 必选某些字段
+type RequiredFields<T, K extends keyof T> = T & Required<Pick<T, K>>
+```
+
+### 使用示例
+
+```typescript
+interface User {
+  id: string
+  name: string
+  email?: string
+  profile?: {
+    avatar?: string
+    bio?: string
+  }
+}
+
+// 创建时可以只传部分字段
+type CreateUserInput = DeepPartial<User>
+
+// 更新时某些字段必填
+type UpdateUserInput = RequiredFields<Partial<User>, 'id'>
+```
+
+## 类型检查命令
+
+```bash
+# 类型检查（不生成文件）
+pnpm tsc --noEmit
+
+# Next.js 类型检查
+pnpm next build  # 构建时自动检查
+
+# 在 package.json 中添加脚本
+```
+
+```json
+{
+  "scripts": {
+    "type-check": "tsc --noEmit",
+    "type-check:watch": "tsc --noEmit --watch"
+  }
+}
+```
+
+## 常见问题
+
+🤔 **Q: 如何处理第三方库没有类型定义？**
+
+```bash
+# 安装社区类型定义
+pnpm add -D @types/lodash
+
+# 或创建本地声明
+```
+
+```typescript
+// types/untyped-lib.d.ts
+declare module 'untyped-lib' {
+  export function doSomething(value: string): number
+  export default function main(): void
+}
+```
+
+🤔 **Q: import type 和 import 有什么区别？**
+
+```typescript
+// import type 只导入类型，不会在运行时存在
+import type { User } from './types'
+
+// import 导入值和类型，运行时可用
+import { User, createUser } from './user'
+
+// 推荐：类型只用于类型注解时使用 import type
+import type { FC, ReactNode } from 'react'
+```
+
+🤔 **Q: 如何处理动态导入的类型？**
+
+```typescript
+// 使用 typeof 获取动态模块类型
+const MyComponent = dynamic(() => import('./MyComponent'))
+type MyComponentProps = React.ComponentProps<typeof MyComponent>
+
+// 或预先导出类型
+export type { MyComponentProps } from './MyComponent'
+```
+
+---
+
+恭喜你完成了第一部分的学习！下一篇将开始路由系统的深入探索，介绍文件系统路由的完整规则。
+
+-EOF-

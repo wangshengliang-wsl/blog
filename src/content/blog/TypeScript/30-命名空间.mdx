@@ -1,0 +1,603 @@
+---
+title: '命名空间'
+description: 'TypeScript 命名空间详解：namespace 定义、命名空间合并、模块与命名空间的区别与选择'
+pubDate: 2024-02-13
+toc: true
+ogImage: true
+category: 'TypeScript'
+tags: ['TypeScript', '命名空间', 'namespace', '代码组织', '模块化']
+---
+
+命名空间（Namespace）是 TypeScript 提供的一种代码组织方式，用于避免全局作用域污染和命名冲突。
+
+## 基本语法
+
+使用 `namespace` 关键字定义命名空间：
+
+```typescript
+// TypeScript 5.x
+
+namespace Utils {
+  // 导出的成员可以在外部访问
+  export function log(message: string): void {
+    console.log(`[LOG]: ${message}`)
+  }
+
+  export function warn(message: string): void {
+    console.warn(`[WARN]: ${message}`)
+  }
+
+  // 未导出的成员是私有的
+  function formatMessage(msg: string): string {
+    return `Formatted: ${msg}`
+  }
+
+  export const VERSION = '1.0.0'
+
+  export interface Config {
+    debug: boolean
+    logLevel: 'info' | 'warn' | 'error'
+  }
+
+  export class Logger {
+    constructor(private config: Config) {}
+
+    log(message: string) {
+      if (this.config.debug) {
+        console.log(message)
+      }
+    }
+  }
+}
+
+// 使用
+Utils.log('Hello')
+Utils.warn('Warning')
+console.log(Utils.VERSION)
+
+const config: Utils.Config = {
+  debug: true,
+  logLevel: 'info',
+}
+
+const logger = new Utils.Logger(config)
+```
+
+## 嵌套命名空间
+
+命名空间可以嵌套：
+
+```typescript
+namespace App {
+  export namespace Models {
+    export interface User {
+      id: number
+      name: string
+    }
+
+    export interface Product {
+      id: number
+      name: string
+      price: number
+    }
+  }
+
+  export namespace Services {
+    export class UserService {
+      getUser(id: number): Models.User {
+        return { id, name: '张三' }
+      }
+    }
+
+    export class ProductService {
+      getProduct(id: number): Models.Product {
+        return { id, name: '商品', price: 100 }
+      }
+    }
+  }
+
+  export namespace Utils {
+    export function formatPrice(price: number): string {
+      return `¥${price.toFixed(2)}`
+    }
+  }
+}
+
+// 使用
+const user: App.Models.User = { id: 1, name: '张三' }
+const service = new App.Services.UserService()
+const price = App.Utils.formatPrice(99.9)
+
+// 简化访问
+import Models = App.Models
+import UserService = App.Services.UserService
+
+const user2: Models.User = { id: 2, name: '李四' }
+const userService = new UserService()
+```
+
+## 命名空间合并
+
+同名命名空间会自动合并：
+
+```typescript
+// 文件 1：animal.ts
+namespace Animal {
+  export interface Dog {
+    bark(): void
+  }
+
+  export function createDog(): Dog {
+    return {
+      bark() {
+        console.log('汪汪!')
+      },
+    }
+  }
+}
+
+// 文件 2：animal-extended.ts
+namespace Animal {
+  export interface Cat {
+    meow(): void
+  }
+
+  export function createCat(): Cat {
+    return {
+      meow() {
+        console.log('喵喵!')
+      },
+    }
+  }
+}
+
+// 使用：两个文件的成员都可以访问
+const dog: Animal.Dog = Animal.createDog()
+const cat: Animal.Cat = Animal.createCat()
+
+dog.bark()
+cat.meow()
+```
+
+## 命名空间与类/函数/枚举合并
+
+命名空间可以与其他声明合并：
+
+```typescript
+// 与类合并
+class Album {
+  label: Album.AlbumLabel
+
+  constructor(label: Album.AlbumLabel) {
+    this.label = label
+  }
+}
+
+namespace Album {
+  export interface AlbumLabel {
+    name: string
+    year: number
+  }
+
+  export function create(name: string): Album {
+    return new Album({ name, year: new Date().getFullYear() })
+  }
+}
+
+const album = Album.create('专辑名')
+console.log(album.label.name)
+
+// 与函数合并
+function buildName(firstName: string, lastName: string) {
+  return `${buildName.prefix}${firstName} ${lastName}`
+}
+
+namespace buildName {
+  export let prefix = 'Mr. '
+  export function setPrefix(p: string) {
+    prefix = p
+  }
+}
+
+console.log(buildName('张', '三')) // Mr. 张 三
+buildName.setPrefix('Dr. ')
+console.log(buildName('李', '四')) // Dr. 李 四
+
+// 与枚举合并
+enum Color {
+  Red,
+  Green,
+  Blue,
+}
+
+namespace Color {
+  export function fromHex(hex: string): Color {
+    // 解析十六进制颜色
+    return Color.Red
+  }
+
+  export function toHex(color: Color): string {
+    switch (color) {
+      case Color.Red:
+        return '#FF0000'
+      case Color.Green:
+        return '#00FF00'
+      case Color.Blue:
+        return '#0000FF'
+    }
+  }
+}
+
+const red = Color.fromHex('#FF0000')
+const hex = Color.toHex(Color.Red)
+```
+
+## 跨文件命名空间
+
+使用三斜线指令引用其他文件：
+
+```typescript
+// === shapes.ts ===
+namespace Shapes {
+  export interface Point {
+    x: number
+    y: number
+  }
+
+  export interface Size {
+    width: number
+    height: number
+  }
+}
+
+// === rectangle.ts ===
+/// <reference path="shapes.ts" />
+
+namespace Shapes {
+  export class Rectangle {
+    constructor(
+      public position: Point,
+      public size: Size
+    ) {}
+
+    get area(): number {
+      return this.size.width * this.size.height
+    }
+  }
+}
+
+// === circle.ts ===
+/// <reference path="shapes.ts" />
+
+namespace Shapes {
+  export class Circle {
+    constructor(
+      public center: Point,
+      public radius: number
+    ) {}
+
+    get area(): number {
+      return Math.PI * this.radius ** 2
+    }
+  }
+}
+
+// === main.ts ===
+/// <reference path="shapes.ts" />
+/// <reference path="rectangle.ts" />
+/// <reference path="circle.ts" />
+
+const rect = new Shapes.Rectangle({ x: 0, y: 0 }, { width: 10, height: 20 })
+
+const circle = new Shapes.Circle({ x: 5, y: 5 }, 10)
+```
+
+## 命名空间别名
+
+使用 `import` 创建别名简化访问：
+
+```typescript
+namespace Company {
+  export namespace Departments {
+    export namespace Engineering {
+      export class Developer {
+        constructor(public name: string) {}
+      }
+
+      export class Manager {
+        constructor(public name: string) {}
+      }
+    }
+
+    export namespace Marketing {
+      export class Designer {
+        constructor(public name: string) {}
+      }
+    }
+  }
+}
+
+// 创建别名
+import Engineering = Company.Departments.Engineering
+import Marketing = Company.Departments.Marketing
+
+const dev = new Engineering.Developer('张三')
+const designer = new Marketing.Designer('李四')
+
+// 也可以为类创建别名
+import Developer = Company.Departments.Engineering.Developer
+const dev2 = new Developer('王五')
+```
+
+## 模块中的命名空间
+
+在模块中使用命名空间：
+
+```typescript
+// utils.ts
+export namespace StringUtils {
+  export function capitalize(str: string): string {
+    return str.charAt(0).toUpperCase() + str.slice(1)
+  }
+
+  export function lowercase(str: string): string {
+    return str.toLowerCase()
+  }
+}
+
+export namespace NumberUtils {
+  export function clamp(value: number, min: number, max: number): number {
+    return Math.min(Math.max(value, min), max)
+  }
+
+  export function random(min: number, max: number): number {
+    return Math.floor(Math.random() * (max - min + 1)) + min
+  }
+}
+
+// main.ts
+import { StringUtils, NumberUtils } from './utils'
+
+const capitalized = StringUtils.capitalize('hello')
+const clamped = NumberUtils.clamp(150, 0, 100)
+```
+
+## 命名空间 vs 模块
+
+```typescript
+// 🔶 命名空间（旧方式）
+namespace MyApp {
+  export interface User {}
+  export class UserService {}
+}
+
+// ✅ 模块（推荐方式）
+// user.ts
+export interface User {}
+export class UserService {}
+
+// 模块的优势：
+// 1. 更好的代码组织
+// 2. 更好的工具支持
+// 3. 更好的 tree-shaking
+// 4. 符合 ES 模块标准
+```
+
+## 实际应用场景
+
+### 类型声明文件
+
+命名空间在声明文件中很常见：
+
+```typescript
+// global.d.ts
+declare namespace NodeJS {
+  interface ProcessEnv {
+    NODE_ENV: 'development' | 'production'
+    API_URL: string
+  }
+}
+
+// 使用
+const env = process.env.NODE_ENV // 类型安全
+const apiUrl = process.env.API_URL
+
+// jquery.d.ts
+declare namespace JQuery {
+  interface Ajax {
+    url: string
+    method: 'GET' | 'POST' | 'PUT' | 'DELETE'
+    data?: unknown
+  }
+
+  interface Event {
+    type: string
+    target: HTMLElement
+  }
+}
+
+declare const $: {
+  ajax(options: JQuery.Ajax): Promise<unknown>
+  (selector: string): {
+    on(event: string, handler: (e: JQuery.Event) => void): void
+  }
+}
+```
+
+### 全局扩展
+
+```typescript
+// 扩展全局对象
+declare global {
+  interface Window {
+    myApp: {
+      version: string
+      config: Record<string, unknown>
+    }
+  }
+
+  namespace NodeJS {
+    interface Global {
+      myGlobal: string
+    }
+  }
+}
+
+// 使用
+window.myApp = {
+  version: '1.0.0',
+  config: {},
+}
+
+export {} // 使文件成为模块
+```
+
+### 第三方库扩展
+
+```typescript
+// 扩展 Express
+declare namespace Express {
+  interface Request {
+    user?: {
+      id: string
+      role: string
+    }
+  }
+
+  interface Response {
+    success(data: unknown): void
+    error(message: string): void
+  }
+}
+
+// 使用
+import express from 'express'
+
+const app = express()
+
+app.use((req, res, next) => {
+  req.user = { id: '123', role: 'admin' }
+  next()
+})
+
+app.get('/', (req, res) => {
+  console.log(req.user?.id) // 类型安全
+})
+```
+
+## 何时使用命名空间
+
+```typescript
+// ✅ 适合使用命名空间的场景
+
+// 1. 全局类型声明
+declare namespace MyLibrary {
+  interface Options {}
+}
+
+// 2. 为第三方库添加类型
+declare namespace Express {
+  interface Request {
+    customProp: string
+  }
+}
+
+// 3. 逐步迁移旧代码
+
+// 🔶 不推荐使用命名空间的场景
+
+// 1. 新项目 - 使用 ES 模块
+// 2. Node.js 项目 - 使用 CommonJS 或 ES 模块
+// 3. 现代前端项目 - 使用 ES 模块
+```
+
+## 常见问题
+
+### 🙋 命名空间和模块可以混用吗？
+
+```typescript
+// 可以，但不推荐
+// 命名空间在模块文件中会成为导出的一部分
+
+// utils.ts
+export namespace Utils {
+  export function log(msg: string) {
+    console.log(msg)
+  }
+}
+
+// main.ts
+import { Utils } from './utils'
+Utils.log('hello')
+
+// 更好的做法：直接使用模块
+// utils.ts
+export function log(msg: string) {
+  console.log(msg)
+}
+```
+
+### 🙋 如何在声明文件中组织类型？
+
+```typescript
+// 使用命名空间组织相关类型
+declare namespace API {
+  namespace Users {
+    interface User {
+      id: number
+      name: string
+    }
+
+    interface CreateUserRequest {
+      name: string
+      email: string
+    }
+
+    interface UpdateUserRequest {
+      name?: string
+      email?: string
+    }
+  }
+
+  namespace Products {
+    interface Product {
+      id: number
+      name: string
+      price: number
+    }
+  }
+}
+
+// 使用
+function createUser(data: API.Users.CreateUserRequest): API.Users.User {
+  // ...
+}
+```
+
+### 🙋 命名空间会影响打包大小吗？
+
+```typescript
+// 命名空间编译后会生成 IIFE
+var Utils
+;(function (Utils) {
+  function log(msg) {
+    console.log(msg)
+  }
+  Utils.log = log
+})(Utils || (Utils = {}))
+
+// 模块可以更好地进行 tree-shaking
+// 现代打包工具推荐使用 ES 模块
+```
+
+## 总结
+
+| 特性         | 命名空间         | 模块              |
+| ------------ | ---------------- | ----------------- |
+| 语法         | `namespace`      | `import`/`export` |
+| 作用域       | 全局或文件       | 文件级别          |
+| 合并         | 支持自动合并     | 不支持            |
+| Tree-shaking | 支持有限         | 完全支持          |
+| 推荐场景     | 声明文件、旧代码 | 新项目            |
+
+下一篇我们将学习声明文件基础，了解如何为 JavaScript 库添加类型支持。

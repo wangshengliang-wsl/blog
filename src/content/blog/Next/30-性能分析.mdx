@@ -1,0 +1,511 @@
+---
+title: 性能分析
+description: 使用 Bundle Analyzer、Web Vitals 和 DevTools 分析 Next.js 应用性能，定位瓶颈并优化
+pubDate: 2025-12-03
+toc: true
+ogImage: true
+category: Next
+tags: ['Next.js', '性能分析', 'Core Web Vitals', 'Bundle Analyzer']
+---
+
+🙋 应用变慢了但不知道问题在哪？系统的性能分析能帮你找到瓶颈。
+
+## Core Web Vitals
+
+Google 的核心性能指标：
+
+| 指标 | 全称                      | 良好值  | 衡量内容         |
+| ---- | ------------------------- | ------- | ---------------- |
+| LCP  | Largest Contentful Paint  | < 2.5s  | 最大内容绘制时间 |
+| INP  | Interaction to Next Paint | < 200ms | 交互响应性       |
+| CLS  | Cumulative Layout Shift   | < 0.1   | 布局稳定性       |
+
+## 内置性能分析
+
+### useReportWebVitals
+
+```tsx
+// app/layout.tsx
+import { WebVitals } from '@/components/WebVitals'
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="zh-CN">
+      <body>
+        <WebVitals />
+        {children}
+      </body>
+    </html>
+  )
+}
+```
+
+```tsx
+// components/WebVitals.tsx
+'use client'
+
+import { useReportWebVitals } from 'next/web-vitals'
+
+export function WebVitals() {
+  useReportWebVitals((metric) => {
+    console.log(metric)
+
+    // 发送到分析服务
+    fetch('/api/analytics', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: metric.name,
+        value: metric.value,
+        id: metric.id,
+        delta: metric.delta,
+        rating: metric.rating,
+      }),
+    })
+  })
+
+  return null
+}
+```
+
+### 上报到分析平台
+
+```tsx
+// components/WebVitals.tsx
+'use client'
+
+import { useReportWebVitals } from 'next/web-vitals'
+
+export function WebVitals() {
+  useReportWebVitals((metric) => {
+    // Google Analytics
+    if (window.gtag) {
+      window.gtag('event', metric.name, {
+        value: Math.round(
+          metric.name === 'CLS' ? metric.value * 1000 : metric.value
+        ),
+        event_label: metric.id,
+        non_interaction: true,
+      })
+    }
+
+    // Vercel Analytics
+    if (window.va) {
+      window.va('event', {
+        name: metric.name,
+        value: metric.value,
+      })
+    }
+  })
+
+  return null
+}
+```
+
+## Bundle Analyzer
+
+### 安装配置
+
+```bash
+pnpm add @next/bundle-analyzer
+```
+
+```tsx
+// next.config.ts
+import type { NextConfig } from 'next'
+import bundleAnalyzer from '@next/bundle-analyzer'
+
+const withBundleAnalyzer = bundleAnalyzer({
+  enabled: process.env.ANALYZE === 'true',
+})
+
+const config: NextConfig = {
+  // 其他配置
+}
+
+export default withBundleAnalyzer(config)
+```
+
+### 运行分析
+
+```bash
+ANALYZE=true pnpm build
+```
+
+自动打开浏览器显示：
+
+- `client.html` - 客户端 bundle
+- `nodejs.html` - 服务端 bundle
+
+### 分析结果解读
+
+重点关注：
+
+1. **大模块** - 超过 100KB 的模块
+2. **重复依赖** - 多次打包的库
+3. **未使用代码** - tree-shaking 未移除的代码
+
+## 构建输出分析
+
+```bash
+pnpm build
+```
+
+输出示例：
+
+```
+Route (app)                              Size     First Load JS
+┌ ○ /                                    5.2 kB         92 kB
+├ ○ /about                               1.2 kB         88 kB
+├ ● /blog                                2.1 kB         89 kB
+├ ● /blog/[slug]                         3.5 kB         91 kB
+├ λ /api/search                          0 B            0 B
+└ λ /dashboard                           4.2 kB         95 kB
+
+○  (Static)   prerendered as static content
+●  (SSG)      prerendered as static HTML (uses getStaticProps)
+λ  (Dynamic)  server-rendered on demand
+
+First Load JS shared by all              87.1 kB
+├ chunks/framework-xxx.js                45.2 kB
+├ chunks/main-xxx.js                     28.9 kB
+└ chunks/pages/_app-xxx.js               13 kB
+```
+
+### 优化目标
+
+| 指标          | 目标     | 说明         |
+| ------------- | -------- | ------------ |
+| First Load JS | < 100 kB | 首屏 JS 体积 |
+| 单页 Size     | < 50 kB  | 页面特有代码 |
+| 共享 chunks   | < 100 kB | 所有页面共用 |
+
+## 运行时性能分析
+
+### React DevTools Profiler
+
+```tsx
+// 在开发环境启用 Profiler
+;<Profiler id="MyComponent" onRender={onRenderCallback}>
+  <MyComponent />
+</Profiler>
+
+function onRenderCallback(
+  id: string,
+  phase: 'mount' | 'update',
+  actualDuration: number,
+  baseDuration: number,
+  startTime: number,
+  commitTime: number
+) {
+  console.log({
+    id,
+    phase,
+    actualDuration,
+    baseDuration,
+  })
+}
+```
+
+### 自定义性能标记
+
+```tsx
+// lib/performance.ts
+export function measureAsync<T>(
+  name: string,
+  fn: () => Promise<T>
+): Promise<T> {
+  if (typeof performance === 'undefined') {
+    return fn()
+  }
+
+  const start = performance.now()
+  return fn().finally(() => {
+    const duration = performance.now() - start
+    console.log(`[Performance] ${name}: ${duration.toFixed(2)}ms`)
+
+    // 发送到分析服务
+    if (process.env.NODE_ENV === 'production') {
+      sendToAnalytics(name, duration)
+    }
+  })
+}
+```
+
+```tsx
+// 使用
+const data = await measureAsync('fetchPosts', () => getPosts())
+```
+
+## 服务端性能分析
+
+### 数据获取计时
+
+```tsx
+// app/page.tsx
+export default async function Page() {
+  const start = Date.now()
+
+  const [posts, users] = await Promise.all([getPosts(), getUsers()])
+
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`Data fetching: ${Date.now() - start}ms`)
+  }
+
+  return <div>{/* ... */}</div>
+}
+```
+
+### 请求追踪
+
+```tsx
+// lib/fetch.ts
+export async function tracedFetch(
+  url: string,
+  options?: RequestInit
+): Promise<Response> {
+  const start = Date.now()
+
+  try {
+    const response = await fetch(url, options)
+    const duration = Date.now() - start
+
+    console.log(`[Fetch] ${url} - ${response.status} - ${duration}ms`)
+
+    return response
+  } catch (error) {
+    const duration = Date.now() - start
+    console.error(`[Fetch Error] ${url} - ${duration}ms`, error)
+    throw error
+  }
+}
+```
+
+## 常见性能问题
+
+### 1. Bundle 过大
+
+问题定位：
+
+```bash
+ANALYZE=true pnpm build
+```
+
+解决方案：
+
+```tsx
+// 动态导入大型库
+import dynamic from 'next/dynamic'
+
+const HeavyChart = dynamic(() => import('@/components/HeavyChart'), {
+  loading: () => <div>加载中...</div>,
+  ssr: false,
+})
+
+// 按需导入
+import { format } from 'date-fns/format' // ✅
+// import { format } from 'date-fns' // ❌
+```
+
+### 2. 请求瀑布
+
+问题：顺序请求导致加载慢
+
+```tsx
+// ❌ 瀑布流
+const user = await getUser()
+const posts = await getPosts(user.id)
+const comments = await getComments(posts[0].id)
+
+// ✅ 并行请求
+const [user, posts] = await Promise.all([getUser(), getPosts()])
+```
+
+### 3. 重复渲染
+
+使用 React DevTools 检测：
+
+```tsx
+// 使用 memo 避免不必要渲染
+import { memo } from 'react'
+
+const ExpensiveComponent = memo(function ExpensiveComponent({
+  data,
+}: {
+  data: Data
+}) {
+  return <div>{/* 复杂渲染 */}</div>
+})
+```
+
+### 4. 大图片
+
+```tsx
+// ✅ 使用 next/image
+import Image from 'next/image'
+
+;<Image
+  src="/large-image.jpg"
+  alt="大图"
+  width={1200}
+  height={800}
+  priority // 首屏图片
+/>
+```
+
+## 性能优化清单
+
+### 构建时优化
+
+- [ ] 使用动态导入分割代码
+- [ ] 按需导入库函数
+- [ ] 移除未使用的依赖
+- [ ] 启用 Tree Shaking
+- [ ] 压缩图片资源
+
+### 运行时优化
+
+- [ ] 使用 Server Components
+- [ ] 实施请求并行化
+- [ ] 添加适当的缓存策略
+- [ ] 使用 Suspense 实现流式渲染
+- [ ] 避免不必要的重渲染
+
+### 加载优化
+
+- [ ] 首屏图片使用 priority
+- [ ] 第三方脚本使用 lazyOnload
+- [ ] 字体使用 next/font
+- [ ] 启用预取 prefetch
+
+## 监控仪表盘
+
+### 自建监控
+
+```tsx
+// app/api/analytics/route.ts
+import { NextRequest, NextResponse } from 'next/server'
+
+interface Metric {
+  name: string
+  value: number
+  id: string
+  rating: 'good' | 'needs-improvement' | 'poor'
+}
+
+export async function POST(request: NextRequest) {
+  const metric: Metric = await request.json()
+
+  // 存储到数据库
+  await db.metric.create({
+    data: {
+      name: metric.name,
+      value: metric.value,
+      rating: metric.rating,
+      timestamp: new Date(),
+      page: request.headers.get('referer'),
+      userAgent: request.headers.get('user-agent'),
+    },
+  })
+
+  return NextResponse.json({ received: true })
+}
+```
+
+### Vercel Analytics
+
+```bash
+pnpm add @vercel/analytics
+```
+
+```tsx
+// app/layout.tsx
+import { Analytics } from '@vercel/analytics/react'
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="zh-CN">
+      <body>
+        {children}
+        <Analytics />
+      </body>
+    </html>
+  )
+}
+```
+
+### Speed Insights
+
+```bash
+pnpm add @vercel/speed-insights
+```
+
+```tsx
+// app/layout.tsx
+import { SpeedInsights } from '@vercel/speed-insights/next'
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="zh-CN">
+      <body>
+        {children}
+        <SpeedInsights />
+      </body>
+    </html>
+  )
+}
+```
+
+## 性能测试工具
+
+### Lighthouse
+
+```bash
+# 命令行运行
+npx lighthouse https://example.com --view
+```
+
+### PageSpeed Insights
+
+访问 https://pagespeed.web.dev/ 输入网址分析。
+
+### WebPageTest
+
+访问 https://www.webpagetest.org/ 进行详细分析。
+
+## 常见问题
+
+🤔 **Q: First Load JS 过大怎么办？**
+
+1. 检查是否有大型库可以动态导入
+2. 使用 Bundle Analyzer 找出大模块
+3. 检查是否有不必要的 polyfills
+
+🤔 **Q: LCP 过慢怎么优化？**
+
+1. 首屏图片使用 `priority`
+2. 减少服务端数据获取时间
+3. 使用 Streaming 提前发送 HTML
+
+🤔 **Q: CLS 分数差怎么办？**
+
+1. 图片设置明确的宽高
+2. 使用 next/font 避免字体闪烁
+3. 为动态内容预留空间
+
+---
+
+恭喜你完成了优化与性能部分！下一篇将进入全栈开发部分，介绍认证基础。
+
+-EOF-

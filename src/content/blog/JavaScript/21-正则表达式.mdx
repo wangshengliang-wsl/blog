@@ -1,0 +1,477 @@
+---
+title: '正则表达式'
+description: '掌握 JavaScript 正则表达式语法，学会模式匹配与文本处理'
+pubDate: 2025-12-03
+toc: true
+ogImage: true
+category: 'JavaScript'
+tags: ['JavaScript', '正则表达式', 'RegExp', '模式匹配']
+---
+
+正则表达式是用于匹配字符串模式的工具。掌握正则，能让文本处理效率大大提升。
+
+## 🎯 创建正则表达式
+
+### 字面量方式
+
+```javascript
+// 基本语法：/pattern/flags
+const regex1 = /hello/
+const regex2 = /hello/i // i 忽略大小写
+const regex3 = /hello/g // g 全局匹配
+
+// 测试匹配
+console.log(regex1.test('hello world')) // true
+console.log(regex1.test('Hello world')) // false
+console.log(regex2.test('Hello world')) // true
+```
+
+### 构造函数方式
+
+```javascript
+// 当模式是动态的时候使用
+const pattern = 'hello'
+const regex = new RegExp(pattern, 'i')
+
+console.log(regex.test('Hello')) // true
+
+// 🔶 注意：字符串中的反斜杠需要转义
+const regex2 = new RegExp('\\d+') // 匹配数字
+// 等同于 /\d+/
+```
+
+## 修饰符（Flags）
+
+```javascript
+// i - 忽略大小写
+/abc/i.test('ABC')  // true
+
+// g - 全局匹配（查找所有匹配项）
+'abcabc'.match(/abc/g)  // ['abc', 'abc']
+
+// m - 多行模式（^ 和 $ 匹配每行）
+/^abc/m.test('xxx\nabc')  // true
+
+// s - 点号匹配换行符（ES2018）
+/a.b/s.test('a\nb')  // true
+
+// u - Unicode 模式
+/\u{1F600}/u.test('😀')  // true
+
+// y - 粘性匹配（从 lastIndex 开始）
+const sticky = /abc/y
+sticky.lastIndex = 3
+sticky.test('xxxabc')  // true
+```
+
+## 基础语法
+
+### 普通字符
+
+```javascript
+// 普通字符匹配自身
+/hello/.test('hello world')  // true
+/123/.test('abc123def')      // true
+```
+
+### 元字符
+
+```javascript
+// . 匹配任意单个字符（除换行符）
+/a.c/.test('abc')  // true
+/a.c/.test('aXc')  // true
+/a.c/.test('ac')   // false
+
+// ^ 匹配字符串开头
+/^hello/.test('hello world')  // true
+/^hello/.test('say hello')    // false
+
+// $ 匹配字符串结尾
+/world$/.test('hello world')  // true
+/world$/.test('world hello')  // false
+
+// ^...$ 精确匹配
+/^hello$/.test('hello')        // true
+/^hello$/.test('hello world')  // false
+```
+
+### 字符类
+
+```javascript
+// [...] 匹配括号内的任意字符
+/[abc]/.test('a')    // true
+/[abc]/.test('d')    // false
+
+// [^...] 匹配不在括号内的字符
+/[^abc]/.test('d')   // true
+/[^abc]/.test('a')   // false
+
+// 范围
+/[a-z]/.test('m')    // true（小写字母）
+/[A-Z]/.test('M')    // true（大写字母）
+/[0-9]/.test('5')    // true（数字）
+/[a-zA-Z0-9]/.test('x')  // true（字母数字）
+
+// 组合
+/[a-z0-9_]/.test('_')  // true
+```
+
+### 预定义字符类
+
+```javascript
+// \d 数字，等同于 [0-9]
+/\d/.test('123')     // true
+
+// \D 非数字，等同于 [^0-9]
+/\D/.test('abc')     // true
+
+// \w 单词字符，等同于 [a-zA-Z0-9_]
+/\w/.test('hello')   // true
+
+// \W 非单词字符
+/\W/.test('@')       // true
+
+// \s 空白字符（空格、制表符、换行等）
+/\s/.test(' ')       // true
+/\s/.test('\t')      // true
+
+// \S 非空白字符
+/\S/.test('a')       // true
+
+// \b 单词边界
+/\bcat\b/.test('the cat sat')  // true
+/\bcat\b/.test('category')     // false
+
+// \B 非单词边界
+/\Bcat\B/.test('category')     // false
+/\Bcat/.test('tomcat')         // true
+```
+
+## 量词
+
+```javascript
+// * 零次或多次
+/ab*c/.test('ac')     // true
+/ab*c/.test('abc')    // true
+/ab*c/.test('abbbc')  // true
+
+// + 一次或多次
+/ab+c/.test('ac')     // false
+/ab+c/.test('abc')    // true
+/ab+c/.test('abbbc')  // true
+
+// ? 零次或一次
+/ab?c/.test('ac')     // true
+/ab?c/.test('abc')    // true
+/ab?c/.test('abbc')   // false
+
+// {n} 恰好 n ���
+/a{3}/.test('aaa')    // true
+/a{3}/.test('aa')     // false
+
+// {n,} 至少 n 次
+/a{2,}/.test('aa')    // true
+/a{2,}/.test('aaaa')  // true
+
+// {n,m} n 到 m 次
+/a{2,4}/.test('a')     // false
+/a{2,4}/.test('aa')    // true
+/a{2,4}/.test('aaaa')  // true
+/a{2,4}/.test('aaaaa') // true（匹配前4个）
+```
+
+### 贪婪与非贪婪
+
+```javascript
+const str = '<div>hello</div>'
+
+// 贪婪模式（默认）：尽可能多地匹配
+str.match(/<.+>/) // ['<div>hello</div>']
+
+// 非贪婪模式：尽可能少地匹配（量词后加 ?）
+str.match(/<.+?>/) // ['<div>']
+
+// 其他非贪婪量词
+// *?  零次或多次（非贪婪）
+// +?  一次或多次（非贪婪）
+// ??  零次或一次（非贪婪）
+// {n,m}? n 到 m 次（非贪婪）
+```
+
+## 分组与引用
+
+### 捕获分组
+
+```javascript
+// 使用 () 创建分组
+const regex = /(\d{4})-(\d{2})-(\d{2})/
+const match = regex.exec('2024-01-15')
+
+console.log(match[0]) // '2024-01-15'（完整匹配）
+console.log(match[1]) // '2024'（第一个分组）
+console.log(match[2]) // '01'（第二个分组）
+console.log(match[3]) // '15'（第三个分组）
+
+// 在替换中使用分组
+'2024-01-15'.replace(/(\d{4})-(\d{2})-(\d{2})/, '$2/$3/$1')
+// '01/15/2024'
+```
+
+### 非捕获分组
+
+```javascript
+// (?:...) 不捕获分组
+const regex = /(?:https?:\/\/)?(\w+\.\w+)/
+const match = regex.exec('https://example.com')
+
+console.log(match[1]) // 'example.com'（只有一个捕获组）
+```
+
+### 命名分组（ES2018）
+
+```javascript
+const regex = /(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})/
+const match = regex.exec('2024-01-15')
+
+console.log(match.groups.year) // '2024'
+console.log(match.groups.month) // '01'
+console.log(match.groups.day) // '15'
+
+// 在替换中使用
+'2024-01-15'.replace(regex, '$<month>/$<day>/$<year>')
+// '01/15/2024'
+```
+
+### 反向引用
+
+```javascript
+// \1, \2 引用之前的分组
+// 匹配重复的单词
+const regex = /(\w+)\s+\1/
+regex.test('hello hello') // true
+regex.test('hello world') // false
+
+// 匹配引号内容（引号必须配对）
+const quoteRegex = /(['"])(.*?)\1/
+quoteRegex.exec('"hello"') // ['"hello"', '"', 'hello']
+quoteRegex.exec("'world'") // ["'world'", "'", 'world']
+```
+
+## 选择与断言
+
+### 选择（或）
+
+```javascript
+// | 表示或
+/cat|dog/.test('cat')  // true
+/cat|dog/.test('dog')  // true
+/cat|dog/.test('bird') // false
+
+// 分组中的选择
+/(red|blue) car/.test('red car')   // true
+/(red|blue) car/.test('blue car')  // true
+```
+
+### 先行断言
+
+```javascript
+// (?=...) 正向先行断言：后面必须是...
+/foo(?=bar)/.test('foobar')  // true
+/foo(?=bar)/.test('foobaz')  // false
+'foobar'.match(/foo(?=bar)/) // ['foo']（不包含 bar）
+
+// (?!...) 负向先行断言：后面不能是...
+/foo(?!bar)/.test('foobaz')  // true
+/foo(?!bar)/.test('foobar')  // false
+```
+
+### 后行断言（ES2018）
+
+```javascript
+// (?<=...) 正向后行断言：前面必须是...
+/(?<=\$)\d+/.exec('$100')  // ['100']
+/(?<=\$)\d+/.exec('€100')  // null
+
+// (?<!...) 负向后行断言：前面不能是...
+/(?<!\$)\d+/.exec('€100')  // ['100']
+/(?<!\$)\d+/.exec('$100')  // null（$ 后面的不匹配）
+```
+
+## 常用方法
+
+### RegExp 方法
+
+```javascript
+const regex = /\d+/g
+
+// test：测试是否匹配
+regex.test('abc123') // true
+
+// exec：返回匹配详情
+regex.exec('abc123def456') // ['123', index: 3, ...]
+regex.exec('abc123def456') // ['456', index: 9, ...]
+regex.exec('abc123def456') // null（没有更多匹配）
+
+// 🔶 注意：g 模式下 exec 会记住 lastIndex
+regex.lastIndex = 0 // 重置
+```
+
+### String 方法
+
+```javascript
+const str = 'hello world'
+
+// match：返回匹配结果
+str.match(/o/) // ['o', index: 4, ...]
+str.match(/o/g) // ['o', 'o']（g 模式返回所有匹配）
+str.match(/x/) // null
+
+// matchAll（ES2020）：返回迭代器
+const matches = str.matchAll(/o/g)
+for (const match of matches) {
+  console.log(match.index) // 4, 7
+}
+
+// search：返回匹配位置
+str.search(/world/) // 6
+str.search(/xyz/) // -1
+
+// replace：替换
+str.replace(/world/, 'JavaScript') // 'hello JavaScript'
+str.replace(/o/g, '0') // 'hell0 w0rld'
+
+// 替换回调函数
+'hello'.replace(/./g, (char, index) => {
+  return index === 0 ? char.toUpperCase() : char
+}) // 'Hello'
+
+// split：分割
+'a,b;c|d'.split(/[,;|]/) // ['a', 'b', 'c', 'd']
+```
+
+## 实用正则表达式
+
+### 常见验证
+
+```javascript
+// 邮箱（简化版）
+const emailRegex = /^[\w.-]+@[\w.-]+\.\w+$/
+emailRegex.test('user@example.com') // true
+
+// 手机号（中国大陆）
+const phoneRegex = /^1[3-9]\d{9}$/
+phoneRegex.test('13812345678') // true
+
+// URL
+const urlRegex = /^https?:\/\/[\w.-]+(?:\/[\w./?%&=-]*)?$/
+urlRegex.test('https://example.com/path?query=1') // true
+
+// 身份证号（简化版）
+const idCardRegex = /^\d{17}[\dXx]$/
+idCardRegex.test('11010119900101001X') // true
+
+// 密码（8-20位，包含字母和数字）
+const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,20}$/
+passwordRegex.test('password123') // true
+
+// 中文字符
+const chineseRegex = /[\u4e00-\u9fa5]/
+chineseRegex.test('你好') // true
+
+// IP 地址（简化版）
+const ipRegex = /^(\d{1,3}\.){3}\d{1,3}$/
+ipRegex.test('192.168.1.1') // true
+```
+
+### 文本处理
+
+```javascript
+// 去除首尾空格
+const trimRegex = /^\s+|\s+$/g
+'  hello  '.replace(trimRegex, '') // 'hello'
+
+// 压缩多个空格
+'hello   world'.replace(/\s+/g, ' ') // 'hello world'
+
+// 提取数字
+'价格: ¥199.99'.match(/\d+\.?\d*/g) // ['199.99']
+
+// 驼峰转连字符
+'backgroundColor'.replace(/([A-Z])/g, '-$1').toLowerCase()
+// 'background-color'
+
+// 连字符转驼峰
+'background-color'.replace(/-([a-z])/g, (_, char) => char.toUpperCase())
+// 'backgroundColor'
+
+// 首字母大写
+'hello world'.replace(/\b\w/g, (char) => char.toUpperCase())
+// 'Hello World'
+
+// 转义 HTML 特殊字符
+function escapeHtml(str) {
+  return str.replace(
+    /[&<>"']/g,
+    (char) =>
+      ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;',
+      })[char]
+  )
+}
+```
+
+## 性能优化
+
+```javascript
+// ✅ 编译一次，多次使用
+const regex = /pattern/
+for (const str of strings) {
+  regex.test(str)
+}
+
+// 🔶 避免在循环中创建正则
+for (const str of strings) {
+  /pattern/.test(str)  // 每次都创建新正则
+}
+
+// ✅ 避免回溯灾难
+// 🔶 不好：嵌套量词可能导致指数级回溯
+const bad = /^(a+)+$/
+
+// ✅ 好：使用原子组或更精确的模式
+const good = /^a+$/
+
+// ✅ 使用非捕获组减少内存
+/(?:abc)+/  // 不需要捕获时使用 (?:...)
+```
+
+## 总结
+
+| 元字符    | 含义       |
+| --------- | ---------- |
+| `.`       | 任意字符   |
+| `^`       | 开头       |
+| `$`       | 结尾       |
+| `*`       | 零次或多次 |
+| `+`       | 一次或多次 |
+| `?`       | 零次或一次 |
+| `\d`      | 数字       |
+| `\w`      | 单词字符   |
+| `\s`      | 空白字符   |
+| `\b`      | 单词边界   |
+| `[...]`   | 字符类     |
+| `(...)`   | 捕获分组   |
+| `(?:...)` | 非捕获分组 |
+| `\|`      | 或         |
+
+**核心要点**：
+
+- 字面量 `/pattern/` 用于静态模式
+- 构造函数 `new RegExp()` 用于动态模式
+- 量词默认贪婪，加 `?` 变非贪婪
+- 使用分组提取和引用匹配内容
+- 断言匹配位置而非字符

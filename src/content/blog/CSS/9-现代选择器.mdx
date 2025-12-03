@@ -1,0 +1,457 @@
+---
+title: 现代选择器
+description: 掌握 CSS 现代选择器 :is()、:where()、:has() 和 :not()，简化复杂选择器
+pubDate: 2025-12-03
+toc: true
+ogImage: true
+category: CSS
+---
+
+CSS 选择器在不断进化。`:is()`、`:where()`、`:has()` 和增强的 `:not()` 让我们能用更简洁的方式编写复杂选择器，同时更好地控制优先级。
+
+## :is() 匹配选择器
+
+`:is()` 接受一个选择器列表，匹配其中任一选择器：
+
+### 基本用法
+
+```css
+/* 传统写法 */
+header a,
+nav a,
+footer a {
+  color: #3b82f6;
+}
+
+/* 使用 :is() */
+:is(header, nav, footer) a {
+  color: #3b82f6;
+}
+```
+
+### 简化嵌套选择器
+
+```css
+/* 传统写法 */
+article h1,
+article h2,
+article h3,
+section h1,
+section h2,
+section h3 {
+  line-height: 1.2;
+}
+
+/* 使用 :is() */
+:is(article, section) :is(h1, h2, h3) {
+  line-height: 1.2;
+}
+```
+
+### 优先级特性
+
+🎯 `:is()` 的优先级等于其参数中**最高**的那个：
+
+```css
+:is(#id, .class, p) {
+  /* 优先级等于 #id，即 1-0-0 */
+}
+
+:is(.foo, .bar) {
+  /* 优先级等于 0-1-0 */
+}
+```
+
+### 容错特性
+
+`:is()` 会忽略无效的选择器，不会导致整条规则失效：
+
+```css
+/* 如果 :unknown 无效，整条规则仍然有效 */
+:is(.valid, :unknown, .another-valid) {
+  color: blue;
+}
+```
+
+## :where() 零权重选择器
+
+`:where()` 语法与 `:is()` 完全相同，但**优先级始终为 0**：
+
+```css
+/* 优先级：0-0-0 */
+:where(#id, .class, p) {
+  color: gray;
+}
+
+/* 可以被任何选择器覆盖 */
+p {
+  color: red; /* 这个会生效！ */
+}
+```
+
+### 使用场景
+
+**1. 可覆盖的基础样式**
+
+```css
+/* 组件库的默认样式 */
+:where(.button) {
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  background: #e5e7eb;
+}
+
+/* 用户可以轻松覆盖 */
+.button {
+  background: #3b82f6;
+}
+```
+
+**2. CSS Reset**
+
+```css
+/* 零优先级的 reset，用户样式可以轻松覆盖 */
+:where(h1, h2, h3, h4, h5, h6) {
+  margin: 0;
+  font-weight: normal;
+}
+
+:where(ul, ol) {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+```
+
+**3. 降低 ID 选择器的优先级**
+
+```css
+/* 正常优先级 1-0-1 */
+#sidebar a {
+  color: blue;
+}
+
+/* 优先级降为 0-0-1 */
+:where(#sidebar) a {
+  color: blue;
+}
+```
+
+## :has() 父选择器
+
+`:has()` 是 CSS 历史上最受期待的选择器之一，它让你能够基于子元素或后续元素来选择元素。
+
+### 基本用法
+
+```css
+/* 包含 img 的 a 元素 */
+a:has(img) {
+  display: block;
+}
+
+/* 包含必填输入框的表单组 */
+.form-group:has(input:required) {
+  font-weight: bold;
+}
+```
+
+### 选择父元素
+
+```css
+/* 如果卡片包含图片，卡片就应用样式 */
+.card:has(img) {
+  padding: 0;
+}
+
+/* 如果表单有无效输入，整个表单边框变红 */
+form:has(input:invalid) {
+  border-color: #ef4444;
+}
+```
+
+### 选择前面的兄弟元素
+
+```css
+/* 如果后面紧跟 p，则 h2 添加样式 */
+h2:has(+ p) {
+  margin-bottom: 0.5rem;
+}
+
+/* 如果后面有 .error，则输入框变红 */
+input:has(~ .error) {
+  border-color: #ef4444;
+}
+```
+
+### 实战案例
+
+**1. 空状态样式**
+
+```css
+/* 没有子元素的容器 */
+.container:not(:has(*)) {
+  display: none;
+}
+
+/* 或者显示空状态提示 */
+.list:not(:has(li))::before {
+  content: '暂无数据';
+  display: block;
+  padding: 2rem;
+  text-align: center;
+  color: #9ca3af;
+}
+```
+
+**2. 表单验证反馈**
+
+```css
+/* 包含无效输入的表单组 */
+.form-group:has(input:invalid:not(:placeholder-shown)) {
+  --input-border-color: #ef4444;
+}
+
+.form-group:has(input:valid:not(:placeholder-shown)) {
+  --input-border-color: #10b981;
+}
+
+.form-group input {
+  border-color: var(--input-border-color, #d1d5db);
+}
+```
+
+**3. 响应内容的布局**
+
+```css
+/* 如果卡片有图片，使用水平布局 */
+.card:has(img) {
+  display: flex;
+  gap: 1rem;
+}
+
+.card:has(img) img {
+  flex: 0 0 200px;
+  object-fit: cover;
+}
+
+/* 没有图片则垂直堆叠 */
+.card:not(:has(img)) {
+  display: block;
+}
+```
+
+**4. 全局状态**
+
+```css
+/* 如果页面有模态框打开，禁止滚动 */
+body:has(.modal.open) {
+  overflow: hidden;
+}
+
+/* 如果侧边栏展开，调整主内容区 */
+.main:has(.sidebar.expanded) {
+  margin-left: 250px;
+}
+```
+
+## :not() 否定选择器
+
+`:not()` 选择不匹配指定选择器的元素。
+
+### 基本用法
+
+```css
+/* 除了最后一个 */
+li:not(:last-child) {
+  border-bottom: 1px solid #e5e7eb;
+}
+
+/* 除了禁用的 */
+button:not(:disabled) {
+  cursor: pointer;
+}
+
+/* 除了空的 */
+input:not(:placeholder-shown) {
+  border-color: #3b82f6;
+}
+```
+
+### 增强的 :not()
+
+现代浏览器支持在 `:not()` 中使用选择器列表：
+
+```css
+/* 传统写法 */
+p:not(.intro):not(.outro) {
+  text-indent: 2em;
+}
+
+/* 现代写法 */
+p:not(.intro, .outro) {
+  text-indent: 2em;
+}
+```
+
+### 优先级
+
+`:not()` 的优先级等于其参数中最高的选择器：
+
+```css
+p:not(#special) {
+  /* 优先级 = 1-0-1（#special 的 1-0-0 + p 的 0-0-1） */
+}
+```
+
+### 常见模式
+
+```css
+/* 除了第一个的所有元素 */
+.item:not(:first-child) {
+  margin-top: 1rem;
+}
+
+/* 除了类名包含 "no-" 的 */
+[class]:not([class*='no-']) {
+  /* ... */
+}
+
+/* 不是链接的可点击元素 */
+[role='button']:not(a) {
+  cursor: pointer;
+}
+```
+
+## 组合使用
+
+这些选择器可以组合使用，创建非常强大的选择器：
+
+```css
+/* 包含链接的导航项，但不是当前页面 */
+nav li:has(a):not(:has([aria-current])) {
+  opacity: 0.8;
+}
+
+/* 任何标题后面紧跟段落的情况 */
+:is(h1, h2, h3):has(+ p) {
+  margin-bottom: 0.5rem;
+}
+
+/* 表单中有无效输入时的提交按钮 */
+form:has(input:invalid) button[type='submit'] {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* 简化复杂的否定选择 */
+:where(article, section):not(:has(h1, h2, h3)) {
+  border-top: 1px solid #e5e7eb;
+}
+```
+
+## 浏览器兼容性
+
+| 选择器        | Chrome | Firefox | Safari |
+| ------------- | ------ | ------- | ------ |
+| `:is()`       | 88+    | 78+     | 14+    |
+| `:where()`    | 88+    | 78+     | 14+    |
+| `:has()`      | 105+   | 121+    | 15.4+  |
+| `:not()` 列表 | 88+    | 84+     | 9+     |
+
+🔶 `:has()` 是最新添加的，在使用前检查目标浏览器支持情况。
+
+## 实战案例
+
+### 智能表格行
+
+```css
+/* 基础样式 */
+.table tr {
+  transition: background-color 0.2s;
+}
+
+/* 悬停行（但不是表头） */
+.table tr:not(:has(th)):hover {
+  background-color: #f3f4f6;
+}
+
+/* 选中行 */
+.table tr:has(input:checked) {
+  background-color: #eff6ff;
+}
+
+/* 包含错误的行 */
+.table tr:has(.error) {
+  background-color: #fef2f2;
+}
+```
+
+### 动态导航
+
+```css
+.nav-item {
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+}
+
+/* 有子菜单的项目 */
+.nav-item:has(.dropdown) {
+  padding-right: 2rem;
+  position: relative;
+}
+
+.nav-item:has(.dropdown)::after {
+  content: '▼';
+  position: absolute;
+  right: 0.75rem;
+  font-size: 0.75em;
+}
+
+/* 激活状态（任意后代匹配 aria-current） */
+.nav-item:has([aria-current]) {
+  background-color: #eff6ff;
+  color: #3b82f6;
+}
+```
+
+### 响应式卡片
+
+```css
+.card {
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+/* 有封面图的卡片 */
+.card:has(.card-cover) {
+  display: flex;
+  flex-direction: column;
+}
+
+.card:has(.card-cover) .card-cover {
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+}
+
+/* 没有封面图的卡片 */
+.card:not(:has(.card-cover)) {
+  padding: 1.5rem;
+  border: 1px solid #e5e7eb;
+}
+
+/* 有徽章的卡片 */
+.card:has(.badge) {
+  position: relative;
+}
+
+.card:has(.badge) .badge {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+}
+```
+
+---
+
+现代选择器让 CSS 更加强大和灵活。`:is()` 和 `:where()` 简化了复杂选择器的编写，`:has()` 终于实现了"父选择器"的梦想。结合使用这些选择器，可以大大减少对 JavaScript 的依赖，用纯 CSS 实现更多交互逻辑。下一篇我们将学习 CSS 变量，它让样式更加动态和可维护。

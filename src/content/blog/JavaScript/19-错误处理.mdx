@@ -1,0 +1,545 @@
+---
+title: '错误处理'
+description: '掌握 JavaScript 错误处理机制，学会使用 try/catch 和自定义错误'
+pubDate: 2025-12-03
+toc: true
+ogImage: true
+category: 'JavaScript'
+tags: ['JavaScript', '错误处理', 'try-catch', 'Error']
+---
+
+错误处理是编写健壮程序的重要部分。JavaScript 提供了完善的错误处理机制，帮助我们优雅地处理异常情况。
+
+## 🎯 错误类型
+
+### 内置错误类型
+
+```javascript
+// Error - 通用错误
+throw new Error('出错了')
+
+// SyntaxError - 语法错误
+// JSON.parse('{invalid}')  // SyntaxError
+
+// ReferenceError - 引用错误
+// console.log(notDefined)  // ReferenceError
+
+// TypeError - 类型错误
+// null.toString()  // TypeError
+
+// RangeError - 范围错误
+// new Array(-1)  // RangeError
+
+// URIError - URI 错误
+// decodeURI('%')  // URIError
+
+// EvalError - eval 错误（已很少使用）
+```
+
+### Error 对象属性
+
+```javascript
+try {
+  throw new Error('出错了')
+} catch (error) {
+  console.log(error.name) // "Error"
+  console.log(error.message) // "出错了"
+  console.log(error.stack) // 调用栈信息
+}
+
+// 不同错误类型的 name
+try {
+  JSON.parse('invalid')
+} catch (error) {
+  console.log(error.name) // "SyntaxError"
+  console.log(error.message) // 具体错误信息
+}
+```
+
+## try...catch...finally
+
+### 基本用法
+
+```javascript
+try {
+  // 可能出错的代码
+  const data = JSON.parse('invalid json')
+  console.log(data)
+} catch (error) {
+  // 错误处理
+  console.error('解析失败:', error.message)
+} finally {
+  // 无论是否出错都会执行
+  console.log('清理工作')
+}
+```
+
+### 捕获特定错误
+
+```javascript
+try {
+  // 某些操作
+} catch (error) {
+  if (error instanceof SyntaxError) {
+    console.log('语法错误')
+  } else if (error instanceof TypeError) {
+    console.log('类型错误')
+  } else if (error instanceof ReferenceError) {
+    console.log('引用错误')
+  } else {
+    // 未知错误，继续抛出
+    throw error
+  }
+}
+```
+
+### finally 的特殊性
+
+```javascript
+// finally 中的 return 会覆盖其他返回值
+function test() {
+  try {
+    return 'try'
+  } finally {
+    return 'finally' // 这个会覆盖
+  }
+}
+console.log(test()) // "finally"
+
+// finally 一定会执行
+function test2() {
+  try {
+    throw new Error('错误')
+  } catch (error) {
+    return 'catch'
+  } finally {
+    console.log('finally 执行')
+  }
+}
+test2() // 先打印 "finally 执行"，返回 "catch"
+```
+
+### 嵌套 try...catch
+
+```javascript
+try {
+  try {
+    throw new Error('内部错误')
+  } finally {
+    console.log('内部 finally')
+  }
+} catch (error) {
+  // 内部没有 catch，错误会被外部捕获
+  console.log('外部捕获:', error.message)
+}
+// 输出：
+// 内部 finally
+// 外部捕获: 内部错误
+```
+
+## throw 语句
+
+### 抛出错误
+
+```javascript
+// 抛出 Error 对象（推荐）
+throw new Error('出错了')
+
+// 抛出字符串（不推荐，没有堆栈信息）
+throw '出错了'
+
+// 抛出数字（不推荐）
+throw 404
+
+// 抛出对象
+throw { code: 'INVALID_INPUT', message: '输入无效' }
+```
+
+### 条件抛出
+
+```javascript
+function divide(a, b) {
+  if (typeof a !== 'number' || typeof b !== 'number') {
+    throw new TypeError('参数必须是数字')
+  }
+  if (b === 0) {
+    throw new Error('除数不能为零')
+  }
+  return a / b
+}
+
+try {
+  divide(10, 0)
+} catch (error) {
+  console.log(error.message) // "除数不能为零"
+}
+```
+
+## 自定义错误
+
+### 继承 Error
+
+```javascript
+class ValidationError extends Error {
+  constructor(message, field) {
+    super(message)
+    this.name = 'ValidationError'
+    this.field = field
+  }
+}
+
+class NetworkError extends Error {
+  constructor(message, status) {
+    super(message)
+    this.name = 'NetworkError'
+    this.status = status
+  }
+}
+
+// 使用
+function validateEmail(email) {
+  if (!email.includes('@')) {
+    throw new ValidationError('邮箱格式无效', 'email')
+  }
+}
+
+try {
+  validateEmail('invalid')
+} catch (error) {
+  if (error instanceof ValidationError) {
+    console.log(`字段 ${error.field}: ${error.message}`)
+  }
+}
+```
+
+### 错误层次结构
+
+```javascript
+// 基础应用错误
+class AppError extends Error {
+  constructor(message, code) {
+    super(message)
+    this.name = this.constructor.name
+    this.code = code
+  }
+}
+
+// 业务错误
+class BusinessError extends AppError {
+  constructor(message) {
+    super(message, 'BUSINESS_ERROR')
+  }
+}
+
+// 验证错误
+class ValidationError extends AppError {
+  constructor(message, fields) {
+    super(message, 'VALIDATION_ERROR')
+    this.fields = fields
+  }
+}
+
+// 权限错误
+class AuthError extends AppError {
+  constructor(message) {
+    super(message, 'AUTH_ERROR')
+  }
+}
+
+// 使用
+function handleError(error) {
+  if (error instanceof AuthError) {
+    // 重定向到登录页
+  } else if (error instanceof ValidationError) {
+    // 显示表单错误
+  } else if (error instanceof BusinessError) {
+    // 显示业务提示
+  } else {
+    // 通用错误处理
+  }
+}
+```
+
+## 异步错误处理
+
+### Promise 错误
+
+```javascript
+// Promise 中的错误
+const promise = new Promise((resolve, reject) => {
+  throw new Error('同步错误') // 会被 reject
+})
+
+promise.catch((error) => {
+  console.log(error.message) // "同步错误"
+})
+
+// 使用 reject
+const promise2 = new Promise((resolve, reject) => {
+  setTimeout(() => {
+    reject(new Error('异步错误'))
+  }, 100)
+})
+
+// .catch 捕获错误
+fetch('/api/data')
+  .then((response) => response.json())
+  .catch((error) => {
+    console.log('请求失败:', error)
+  })
+
+// 链式调用中的错误会传递
+fetch('/api/data')
+  .then((response) => {
+    if (!response.ok) {
+      throw new Error('HTTP 错误')
+    }
+    return response.json()
+  })
+  .then((data) => {
+    // 处���数据
+  })
+  .catch((error) => {
+    // 捕获上面任何一步的错误
+    console.log('错误:', error.message)
+  })
+```
+
+### async/await 错误
+
+```javascript
+// try...catch 处理异步错误
+async function fetchData() {
+  try {
+    const response = await fetch('/api/data')
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`)
+    }
+    const data = await response.json()
+    return data
+  } catch (error) {
+    console.log('请求失败:', error.message)
+    throw error // 可以重新抛出
+  }
+}
+
+// 调用方处理
+async function main() {
+  try {
+    const data = await fetchData()
+    console.log(data)
+  } catch (error) {
+    console.log('获取数据失败')
+  }
+}
+
+// 不用 try...catch 的方式
+fetchData()
+  .then((data) => console.log(data))
+  .catch((error) => console.log('错误:', error))
+```
+
+### 并行请求的错误处理
+
+```javascript
+// Promise.all - 一个失败全部失败
+async function fetchAll() {
+  try {
+    const [users, posts] = await Promise.all([
+      fetch('/api/users').then((r) => r.json()),
+      fetch('/api/posts').then((r) => r.json()),
+    ])
+    return { users, posts }
+  } catch (error) {
+    console.log('至少一个请求失败')
+  }
+}
+
+// Promise.allSettled - 获取所有结果
+async function fetchAllSettled() {
+  const results = await Promise.allSettled([
+    fetch('/api/users').then((r) => r.json()),
+    fetch('/api/posts').then((r) => r.json()),
+  ])
+
+  results.forEach((result, index) => {
+    if (result.status === 'fulfilled') {
+      console.log(`请求 ${index} 成功:`, result.value)
+    } else {
+      console.log(`请求 ${index} 失败:`, result.reason)
+    }
+  })
+}
+```
+
+## 全局错误处理
+
+### window.onerror
+
+```javascript
+// 捕获未处理的错误
+window.onerror = function (message, source, lineno, colno, error) {
+  console.log('错误:', message)
+  console.log('来源:', source)
+  console.log('行号:', lineno)
+  console.log('列号:', colno)
+  console.log('错误对象:', error)
+
+  // 返回 true 阻止默认处理
+  return true
+}
+
+// 或使用 addEventListener
+window.addEventListener('error', function (event) {
+  console.log('错误:', event.message)
+  event.preventDefault() // 阻止默认处理
+})
+```
+
+### unhandledrejection
+
+```javascript
+// 捕获未处理的 Promise 拒绝
+window.addEventListener('unhandledrejection', function (event) {
+  console.log('未处理的 Promise 拒绝:', event.reason)
+  event.preventDefault() // 阻止默认处理
+})
+
+// 触发示例
+Promise.reject(new Error('未捕获的错误'))
+```
+
+### 错误上报
+
+```javascript
+// 简单的错误上报
+function reportError(error) {
+  const errorInfo = {
+    message: error.message,
+    stack: error.stack,
+    url: window.location.href,
+    userAgent: navigator.userAgent,
+    timestamp: Date.now(),
+  }
+
+  // 发送到服务器
+  navigator.sendBeacon('/api/errors', JSON.stringify(errorInfo))
+}
+
+window.onerror = function (message, source, lineno, colno, error) {
+  reportError(error || new Error(message))
+}
+
+window.addEventListener('unhandledrejection', function (event) {
+  reportError(event.reason)
+})
+```
+
+## 最佳实践
+
+### 具体的错误信息
+
+```javascript
+// 🔶 不好：模糊的错误信息
+throw new Error('出错了')
+
+// ✅ 好：具体的错误信息
+throw new Error(`用户 ${userId} 不存在`)
+throw new Error(`请求 ${url} 失败，状态码: ${status}`)
+```
+
+### 提前返回
+
+```javascript
+// 🔶 深层嵌套
+function processData(data) {
+  if (data) {
+    if (data.items) {
+      if (data.items.length > 0) {
+        // 处理
+      }
+    }
+  }
+}
+
+// ✅ 提前返回
+function processData(data) {
+  if (!data) throw new Error('数据为空')
+  if (!data.items) throw new Error('缺少 items')
+  if (data.items.length === 0) throw new Error('items 为空')
+
+  // 处理
+}
+```
+
+### 错误边界
+
+```javascript
+// 封装可能出错的操作
+function safeJSON(str) {
+  try {
+    return { data: JSON.parse(str), error: null }
+  } catch (error) {
+    return { data: null, error }
+  }
+}
+
+const { data, error } = safeJSON('invalid')
+if (error) {
+  console.log('解析失败')
+} else {
+  console.log(data)
+}
+
+// async 版本
+async function safeFetch(url) {
+  try {
+    const response = await fetch(url)
+    const data = await response.json()
+    return { data, error: null }
+  } catch (error) {
+    return { data: null, error }
+  }
+}
+```
+
+### 有意义的重新抛出
+
+```javascript
+async function getUserData(userId) {
+  try {
+    const response = await fetch(`/api/users/${userId}`)
+    return await response.json()
+  } catch (error) {
+    // 添加上下文信息后重新抛出
+    throw new Error(`获取用户 ${userId} 数据失败: ${error.message}`)
+  }
+}
+```
+
+## 总结
+
+| 错误类型       | 场景           |
+| -------------- | -------------- |
+| Error          | 通用错误       |
+| TypeError      | 类型错误       |
+| ReferenceError | 引用未定义变量 |
+| SyntaxError    | 语法错误       |
+| RangeError     | 数值超出范围   |
+| 自定义错误     | 业务特定错误   |
+
+| 处理方式           | 适用场景         |
+| ------------------ | ---------------- |
+| try...catch        | 同步代码         |
+| .catch()           | Promise          |
+| try + await        | async 函数       |
+| window.onerror     | 全局同步错误     |
+| unhandledrejection | 未处理的 Promise |
+
+**核心要点**：
+
+- 使用具体的错误类型和信息
+- 自定义错误类处理业务异常
+- 异步代码注意错误捕获方式
+- 设置全局错误处理作为兜底
+- 错误上报帮助追踪生产问题

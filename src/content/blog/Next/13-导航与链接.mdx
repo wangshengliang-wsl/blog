@@ -1,0 +1,562 @@
+---
+title: 导航与链接
+description: 掌握 Next.js 导航系统，深入理解 Link 组件、useRouter 钩子与预取策略
+pubDate: 2025-12-03
+toc: true
+ogImage: true
+category: Next
+tags: ['Next.js', '导航', 'Link', 'useRouter', '预取']
+---
+
+🙋 如何在 Next.js 中实现页面跳转？Link 组件和 `router.push` 有什么区别？预取是如何工作的？
+
+## Link 组件
+
+Link 是 Next.js 提供的导航组件，支持客户端导航和预取。
+
+### 基础用法
+
+```tsx
+// components/Nav.tsx
+// Next.js 15.x
+import Link from 'next/link'
+
+export default function Nav() {
+  return (
+    <nav className="flex gap-4">
+      <Link href="/">首页</Link>
+      <Link href="/about">关于</Link>
+      <Link href="/blog">博客</Link>
+    </nav>
+  )
+}
+```
+
+### 动态路由链接
+
+```tsx
+// components/PostLink.tsx
+// Next.js 15.x
+import Link from 'next/link'
+
+interface Post {
+  id: string
+  slug: string
+  title: string
+}
+
+export default function PostLink({ post }: { post: Post }) {
+  return <Link href={`/blog/${post.slug}`}>{post.title}</Link>
+}
+
+// 使用对象形式
+export function PostLinkObject({ post }: { post: Post }) {
+  return (
+    <Link
+      href={{
+        pathname: '/blog/[slug]',
+        query: { slug: post.slug },
+      }}
+    >
+      {post.title}
+    </Link>
+  )
+}
+```
+
+### 带查询参数
+
+```tsx
+// components/SearchLink.tsx
+// Next.js 15.x
+import Link from 'next/link'
+
+export default function SearchLink() {
+  return (
+    <div className="flex gap-4">
+      <Link href="/search?q=next">搜索 Next</Link>
+
+      <Link
+        href={{
+          pathname: '/search',
+          query: { q: 'react', page: '1' },
+        }}
+      >
+        搜索 React
+      </Link>
+    </div>
+  )
+}
+```
+
+## Link 组件属性
+
+### replace
+
+替换历史记录而非添加：
+
+```tsx
+<Link href="/login" replace>
+  登录（不添加历史记录）
+</Link>
+```
+
+### scroll
+
+控制导航后是否滚动到顶部：
+
+```tsx
+<Link href="/page" scroll={false}>
+  导航但不滚动
+</Link>
+```
+
+### prefetch
+
+控制预取行为：
+
+```tsx
+// 默认：在视口内时预取
+<Link href="/page">默认预取</Link>
+
+// 禁用预取
+<Link href="/page" prefetch={false}>
+  禁用预取
+</Link>
+```
+
+### 自定义组件包装
+
+```tsx
+// components/Button.tsx
+// Next.js 15.x
+import Link from 'next/link'
+import { forwardRef } from 'react'
+
+interface ButtonLinkProps {
+  href: string
+  children: React.ReactNode
+  variant?: 'primary' | 'secondary'
+}
+
+const ButtonLink = forwardRef<HTMLAnchorElement, ButtonLinkProps>(
+  ({ href, children, variant = 'primary' }, ref) => {
+    const styles = {
+      primary: 'bg-blue-600 text-white',
+      secondary: 'border border-gray-300',
+    }
+
+    return (
+      <Link
+        href={href}
+        ref={ref}
+        className={`px-4 py-2 rounded ${styles[variant]}`}
+      >
+        {children}
+      </Link>
+    )
+  }
+)
+
+ButtonLink.displayName = 'ButtonLink'
+
+export default ButtonLink
+```
+
+## useRouter 钩子
+
+### 基础导航
+
+```tsx
+// components/Navigation.tsx
+// Next.js 15.x
+'use client'
+
+import { useRouter } from 'next/navigation'
+
+export default function Navigation() {
+  const router = useRouter()
+
+  return (
+    <div className="flex gap-4">
+      <button onClick={() => router.push('/dashboard')}>前往仪表盘</button>
+      <button onClick={() => router.replace('/login')}>跳转登录（替换）</button>
+      <button onClick={() => router.back()}>返回</button>
+      <button onClick={() => router.forward()}>前进</button>
+    </div>
+  )
+}
+```
+
+### 带参数导航
+
+```tsx
+// components/SearchForm.tsx
+// Next.js 15.x
+'use client'
+
+import { useRouter } from 'next/navigation'
+import { useState } from 'react'
+
+export default function SearchForm() {
+  const router = useRouter()
+  const [query, setQuery] = useState('')
+
+  const handleSearch = () => {
+    const params = new URLSearchParams()
+    params.set('q', query)
+    router.push(`/search?${params.toString()}`)
+  }
+
+  return (
+    <div className="flex gap-2">
+      <input
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="搜索..."
+        className="border rounded px-3 py-2"
+      />
+      <button
+        onClick={handleSearch}
+        className="bg-blue-600 text-white px-4 py-2 rounded"
+      >
+        搜索
+      </button>
+    </div>
+  )
+}
+```
+
+### router.refresh()
+
+刷新当前路由的服务端组件数据：
+
+```tsx
+// components/RefreshButton.tsx
+// Next.js 15.x
+'use client'
+
+import { useRouter } from 'next/navigation'
+
+export default function RefreshButton() {
+  const router = useRouter()
+
+  const handleRefresh = async () => {
+    // 触发某个操作后刷新数据
+    await fetch('/api/update', { method: 'POST' })
+    router.refresh() // 重新获取服务端数据
+  }
+
+  return <button onClick={handleRefresh}>刷新数据</button>
+}
+```
+
+## 其他导航钩子
+
+### usePathname
+
+获取当前路径：
+
+```tsx
+// components/ActiveLink.tsx
+// Next.js 15.x
+'use client'
+
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
+
+interface NavLinkProps {
+  href: string
+  children: React.ReactNode
+}
+
+export default function NavLink({ href, children }: NavLinkProps) {
+  const pathname = usePathname()
+  const isActive = pathname === href
+
+  return (
+    <Link
+      href={href}
+      className={isActive ? 'text-blue-600 font-bold' : 'text-gray-600'}
+    >
+      {children}
+    </Link>
+  )
+}
+```
+
+### useSearchParams
+
+获取查询参数：
+
+```tsx
+// components/Pagination.tsx
+// Next.js 15.x
+'use client'
+
+import { useSearchParams, usePathname, useRouter } from 'next/navigation'
+
+export default function Pagination({ totalPages }: { totalPages: number }) {
+  const searchParams = useSearchParams()
+  const pathname = usePathname()
+  const router = useRouter()
+
+  const currentPage = Number(searchParams.get('page')) || 1
+
+  const goToPage = (page: number) => {
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('page', page.toString())
+    router.push(`${pathname}?${params.toString()}`)
+  }
+
+  return (
+    <div className="flex gap-2">
+      <button
+        onClick={() => goToPage(currentPage - 1)}
+        disabled={currentPage <= 1}
+      >
+        上一页
+      </button>
+      <span>
+        {currentPage} / {totalPages}
+      </span>
+      <button
+        onClick={() => goToPage(currentPage + 1)}
+        disabled={currentPage >= totalPages}
+      >
+        下一页
+      </button>
+    </div>
+  )
+}
+```
+
+### useParams
+
+获取动态路由参数（客户端）：
+
+```tsx
+// app/blog/[slug]/components/ShareButton.tsx
+// Next.js 15.x
+'use client'
+
+import { useParams } from 'next/navigation'
+
+export default function ShareButton() {
+  const params = useParams<{ slug: string }>()
+
+  const shareUrl = `https://example.com/blog/${params.slug}`
+
+  return (
+    <button onClick={() => navigator.clipboard.writeText(shareUrl)}>
+      复制链接
+    </button>
+  )
+}
+```
+
+## 预取策略
+
+### 默认行为
+
+- **Link 组件**：在视口中时自动预取（生产环境）
+- **router.prefetch()**：手动触发预取
+
+### 预取类型
+
+```tsx
+// Next.js 15 中预取的数据
+// 1. 静态路由：预取完整页面数据
+// 2. 动态路由：预取到第一个 loading.tsx 边界
+```
+
+### 手动预取
+
+```tsx
+// components/ProductCard.tsx
+// Next.js 15.x
+'use client'
+
+import { useRouter } from 'next/navigation'
+import { useEffect } from 'react'
+
+interface Product {
+  id: string
+  name: string
+}
+
+export default function ProductCard({ product }: { product: Product }) {
+  const router = useRouter()
+
+  // 鼠标悬停时预取
+  const handleMouseEnter = () => {
+    router.prefetch(`/products/${product.id}`)
+  }
+
+  return (
+    <div
+      onMouseEnter={handleMouseEnter}
+      onClick={() => router.push(`/products/${product.id}`)}
+      className="cursor-pointer p-4 border rounded hover:shadow"
+    >
+      <h3>{product.name}</h3>
+    </div>
+  )
+}
+```
+
+### 禁用预取场景
+
+```tsx
+// 大量链接时禁用预取节省带宽
+export default function LongList({ items }) {
+  return (
+    <ul>
+      {items.map((item) => (
+        <li key={item.id}>
+          <Link href={`/item/${item.id}`} prefetch={false}>
+            {item.name}
+          </Link>
+        </li>
+      ))}
+    </ul>
+  )
+}
+```
+
+## redirect 函数
+
+服务端重定向：
+
+```tsx
+// app/old-page/page.tsx
+// Next.js 15.x
+import { redirect } from 'next/navigation'
+
+export default function OldPage() {
+  redirect('/new-page')
+}
+```
+
+```tsx
+// app/dashboard/page.tsx
+// Next.js 15.x
+import { redirect } from 'next/navigation'
+import { getSession } from '@/lib/auth'
+
+export default async function DashboardPage() {
+  const session = await getSession()
+
+  if (!session) {
+    redirect('/login')
+  }
+
+  return <div>欢迎, {session.user.name}</div>
+}
+```
+
+### permanentRedirect
+
+永久重定向（301）：
+
+```tsx
+import { permanentRedirect } from 'next/navigation'
+
+export default function OldRoute() {
+  permanentRedirect('/new-route')
+}
+```
+
+## 导航事件
+
+### 监听路由变化
+
+```tsx
+// components/RouteChangeListener.tsx
+// Next.js 15.x
+'use client'
+
+import { usePathname, useSearchParams } from 'next/navigation'
+import { useEffect } from 'react'
+
+export default function RouteChangeListener() {
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+
+  useEffect(() => {
+    const url = `${pathname}${searchParams.toString() ? `?${searchParams.toString()}` : ''}`
+    console.log('路由变化:', url)
+
+    // 可以在这里发送分析数据
+    // analytics.pageView(url)
+  }, [pathname, searchParams])
+
+  return null
+}
+```
+
+### NProgress 进度条
+
+```tsx
+// components/ProgressBar.tsx
+// Next.js 15.x
+'use client'
+
+import { useEffect } from 'react'
+import { usePathname, useSearchParams } from 'next/navigation'
+import NProgress from 'nprogress'
+import 'nprogress/nprogress.css'
+
+export default function ProgressBar() {
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+
+  useEffect(() => {
+    NProgress.done()
+  }, [pathname, searchParams])
+
+  return null
+}
+```
+
+## 常见问题
+
+🤔 **Q: Link 和 router.push 怎么选？**
+
+- **Link**：声明式，适合静态链接，支持预取
+- **router.push**：命令式，适合表单提交后跳转、条件导航
+
+🤔 **Q: 如何在 Link 点击时执行额外逻辑？**
+
+```tsx
+<Link
+  href="/page"
+  onClick={(e) => {
+    // 不要调用 e.preventDefault()
+    console.log('链接被点击')
+    // 执行其他逻辑
+  }}
+>
+  链接
+</Link>
+```
+
+🤔 **Q: 如何阻止导航？**
+
+```tsx
+const handleClick = (e) => {
+  if (!confirm('确定离开吗？')) {
+    e.preventDefault()
+  }
+}
+
+;<Link href="/page" onClick={handleClick}>
+  需要确认的链接
+</Link>
+```
+
+---
+
+下一篇将介绍中间件，学习如何在请求到达页面之前进行拦截和处理。
+
+-EOF-

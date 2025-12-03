@@ -1,0 +1,503 @@
+---
+title: 拦截路由
+description: 掌握 Next.js 拦截路由语法 (.)、(..)、(...)，实现优雅的模态框预览与页面切换效果
+pubDate: 2025-12-03
+toc: true
+ogImage: true
+category: Next
+tags: ['Next.js', '拦截路由', '模态框', '路由']
+---
+
+🙋 想要点击图片弹出模态框预览，但直接访问 URL 又能看到完整页面？这种"Instagram 式"的体验如何实现？
+
+## 拦截路由语法
+
+拦截路由使用特殊文件夹命名来"拦截"目标路由：
+
+| 语法       | 含义     | 类比     |
+| ---------- | -------- | -------- |
+| `(.)`      | 同级目录 | `./`     |
+| `(..)`     | 父级目录 | `../`    |
+| `(..)(..)` | 上两级   | `../../` |
+| `(...)`    | 根目录   | `/`      |
+
+## 基础示例
+
+### 图片预览模态框
+
+```
+app/
+├── layout.tsx
+├── page.tsx              # 图片列表
+├── @modal/
+│   ├── default.tsx       # 默认空
+│   └── (.)photo/
+│       └── [id]/
+│           └── page.tsx  # 拦截后的模态框
+└── photo/
+    └── [id]/
+        └── page.tsx      # 独立页面
+```
+
+**行为说明**：
+
+1. 从列表点击图片 → `@modal/(.)photo/[id]` 拦截，显示模态框
+2. 直接访问 `/photo/123` → `photo/[id]` 渲染完整页面
+3. 在模态框中刷新 → 变成完整页面
+
+```tsx
+// app/page.tsx - 图片列表
+// Next.js 15.x
+import Link from 'next/link'
+
+const photos = [
+  { id: '1', title: '风景' },
+  { id: '2', title: '城市' },
+  { id: '3', title: '人物' },
+]
+
+export default function HomePage() {
+  return (
+    <div className="grid grid-cols-3 gap-4 p-8">
+      {photos.map((photo) => (
+        <Link
+          key={photo.id}
+          href={`/photo/${photo.id}`}
+          className="aspect-square bg-gray-200 rounded-lg"
+        >
+          <img
+            src={`/images/${photo.id}.jpg`}
+            alt={photo.title}
+            className="w-full h-full object-cover rounded-lg"
+          />
+        </Link>
+      ))}
+    </div>
+  )
+}
+```
+
+```tsx
+// app/@modal/(.)photo/[id]/page.tsx - 模态框
+// Next.js 15.x
+'use client'
+
+import { useRouter } from 'next/navigation'
+import { use } from 'react'
+
+interface PageProps {
+  params: Promise<{ id: string }>
+}
+
+export default function PhotoModal({ params }: PageProps) {
+  const { id } = use(params)
+  const router = useRouter()
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/80 flex items-center justify-center z-50"
+      onClick={() => router.back()}
+    >
+      <div
+        className="relative max-w-4xl max-h-[90vh]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <img
+          src={`/images/${id}.jpg`}
+          alt={`Photo ${id}`}
+          className="max-w-full max-h-[90vh] object-contain"
+        />
+        <button
+          onClick={() => router.back()}
+          className="absolute top-4 right-4 text-white bg-black/50 rounded-full p-2"
+        >
+          ✕
+        </button>
+      </div>
+    </div>
+  )
+}
+```
+
+```tsx
+// app/photo/[id]/page.tsx - 完整页面
+// Next.js 15.x
+import Link from 'next/link'
+
+interface PageProps {
+  params: Promise<{ id: string }>
+}
+
+export default async function PhotoPage({ params }: PageProps) {
+  const { id } = await params
+
+  return (
+    <main className="min-h-screen p-8">
+      <Link href="/" className="text-blue-600 mb-4 inline-block">
+        ← 返回列表
+      </Link>
+      <img
+        src={`/images/${id}.jpg`}
+        alt={`Photo ${id}`}
+        className="w-full max-w-4xl mx-auto"
+      />
+      <div className="max-w-4xl mx-auto mt-4">
+        <h1 className="text-2xl font-bold">图片 {id}</h1>
+        <p className="text-gray-600 mt-2">图片详情和描述...</p>
+      </div>
+    </main>
+  )
+}
+```
+
+```tsx
+// app/@modal/default.tsx
+// Next.js 15.x
+
+export default function ModalDefault() {
+  return null
+}
+```
+
+```tsx
+// app/layout.tsx
+// Next.js 15.x
+
+export default function RootLayout({
+  children,
+  modal,
+}: {
+  children: React.ReactNode
+  modal: React.ReactNode
+}) {
+  return (
+    <html lang="zh-CN">
+      <body>
+        {children}
+        {modal}
+      </body>
+    </html>
+  )
+}
+```
+
+## 拦截层级详解
+
+### (.) 同级拦截
+
+```
+app/
+├── feed/
+│   ├── page.tsx
+│   └── (.)photo/         # 拦截 feed/photo
+│       └── [id]/page.tsx
+└── feed/
+    └── photo/
+        └── [id]/page.tsx
+```
+
+从 `/feed` 点击链接到 `/feed/photo/1` 时，`(.)photo` 拦截。
+
+### (..) 父级拦截
+
+```
+app/
+├── @modal/
+│   └── (..)photo/        # 从 @modal 向上一级拦截 photo
+│       └── [id]/page.tsx
+└── photo/
+    └── [id]/page.tsx
+```
+
+🔶 **注意**：`@modal` 是插槽，不算作路由段。所以 `(..)` 实际上是拦截 `app/photo`。
+
+### (...) 根目录拦截
+
+```
+app/
+├── shop/
+│   ├── page.tsx
+│   └── @modal/
+│       └── (...)cart/    # 从任意位置拦截 /cart
+│           └── page.tsx
+└── cart/
+    └── page.tsx
+```
+
+## 完整模态框示例
+
+### 商品快速预览
+
+```
+app/
+├── layout.tsx
+├── products/
+│   ├── page.tsx                    # 商品列表
+│   └── @preview/
+│       ├── default.tsx
+│       └── (.)detail/
+│           └── [id]/
+│               └── page.tsx        # 快速预览模态框
+└── products/
+    └── detail/
+        └── [id]/
+            └── page.tsx            # 商品详情页
+```
+
+```tsx
+// app/products/page.tsx
+// Next.js 15.x
+import Link from 'next/link'
+
+const products = [
+  { id: '1', name: 'MacBook Pro', price: 12999 },
+  { id: '2', name: 'iPhone 15', price: 7999 },
+  { id: '3', name: 'AirPods Pro', price: 1999 },
+]
+
+export default function ProductsPage() {
+  return (
+    <div className="p-8">
+      <h1 className="text-2xl font-bold mb-6">商品列表</h1>
+      <div className="grid grid-cols-3 gap-6">
+        {products.map((product) => (
+          <Link
+            key={product.id}
+            href={`/products/detail/${product.id}`}
+            className="border rounded-lg p-4 hover:shadow-lg transition"
+          >
+            <div className="aspect-square bg-gray-100 rounded mb-4" />
+            <h2 className="font-semibold">{product.name}</h2>
+            <p className="text-blue-600">¥{product.price}</p>
+          </Link>
+        ))}
+      </div>
+    </div>
+  )
+}
+```
+
+```tsx
+// app/products/@preview/(.)detail/[id]/page.tsx
+// Next.js 15.x
+'use client'
+
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { use } from 'react'
+
+interface PageProps {
+  params: Promise<{ id: string }>
+}
+
+const products: Record<string, { name: string; price: number; desc: string }> =
+  {
+    '1': { name: 'MacBook Pro', price: 12999, desc: '专业级笔记本' },
+    '2': { name: 'iPhone 15', price: 7999, desc: '新一代手机' },
+    '3': { name: 'AirPods Pro', price: 1999, desc: '降噪耳机' },
+  }
+
+export default function ProductPreview({ params }: PageProps) {
+  const { id } = use(params)
+  const router = useRouter()
+  const product = products[id]
+
+  if (!product) return null
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+      onClick={() => router.back()}
+    >
+      <div
+        className="bg-white rounded-lg p-6 max-w-md w-full mx-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="aspect-video bg-gray-100 rounded mb-4" />
+        <h2 className="text-xl font-bold">{product.name}</h2>
+        <p className="text-2xl text-blue-600 my-2">¥{product.price}</p>
+        <p className="text-gray-600 mb-4">{product.desc}</p>
+
+        <div className="flex gap-2">
+          <button className="flex-1 bg-blue-600 text-white py-2 rounded">
+            加入购物车
+          </button>
+          <Link
+            href={`/products/detail/${id}`}
+            className="flex-1 border py-2 rounded text-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            查看详情
+          </Link>
+        </div>
+
+        <button
+          onClick={() => router.back()}
+          className="absolute top-4 right-4 text-gray-400"
+        >
+          ✕
+        </button>
+      </div>
+    </div>
+  )
+}
+```
+
+```tsx
+// app/products/layout.tsx
+// Next.js 15.x
+
+export default function ProductsLayout({
+  children,
+  preview,
+}: {
+  children: React.ReactNode
+  preview: React.ReactNode
+}) {
+  return (
+    <>
+      {children}
+      {preview}
+    </>
+  )
+}
+```
+
+## 使用场景
+
+### 1. 图片画廊
+
+- 点击缩略图 → 模态框预览大图
+- 直接 URL → 图片详情页
+- 分享 URL → 对方看到完整页面
+
+### 2. 登录/注册
+
+- 点击"登录" → 模态框登录表单
+- 直接访问 `/login` → 完整登录页面
+
+### 3. 商品快速预览
+
+- 列表中悬停/点击 → 快速预览弹窗
+- 想要详细了解 → 点击进入详情页
+
+### 4. 评论/回复
+
+- 点击回复 → 模态框写回复
+- 刷新 → 独立的回复页面
+
+## 结合并行路由
+
+拦截路由通常与并行路由（`@folder`）配合使用：
+
+```
+app/
+├── layout.tsx              # 渲染 children + modal
+├── @modal/                 # 并行路由插槽
+│   ├── default.tsx         # 默认空
+│   └── (.)items/           # 拦截 /items
+│       └── [id]/
+│           └── page.tsx    # 模态框内容
+├── page.tsx                # 列表页
+└── items/
+    └── [id]/
+        └── page.tsx        # 详情页
+```
+
+## 常见陷阱
+
+### 1. 路由段计算
+
+`@folder` 不计入路由段：
+
+```
+app/
+└── shop/
+    └── @modal/
+        └── (..)cart/       # 实际拦截 app/cart，不是 app/shop/cart
+```
+
+### 2. 刷新行为
+
+模态框状态在刷新后会丢失，显示独立页面：
+
+```tsx
+// 解决方案：添加返回按钮
+<Link href="/">← 返回列表</Link>
+```
+
+### 3. 默认文件
+
+并行路由必须有 `default.tsx`，否则导航到其他路由会 404。
+
+## 动画增强
+
+```tsx
+// app/@modal/(.)photo/[id]/page.tsx
+// Next.js 15.x
+'use client'
+
+import { motion, AnimatePresence } from 'framer-motion'
+import { useRouter } from 'next/navigation'
+
+export default function PhotoModal({ params }) {
+  const router = useRouter()
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 bg-black/80 flex items-center justify-center"
+        onClick={() => router.back()}
+      >
+        <motion.div
+          initial={{ scale: 0.9, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          exit={{ scale: 0.9, opacity: 0 }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <img src={`/images/${params.id}.jpg`} alt="" />
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  )
+}
+```
+
+## 常见问题
+
+🤔 **Q: 软导航和硬导航的区别？**
+
+- **软导航**：客户端导航（Link 点击），触发拦截
+- **硬导航**：页面刷新、直接输入 URL，不触发拦截
+
+🤔 **Q: 如何判断是模态框还是独立页面？**
+
+```tsx
+'use client'
+import { usePathname } from 'next/navigation'
+
+// 在模态框中
+const isModal = usePathname().includes('/@modal')
+
+// 或通过 searchParams 标记
+// /photo/1?modal=true
+```
+
+🤔 **Q: 模态框中的表单提交后如何处理？**
+
+```tsx
+async function handleSubmit() {
+  await submitForm()
+  router.back() // 关闭模态框
+  router.refresh() // 刷新列表数据
+}
+```
+
+---
+
+下一篇将介绍导航与链接，深入 Link 组件、useRouter 和预取策略。
+
+-EOF-

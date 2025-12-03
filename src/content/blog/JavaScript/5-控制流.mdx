@@ -1,0 +1,632 @@
+---
+title: '控制流语句'
+description: '掌握 JavaScript 的条件判断和循环语句，写出逻辑清晰的程序流程'
+pubDate: 2025-12-03
+toc: true
+ogImage: true
+category: 'JavaScript'
+tags: ['JavaScript', '控制流', '条件语句', '循环']
+---
+
+控制流语句决定代码的执行顺序。条件语句用于分支选择，循环语句用于重复执行。
+
+## 🎯 if 语句
+
+### 基本用法
+
+```javascript
+const age = 18
+
+if (age >= 18) {
+  console.log('成年人')
+}
+
+// if...else
+if (age >= 18) {
+  console.log('成年人')
+} else {
+  console.log('未成年人')
+}
+
+// if...else if...else
+const score = 85
+
+if (score >= 90) {
+  console.log('优秀')
+} else if (score >= 80) {
+  console.log('良好')
+} else if (score >= 60) {
+  console.log('及格')
+} else {
+  console.log('不及格')
+}
+```
+
+### 条件表达式
+
+```javascript
+// 任何表达式都可以作为条件
+if (true) console.log('执行')
+if (1) console.log('执行') // 非零数字是真值
+if ('hello') console.log('执行') // 非空字符串是真值
+if ([]) console.log('执行') // 空数组也是真值！
+if ({}) console.log('执行') // 空对象也是真值！
+
+// 假值：false, 0, "", null, undefined, NaN
+if (0) console.log('不执行')
+if ('') console.log('不执行')
+if (null) console.log('不执行')
+```
+
+### 简化写法
+
+```javascript
+// 单行语句可以省略花括号（不推荐）
+if (age >= 18) console.log('成年')
+
+// 三元运算符替代简单 if...else
+const status = age >= 18 ? '成年' : '未成年'
+
+// && 短路替代 if
+age >= 18 && console.log('成年')
+
+// || 短路设置默认值
+const name = inputName || '游客'
+```
+
+🔶 始终使用花括号，避免后续维护时出错：
+
+```javascript
+// 危险写法
+if (condition) doSomething()
+doSomethingElse() // 这行总是会执行！
+
+// 安全写法
+if (condition) {
+  doSomething()
+  doSomethingElse()
+}
+```
+
+## switch 语句
+
+### 基本用法
+
+```javascript
+const day = 3
+
+switch (day) {
+  case 1:
+    console.log('星期一')
+    break
+  case 2:
+    console.log('星期二')
+    break
+  case 3:
+    console.log('星期三')
+    break
+  default:
+    console.log('其他')
+}
+```
+
+### 注意事项
+
+```javascript
+// 1. 严格相等比较
+const value = '1'
+switch (value) {
+  case 1:
+    console.log('数字1') // 不会执行
+    break
+  case '1':
+    console.log('字符串1') // 执行这个
+    break
+}
+
+// 2. 忘记 break 会穿透
+const fruit = 'apple'
+switch (fruit) {
+  case 'apple':
+    console.log('苹果') // 执行
+  case 'banana':
+    console.log('香蕉') // 也执行！
+    break
+  case 'orange':
+    console.log('橘子')
+    break
+}
+
+// 3. 利用穿透合并 case
+const month = 2
+switch (month) {
+  case 1:
+  case 3:
+  case 5:
+  case 7:
+  case 8:
+  case 10:
+  case 12:
+    console.log('31天')
+    break
+  case 4:
+  case 6:
+  case 9:
+  case 11:
+    console.log('30天')
+    break
+  case 2:
+    console.log('28或29天')
+    break
+}
+```
+
+### 替代方案
+
+```javascript
+// 用对象映射替代 switch
+const dayNames = {
+  1: '星期一',
+  2: '星期二',
+  3: '星期三',
+  4: '星期四',
+  5: '星期五',
+  6: '星期六',
+  0: '星期日',
+}
+
+const today = new Date().getDay()
+console.log(dayNames[today] ?? '未知')
+
+// 用函数映射处理复杂逻辑
+const handlers = {
+  add: (a, b) => a + b,
+  subtract: (a, b) => a - b,
+  multiply: (a, b) => a * b,
+  divide: (a, b) => a / b,
+}
+
+function calculate(operation, a, b) {
+  const handler = handlers[operation]
+  if (!handler) throw new Error('未知操作')
+  return handler(a, b)
+}
+```
+
+## for 循环
+
+### 基本语法
+
+```javascript
+// for (初始化; 条件; 更新)
+for (let i = 0; i < 5; i++) {
+  console.log(i) // 0, 1, 2, 3, 4
+}
+
+// 倒序
+for (let i = 4; i >= 0; i--) {
+  console.log(i) // 4, 3, 2, 1, 0
+}
+
+// 步长为 2
+for (let i = 0; i < 10; i += 2) {
+  console.log(i) // 0, 2, 4, 6, 8
+}
+
+// 多个变量
+for (let i = 0, j = 10; i < j; i++, j--) {
+  console.log(i, j) // 0 10, 1 9, 2 8, 3 7, 4 6
+}
+```
+
+### 遍历数组
+
+```javascript
+const fruits = ['苹果', '香蕉', '橘子']
+
+// 传统 for 循环
+for (let i = 0; i < fruits.length; i++) {
+  console.log(fruits[i])
+}
+
+// 缓存长度（微优化）
+for (let i = 0, len = fruits.length; i < len; i++) {
+  console.log(fruits[i])
+}
+
+// for...of（推荐）
+for (const fruit of fruits) {
+  console.log(fruit)
+}
+
+// 需要索引时用 entries()
+for (const [index, fruit] of fruits.entries()) {
+  console.log(index, fruit)
+}
+```
+
+### 无限循环
+
+```javascript
+// 三个部分都可以省略
+for (;;) {
+  console.log('无限循环')
+  break // 必须有退出条件
+}
+
+// 等价于
+while (true) {
+  console.log('无限循环')
+  break
+}
+```
+
+## while 循环
+
+### 基本用法
+
+```javascript
+// while：先判断后执行
+let count = 0
+while (count < 5) {
+  console.log(count)
+  count++
+}
+
+// do...while：先执行后判断（至少执行一次）
+let num = 0
+do {
+  console.log(num)
+  num++
+} while (num < 5)
+
+// 区别展示
+let x = 10
+while (x < 5) {
+  console.log('while:', x) // 不执行
+}
+
+let y = 10
+do {
+  console.log('do-while:', y) // 执行一次
+} while (y < 5)
+```
+
+### 实际应用
+
+```javascript
+// 读取用户输���直到有效
+function getValidInput() {
+  let input
+  do {
+    input = prompt('请输入一个正数')
+  } while (isNaN(input) || input <= 0)
+  return Number(input)
+}
+
+// 处理异步重试
+async function fetchWithRetry(url, maxRetries = 3) {
+  let attempts = 0
+  while (attempts < maxRetries) {
+    try {
+      return await fetch(url)
+    } catch (error) {
+      attempts++
+      if (attempts === maxRetries) throw error
+      await new Promise((r) => setTimeout(r, 1000 * attempts))
+    }
+  }
+}
+```
+
+## for...in 和 for...of
+
+### for...in：遍历键名
+
+```javascript
+// 遍历对象属性
+const person = { name: '张三', age: 25, city: '北京' }
+
+for (const key in person) {
+  console.log(key, person[key])
+}
+// name 张三
+// age 25
+// city 北京
+
+// 🔶 也会遍历继承的可枚举属性
+function Animal(name) {
+  this.name = name
+}
+Animal.prototype.speak = function () {}
+
+const dog = new Animal('小黑')
+for (const key in dog) {
+  console.log(key) // name, speak（包含原型属性）
+}
+
+// 只遍历自身属性
+for (const key in dog) {
+  if (dog.hasOwnProperty(key)) {
+    console.log(key) // 只有 name
+  }
+}
+```
+
+### for...of：遍历值
+
+```javascript
+// 遍历数组
+const arr = ['a', 'b', 'c']
+for (const value of arr) {
+  console.log(value) // a, b, c
+}
+
+// 遍历字符串
+for (const char of 'hello') {
+  console.log(char) // h, e, l, l, o
+}
+
+// 遍历 Map
+const map = new Map([
+  ['name', '张三'],
+  ['age', 25],
+])
+for (const [key, value] of map) {
+  console.log(key, value)
+}
+
+// 遍历 Set
+const set = new Set([1, 2, 3])
+for (const value of set) {
+  console.log(value)
+}
+
+// 🔶 普通对象不能直接用 for...of
+// for (const value of person) {}  // TypeError
+
+// 需要转换
+for (const key of Object.keys(person)) {
+  console.log(key)
+}
+for (const value of Object.values(person)) {
+  console.log(value)
+}
+for (const [key, value] of Object.entries(person)) {
+  console.log(key, value)
+}
+```
+
+### 对比总结
+
+| 特性       | for...in          | for...of    |
+| ---------- | ----------------- | ----------- |
+| 遍历对象   | ✅ 键名           | ❌ 需要转换 |
+| 遍历数组   | ⚠️ 索引（不推荐） | ✅ 值       |
+| 原型属性   | 会遍历            | 不会        |
+| 可迭代对象 | ❌                | ✅          |
+| 性能       | 较慢              | 较快        |
+
+## break 和 continue
+
+### break：跳出循环
+
+```javascript
+// 找到目标后停止
+const numbers = [1, 3, 5, 7, 9, 2, 4]
+let firstEven = null
+
+for (const num of numbers) {
+  if (num % 2 === 0) {
+    firstEven = num
+    break // 找到第一个偶数后退出
+  }
+}
+console.log(firstEven) // 2
+```
+
+### continue：跳过本次迭代
+
+```javascript
+// 跳过偶数
+for (let i = 0; i < 10; i++) {
+  if (i % 2 === 0) continue
+  console.log(i) // 1, 3, 5, 7, 9
+}
+
+// 跳过无效数据
+const data = [1, null, 3, undefined, 5]
+const valid = []
+for (const item of data) {
+  if (item == null) continue
+  valid.push(item)
+}
+console.log(valid) // [1, 3, 5]
+```
+
+### 标签语句
+
+用于跳出多层循环：
+
+```javascript
+// 没有标签：只能跳出内层循环
+for (let i = 0; i < 3; i++) {
+  for (let j = 0; j < 3; j++) {
+    if (i === 1 && j === 1) break
+    console.log(i, j)
+  }
+}
+// 输出：0,0 0,1 0,2 1,0 2,0 2,1 2,2
+
+// 使用标签：跳出外层循环
+outer: for (let i = 0; i < 3; i++) {
+  for (let j = 0; j < 3; j++) {
+    if (i === 1 && j === 1) break outer
+    console.log(i, j)
+  }
+}
+// 输出：0,0 0,1 0,2 1,0
+
+// continue 也可以用标签
+outer: for (let i = 0; i < 3; i++) {
+  for (let j = 0; j < 3; j++) {
+    if (j === 1) continue outer
+    console.log(i, j)
+  }
+}
+// 输出：0,0 1,0 2,0
+```
+
+## 循环最佳实践
+
+### 选择合适的循环
+
+```javascript
+// 1. 已知次数：用 for
+for (let i = 0; i < 10; i++) {
+  // ...
+}
+
+// 2. 遍历数组值：用 for...of
+for (const item of array) {
+  // ...
+}
+
+// 3. 遍历对象属性：用 for...in 或 Object.keys
+for (const key in object) {
+  // ...
+}
+
+// 4. 条件循环：用 while
+while (condition) {
+  // ...
+}
+
+// 5. 至少执行一次：用 do...while
+do {
+  // ...
+} while (condition)
+```
+
+### 避免修改循环中的数组
+
+```javascript
+// 🔶 危险：遍历时修改数组
+const arr = [1, 2, 3, 4, 5]
+for (let i = 0; i < arr.length; i++) {
+  if (arr[i] % 2 === 0) {
+    arr.splice(i, 1) // 删除偶数
+  }
+}
+console.log(arr) // [1, 3, 5]？不一定！
+
+// ✅ 安全：倒序遍历
+for (let i = arr.length - 1; i >= 0; i--) {
+  if (arr[i] % 2 === 0) {
+    arr.splice(i, 1)
+  }
+}
+
+// ✅ 更好：使用 filter 创建新数组
+const odds = arr.filter((n) => n % 2 !== 0)
+```
+
+### 使用数组方法替代循环
+
+```javascript
+const numbers = [1, 2, 3, 4, 5]
+
+// 代替 for：forEach
+numbers.forEach((n) => console.log(n))
+
+// 代替 for + push：map
+const doubled = numbers.map((n) => n * 2)
+
+// 代替 for + if + push：filter
+const evens = numbers.filter((n) => n % 2 === 0)
+
+// 代替 for + 累加：reduce
+const sum = numbers.reduce((acc, n) => acc + n, 0)
+
+// 代替 for + break（查找）：find
+const firstBig = numbers.find((n) => n > 3)
+
+// 代替 for + 条件判断：some/every
+const hasEven = numbers.some((n) => n % 2 === 0)
+const allPositive = numbers.every((n) => n > 0)
+```
+
+## 常见陷阱
+
+### 🙋 闭包与循环变量
+
+```javascript
+// 经典问题：var 没有块级作用域
+for (var i = 0; i < 3; i++) {
+  setTimeout(() => console.log(i), 100)
+}
+// 输出：3, 3, 3
+
+// 解决方案1：使用 let
+for (let i = 0; i < 3; i++) {
+  setTimeout(() => console.log(i), 100)
+}
+// 输出：0, 1, 2
+
+// 解决方案2：IIFE（ES5 写法）
+for (var i = 0; i < 3; i++) {
+  ;(function (j) {
+    setTimeout(() => console.log(j), 100)
+  })(i)
+}
+```
+
+### 🙋 修改循环条件
+
+```javascript
+// 无限循环！
+const arr = [1, 2, 3]
+for (let i = 0; i < arr.length; i++) {
+  arr.push(i) // 数组不断变长
+}
+
+// 应该缓存长度
+const len = arr.length
+for (let i = 0; i < len; i++) {
+  arr.push(i)
+}
+```
+
+### 🙋 浮点数作为循环条件
+
+```javascript
+// 可能不会停止！
+for (let i = 0; i !== 1; i += 0.1) {
+  console.log(i)
+}
+// 因为 0.1 + 0.1 + ... 可能永远不等于 1
+
+// 使用 < 而不是 !==
+for (let i = 0; i < 1; i += 0.1) {
+  console.log(i.toFixed(1))
+}
+```
+
+## 总结
+
+| 语句       | 适用场景       | 要点         |
+| ---------- | -------------- | ------------ |
+| if...else  | 条件分支       | 用 {} 包裹   |
+| switch     | 多值匹配       | 记得 break   |
+| for        | 已知次数       | 缓存 length  |
+| for...of   | 遍历可迭代对象 | 推荐遍历数组 |
+| for...in   | 遍历对象键     | 注意原型属性 |
+| while      | 条件循环       | 确保能退出   |
+| do...while | 至少执行一次   | 先执行后判断 |
+
+**核心建议**：
+
+- 用 `for...of` 遍历数组，`for...in` 遍历对象
+- 用数组方法（map/filter/reduce）替代简单循环
+- 使用 `let` 而不是 `var` 声明循环变量
+- 复杂逻辑用对象映射替代长 switch

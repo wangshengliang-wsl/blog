@@ -1,0 +1,506 @@
+---
+title: 数据获取基础
+description: 掌握 Next.js 中的数据获取方式，包括 fetch API、并行请求与数据传递模式
+pubDate: 2025-12-03
+toc: true
+ogImage: true
+category: Next
+tags: ['Next.js', '数据获取', 'fetch', 'Server Components']
+---
+
+🙋 在 Next.js 中获取数据有多种方式。什么时候用 fetch？什么时候直接查数据库？如何避免请求瀑布？
+
+## 数据获取方式
+
+### 1. Server Components 中的 fetch
+
+```tsx
+// app/posts/page.tsx
+// Next.js 15.x
+
+interface Post {
+  id: number
+  title: string
+  body: string
+}
+
+async function getPosts(): Promise<Post[]> {
+  const res = await fetch('https://jsonplaceholder.typicode.com/posts')
+
+  if (!res.ok) {
+    throw new Error('获取文章失败')
+  }
+
+  return res.json()
+}
+
+export default async function PostsPage() {
+  const posts = await getPosts()
+
+  return (
+    <ul className="space-y-4">
+      {posts.slice(0, 10).map((post) => (
+        <li key={post.id}>
+          <h2 className="font-bold">{post.title}</h2>
+          <p className="text-gray-600">{post.body}</p>
+        </li>
+      ))}
+    </ul>
+  )
+}
+```
+
+### 2. 直接访问数据库
+
+```tsx
+// app/users/page.tsx
+// Next.js 15.x
+import { db } from '@/lib/db'
+
+export default async function UsersPage() {
+  // 直接使用 ORM 查询
+  const users = await db.user.findMany({
+    select: {
+      id: true,
+      name: true,
+      email: true,
+    },
+    orderBy: { createdAt: 'desc' },
+    take: 20,
+  })
+
+  return (
+    <ul>
+      {users.map((user) => (
+        <li key={user.id}>{user.name}</li>
+      ))}
+    </ul>
+  )
+}
+```
+
+### 3. 读取文件系统
+
+```tsx
+// app/docs/page.tsx
+// Next.js 15.x
+import { readdir, readFile } from 'fs/promises'
+import { join } from 'path'
+import matter from 'gray-matter'
+
+async function getDocs() {
+  const docsDir = join(process.cwd(), 'content', 'docs')
+  const files = await readdir(docsDir)
+
+  const docs = await Promise.all(
+    files
+      .filter((file) => file.endsWith('.md'))
+      .map(async (file) => {
+        const content = await readFile(join(docsDir, file), 'utf-8')
+        const { data, content: body } = matter(content)
+        return { slug: file.replace('.md', ''), ...data, body }
+      })
+  )
+
+  return docs
+}
+
+export default async function DocsPage() {
+  const docs = await getDocs()
+  return <div>{/* 渲染文档列表 */}</div>
+}
+```
+
+## 请求模式
+
+### 顺序请求（瀑布流）
+
+```tsx
+// ❌ 效率低：请求依次执行
+async function Page() {
+  const user = await getUser() // 1秒
+  const posts = await getPosts() // 1秒
+  const comments = await getComments() // 1秒
+  // 总计：3秒
+
+  return <div>{/* ... */}</div>
+}
+```
+
+### 并行请求
+
+```tsx
+// ✅ 高效：请求同时执行
+async function Page() {
+  const [user, posts, comments] = await Promise.all([
+    getUser(),
+    getPosts(),
+    getComments(),
+  ])
+  // 总计：~1秒（取决于最慢的请求）
+
+  return <div>{/* ... */}</div>
+}
+```
+
+### 预加载模式
+
+```tsx
+// lib/data.ts
+import { cache } from 'react'
+
+// 使用 cache 包装确保请求去重
+export const getUser = cache(async (id: string) => {
+  const res = await fetch(`https://api.example.com/users/${id}`)
+  return res.json()
+})
+
+// 预加载函数
+export const preloadUser = (id: string) => {
+  void getUser(id)
+}
+```
+
+```tsx
+// app/user/[id]/page.tsx
+import { getUser, preloadUser } from '@/lib/data'
+import { UserProfile } from '@/components/UserProfile'
+
+export default async function UserPage({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}) {
+  const { id } = await params
+
+  // 提前开始获取数据
+  preloadUser(id)
+
+  return <UserProfile userId={id} />
+}
+```
+
+```tsx
+// components/UserProfile.tsx
+import { getUser } from '@/lib/data'
+
+export async function UserProfile({ userId }: { userId: string }) {
+  // 复用已经开始的请求
+  const user = await getUser(userId)
+
+  return <div>{user.name}</div>
+}
+```
+
+## 数据传递
+
+### Props 传递
+
+```tsx
+// app/dashboard/page.tsx
+// Next.js 15.x
+import { StatsCard } from '@/components/StatsCard'
+
+async function getStats() {
+  const res = await fetch('https://api.example.com/stats')
+  return res.json()
+}
+
+export default async function DashboardPage() {
+  const stats = await getStats()
+
+  return (
+    <div className="grid grid-cols-3 gap-4">
+      <StatsCard title="用户数" value={stats.users} />
+      <StatsCard title="订单数" value={stats.orders} />
+      <StatsCard title="收入" value={`¥${stats.revenue}`} />
+    </div>
+  )
+}
+```
+
+### Server → Client 传递
+
+```tsx
+// app/products/page.tsx - Server Component
+import { ProductFilter } from '@/components/ProductFilter'
+
+async function getProducts() {
+  const res = await fetch('https://api.example.com/products')
+  return res.json()
+}
+
+async function getCategories() {
+  const res = await fetch('https://api.example.com/categories')
+  return res.json()
+}
+
+export default async function ProductsPage() {
+  const [products, categories] = await Promise.all([
+    getProducts(),
+    getCategories(),
+  ])
+
+  // 传递给 Client Component
+  return <ProductFilter initialProducts={products} categories={categories} />
+}
+```
+
+🔶 **注意**：传递的数据必须可序列化（不能传函数、类实例等）。
+
+### 组件级数据获取
+
+```tsx
+// components/UserAvatar.tsx - Server Component
+async function getUser(id: string) {
+  const res = await fetch(`https://api.example.com/users/${id}`)
+  return res.json()
+}
+
+export async function UserAvatar({ userId }: { userId: string }) {
+  const user = await getUser(userId)
+
+  return (
+    <img src={user.avatar} alt={user.name} className="w-10 h-10 rounded-full" />
+  )
+}
+```
+
+```tsx
+// app/page.tsx
+import { UserAvatar } from '@/components/UserAvatar'
+
+export default function Page() {
+  return (
+    <div>
+      <UserAvatar userId="1" />
+      <UserAvatar userId="2" />
+      {/* 请求会自动去重 */}
+    </div>
+  )
+}
+```
+
+## 请求去重
+
+### 自动去重
+
+Next.js 扩展了 fetch，相同请求自动去重：
+
+```tsx
+// 以下两个调用实际上只发送一次请求
+async function getUser() {
+  return fetch('https://api.example.com/user').then((r) => r.json())
+}
+
+async function ComponentA() {
+  const user = await getUser()
+  return <div>{user.name}</div>
+}
+
+async function ComponentB() {
+  const user = await getUser() // 复用 ComponentA 的请求
+  return <div>{user.email}</div>
+}
+```
+
+### 使用 React cache
+
+对于非 fetch 的数据获取，使用 `cache`：
+
+```tsx
+// lib/data.ts
+import { cache } from 'react'
+import { db } from './db'
+
+export const getUser = cache(async (id: string) => {
+  return db.user.findUnique({ where: { id } })
+})
+```
+
+## 错误处理
+
+### try-catch
+
+```tsx
+async function getData() {
+  try {
+    const res = await fetch('https://api.example.com/data')
+
+    if (!res.ok) {
+      throw new Error(`HTTP error! status: ${res.status}`)
+    }
+
+    return res.json()
+  } catch (error) {
+    console.error('数据获取失败:', error)
+    return null
+  }
+}
+
+export default async function Page() {
+  const data = await getData()
+
+  if (!data) {
+    return <div>数据加载失败，请稍后重试</div>
+  }
+
+  return <div>{data.content}</div>
+}
+```
+
+### 抛出错误
+
+```tsx
+async function getData() {
+  const res = await fetch('https://api.example.com/data')
+
+  if (!res.ok) {
+    throw new Error('获取数据失败')
+  }
+
+  return res.json()
+}
+
+export default async function Page() {
+  const data = await getData() // 错误会被 error.tsx 捕获
+  return <div>{data.content}</div>
+}
+```
+
+### 使用 notFound
+
+```tsx
+import { notFound } from 'next/navigation'
+
+async function getPost(slug: string) {
+  const res = await fetch(`https://api.example.com/posts/${slug}`)
+
+  if (res.status === 404) {
+    notFound()
+  }
+
+  if (!res.ok) {
+    throw new Error('获取文章失败')
+  }
+
+  return res.json()
+}
+```
+
+## 实战示例
+
+### 博客列表与详情
+
+```tsx
+// lib/posts.ts
+import { cache } from 'react'
+
+export interface Post {
+  slug: string
+  title: string
+  content: string
+  publishedAt: string
+}
+
+const API_URL = 'https://api.example.com'
+
+export const getPosts = cache(async (): Promise<Post[]> => {
+  const res = await fetch(`${API_URL}/posts`, {
+    next: { revalidate: 60 },
+  })
+  return res.json()
+})
+
+export const getPost = cache(async (slug: string): Promise<Post | null> => {
+  const res = await fetch(`${API_URL}/posts/${slug}`, {
+    next: { tags: [`post-${slug}`] },
+  })
+
+  if (!res.ok) return null
+  return res.json()
+})
+```
+
+```tsx
+// app/blog/page.tsx
+import Link from 'next/link'
+import { getPosts } from '@/lib/posts'
+
+export default async function BlogPage() {
+  const posts = await getPosts()
+
+  return (
+    <div className="space-y-6">
+      <h1 className="text-3xl font-bold">博客</h1>
+      <ul className="space-y-4">
+        {posts.map((post) => (
+          <li key={post.slug}>
+            <Link
+              href={`/blog/${post.slug}`}
+              className="block p-4 border rounded hover:bg-gray-50"
+            >
+              <h2 className="font-semibold">{post.title}</h2>
+              <time className="text-sm text-gray-500">{post.publishedAt}</time>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+```
+
+```tsx
+// app/blog/[slug]/page.tsx
+import { notFound } from 'next/navigation'
+import { getPost, getPosts } from '@/lib/posts'
+
+export async function generateStaticParams() {
+  const posts = await getPosts()
+  return posts.map((post) => ({ slug: post.slug }))
+}
+
+export default async function PostPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}) {
+  const { slug } = await params
+  const post = await getPost(slug)
+
+  if (!post) {
+    notFound()
+  }
+
+  return (
+    <article className="prose max-w-none">
+      <h1>{post.title}</h1>
+      <time>{post.publishedAt}</time>
+      <div dangerouslySetInnerHTML={{ __html: post.content }} />
+    </article>
+  )
+}
+```
+
+## 常见问题
+
+🤔 **Q: fetch 和 axios 怎么选？**
+
+推荐使用原生 fetch，因为 Next.js 对其做了扩展（缓存、去重等）。
+
+🤔 **Q: 数据获取应该放在页面还是组件中？**
+
+- 页面级数据：放在页面组件中
+- 组件专属数据：可以放在组件中
+- 共享数据：抽取到独立函数，使用 cache 包装
+
+🤔 **Q: 如何处理加载状态？**
+
+使用 `loading.tsx` 或 `Suspense` 边界。
+
+---
+
+下一篇将深入缓存策略，掌握 fetch 缓存、数据缓存与路由缓存的配置。
+
+-EOF-

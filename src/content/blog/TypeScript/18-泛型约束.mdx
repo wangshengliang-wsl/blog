@@ -1,0 +1,352 @@
+---
+title: '泛型约束'
+description: 'TypeScript 泛型约束详解：extends 约束、keyof 约束、多重约束的使用方法与最佳实践'
+pubDate: 2024-02-01
+toc: true
+ogImage: true
+category: 'TypeScript'
+tags: ['TypeScript', '泛型约束', 'extends', 'keyof', '类型约束']
+---
+
+泛型很强大，但有时我们需要限制类型参数的范围。泛型约束允许我们指定类型参数必须满足某些条件。
+
+## 基本约束
+
+使用 `extends` 关键字约束类型参数：
+
+```typescript
+// TypeScript 5.x
+
+// 没有约束：无法访问任何属性
+function logLength<T>(arg: T): T {
+  // console.log(arg.length);  // ❌ 错误：T 上不存在 length
+  return arg
+}
+
+// 添加约束：必须有 length 属性
+interface Lengthwise {
+  length: number
+}
+
+function logLength2<T extends Lengthwise>(arg: T): T {
+  console.log(arg.length) // ✅ 现在可以访问
+  return arg
+}
+
+logLength2('hello') // ✅ string 有 length
+logLength2([1, 2, 3]) // ✅ 数组有 length
+logLength2({ length: 10 }) // ✅ 对象有 length
+// logLength2(123);  // ❌ number 没有 length
+```
+
+## keyof 约束
+
+使用 `keyof` 约束类型参数为对象的键：
+
+```typescript
+// 获取对象属性
+function getProperty<T, K extends keyof T>(obj: T, key: K): T[K] {
+  return obj[key]
+}
+
+const person = {
+  name: '张三',
+  age: 25,
+  email: 'test@test.com',
+}
+
+const name = getProperty(person, 'name') // string
+const age = getProperty(person, 'age') // number
+// getProperty(person, 'invalid');  // ❌ 错误
+
+// 设置对象属性
+function setProperty<T, K extends keyof T>(obj: T, key: K, value: T[K]): void {
+  obj[key] = value
+}
+
+setProperty(person, 'age', 30) // ✅
+// setProperty(person, 'age', 'thirty');  // ❌ 类型不匹配
+```
+
+## 多重约束
+
+一个类型参数可以有多个约束：
+
+```typescript
+interface Named {
+  name: string
+}
+
+interface Aged {
+  age: number
+}
+
+// 使用交叉类型实现多重约束
+function greet<T extends Named & Aged>(entity: T): string {
+  return `Hello, ${entity.name}! You are ${entity.age} years old.`
+}
+
+greet({ name: '张三', age: 25 }) // ✅
+greet({ name: '张三', age: 25, email: 'test@test.com' }) // ✅ 可以有额外属性
+// greet({ name: '张三' });  // ❌ 缺少 age
+```
+
+## 类类型约束
+
+约束类型参数为可构造的类型：
+
+```typescript
+// 构造函数约束
+function create<T>(ctor: new () => T): T {
+  return new ctor()
+}
+
+class User {
+  name = 'default'
+}
+
+const user = create(User) // User
+
+// 带参数的构造函数
+function createWithArgs<T>(ctor: new (...args: any[]) => T, ...args: any[]): T {
+  return new ctor(...args)
+}
+
+class Product {
+  constructor(
+    public name: string,
+    public price: number
+  ) {}
+}
+
+const product = createWithArgs(Product, '手机', 5999)
+
+// 更精确的类型约束
+type Constructor<T = {}> = new (...args: any[]) => T
+
+function factory<T extends Constructor>(Base: T) {
+  return class extends Base {
+    timestamp = new Date()
+  }
+}
+
+const TimestampedUser = factory(User)
+const user2 = new TimestampedUser()
+console.log(user2.timestamp)
+```
+
+## 条件类型与约束
+
+约束可以与条件类型结合：
+
+```typescript
+// 提取数组元素类型
+type ElementType<T> = T extends (infer E)[] ? E : never
+
+type StringElement = ElementType<string[]> // string
+type NumberElement = ElementType<number[]> // number
+type Never = ElementType<string> // never
+
+// 提取函数返回类型
+type MyReturnType<T> = T extends (...args: any[]) => infer R ? R : never
+
+type FnReturn = MyReturnType<() => string> // string
+
+// 提取 Promise 内部类型
+type UnwrapPromise<T> = T extends Promise<infer U> ? U : T
+
+type Unwrapped = UnwrapPromise<Promise<string>> // string
+type NotPromise = UnwrapPromise<number> // number
+```
+
+## 约束传递
+
+类型参数之间可以相互约束：
+
+```typescript
+// U 约束为 T 的子类型
+function copy<T extends U, U>(source: T, target: U): T {
+  return { ...target, ...source }
+}
+
+// K 约束为 T 的键
+function pick<T, K extends keyof T>(obj: T, keys: K[]): Pick<T, K> {
+  const result = {} as Pick<T, K>
+  keys.forEach((key) => {
+    result[key] = obj[key]
+  })
+  return result
+}
+
+const user = { name: '张三', age: 25, email: 'test@test.com' }
+const picked = pick(user, ['name', 'age'])
+// { name: string; age: number }
+```
+
+## 默认约束
+
+```typescript
+// 默认约束为 unknown
+function identity<T = unknown>(arg: T): T {
+  return arg
+}
+
+// 默认约束为特定类型
+interface Container<T extends object = Record<string, unknown>> {
+  data: T
+}
+
+const c1: Container = { data: { anything: 'here' } }
+const c2: Container<{ name: string }> = { data: { name: '张三' } }
+```
+
+## 实际应用
+
+### 类型安全的事件系统
+
+```typescript
+interface EventMap {
+  click: { x: number; y: number }
+  input: { value: string }
+  submit: { data: Record<string, unknown> }
+}
+
+class TypedEventEmitter<T extends Record<string, unknown>> {
+  private handlers = new Map<keyof T, Function[]>()
+
+  on<K extends keyof T>(event: K, handler: (payload: T[K]) => void): void {
+    const list = this.handlers.get(event) || []
+    list.push(handler)
+    this.handlers.set(event, list)
+  }
+
+  emit<K extends keyof T>(event: K, payload: T[K]): void {
+    const handlers = this.handlers.get(event) || []
+    handlers.forEach((h) => h(payload))
+  }
+}
+
+const emitter = new TypedEventEmitter<EventMap>()
+
+emitter.on('click', (e) => {
+  console.log(e.x, e.y) // 类型安全
+})
+
+emitter.emit('click', { x: 100, y: 200 }) // ✅
+// emitter.emit('click', { value: 'test' });  // ❌ 类型不匹配
+```
+
+### 类型安全的 API 客户端
+
+```typescript
+interface ApiEndpoints {
+  '/users': { request: { page: number }; response: User[] }
+  '/users/:id': { request: { id: string }; response: User }
+  '/posts': { request: {}; response: Post[] }
+}
+
+class ApiClient<
+  T extends Record<string, { request: object; response: unknown }>,
+> {
+  async get<K extends keyof T>(
+    endpoint: K,
+    params: T[K]['request']
+  ): Promise<T[K]['response']> {
+    // 实现 API 调用
+    const response = await fetch(endpoint as string)
+    return response.json()
+  }
+}
+
+const api = new ApiClient<ApiEndpoints>()
+
+// 类型安全的 API 调用
+const users = await api.get('/users', { page: 1 }) // User[]
+const user = await api.get('/users/:id', { id: '123' }) // User
+```
+
+### 深度只读
+
+```typescript
+type DeepReadonly<T> = T extends object
+  ? { readonly [K in keyof T]: DeepReadonly<T[K]> }
+  : T
+
+interface User {
+  name: string
+  address: {
+    city: string
+    street: string
+  }
+}
+
+type ReadonlyUser = DeepReadonly<User>
+
+const user: ReadonlyUser = {
+  name: '张三',
+  address: {
+    city: '北京',
+    street: '中关村',
+  },
+}
+
+// user.name = '李四';  // ❌ 只读
+// user.address.city = '上海';  // ❌ 深度只读
+```
+
+## 常见问题
+
+### 🙋 约束和默认类型有什么关系？
+
+默认类型必须满足约束：
+
+```typescript
+// ✅ 正确：string 满足 Lengthwise
+interface Lengthwise {
+  length: number
+}
+function fn<T extends Lengthwise = string>(arg: T): T {
+  return arg
+}
+
+// ❌ 错误：number 不满足 Lengthwise
+// function fn2<T extends Lengthwise = number>(arg: T): T
+```
+
+### 🙋 如何约束类型参数为原始类型？
+
+```typescript
+type Primitive = string | number | boolean | null | undefined | symbol | bigint
+
+function process<T extends Primitive>(value: T): T {
+  return value
+}
+
+process('hello') // ✅
+process(42) // ✅
+// process({});  // ❌
+```
+
+### 🙋 约束中的 extends 和继承中的 extends 一样吗？
+
+语法相同，但语义不同：
+
+```typescript
+// 继承：创建子类
+class Dog extends Animal {}
+
+// 约束：类型必须满足条件
+function fn<T extends Animal>(arg: T) {}
+```
+
+## 总结
+
+| 约束类型     | 语法                        | 用途             |
+| ------------ | --------------------------- | ---------------- |
+| 接口约束     | `T extends Interface`       | 必须满足接口结构 |
+| keyof 约束   | `K extends keyof T`         | 必须是对象的键   |
+| 多重约束     | `T extends A & B`           | 必须满足多个条件 |
+| 构造函数约束 | `T extends new () => U`     | 必须是可构造类型 |
+| 条件约束     | `T extends ... ? ... : ...` | 条件类型推断     |
+
+下一篇我们将学习 TypeScript 内置的工具类型，如 Partial、Required、Pick 等。

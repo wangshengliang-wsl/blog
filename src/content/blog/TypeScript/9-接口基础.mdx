@@ -1,0 +1,582 @@
+---
+title: '接口基础'
+description: 'TypeScript 接口基础详解：interface 定义、属性描述、可选与只读属性、对象约束的使用方法'
+pubDate: 2024-01-23
+toc: true
+ogImage: true
+category: 'TypeScript'
+tags: ['TypeScript', '接口', 'interface', '对象类型', '类型约束']
+---
+
+接口是 TypeScript 中定义对象结构的核心方式之一。它描述了对象应该具有哪些属性和方法，是实现类型安全和代码契约的重要工具。
+
+## 接口基本语法
+
+### 定义接口
+
+```typescript
+// TypeScript 5.x
+
+// 使用 interface 关键字定义接口
+interface User {
+  id: number
+  name: string
+  email: string
+}
+
+// 使用接口约束对象
+const user: User = {
+  id: 1,
+  name: '张三',
+  email: 'zhangsan@example.com',
+}
+
+// ❌ 缺少属性会报错
+// const invalidUser: User = {
+//   id: 1,
+//   name: '张三'
+//   // 缺少 email
+// };
+
+// ❌ 多余属性也会报错（直接赋值时）
+// const extraUser: User = {
+//   id: 1,
+//   name: '张三',
+//   email: 'test@test.com',
+//   age: 25  // 多余属性
+// };
+```
+
+### 接口作为类型注解
+
+```typescript
+interface Point {
+  x: number
+  y: number
+}
+
+// 变量类型
+const origin: Point = { x: 0, y: 0 }
+
+// 函数参数类型
+function printPoint(point: Point): void {
+  console.log(`(${point.x}, ${point.y})`)
+}
+
+// 函数返回类型
+function createPoint(x: number, y: number): Point {
+  return { x, y }
+}
+
+// 数组元素类型
+const points: Point[] = [
+  { x: 0, y: 0 },
+  { x: 1, y: 1 },
+  { x: 2, y: 2 },
+]
+```
+
+## 可选属性
+
+使用 `?` 标记可选属性：
+
+```typescript
+interface Config {
+  host: string
+  port: number
+  protocol?: string // 可选
+  timeout?: number // 可选
+}
+
+// 可以不提供可选属性
+const config1: Config = {
+  host: 'localhost',
+  port: 3000,
+}
+
+// 也可以提供
+const config2: Config = {
+  host: 'localhost',
+  port: 3000,
+  protocol: 'https',
+  timeout: 5000,
+}
+```
+
+### 处理可选属性
+
+```typescript
+interface User {
+  name: string
+  nickname?: string
+}
+
+function greet(user: User): string {
+  // 可选属性的类型是 T | undefined
+  // user.nickname 的类型是 string | undefined
+
+  // 方式1：条件判断
+  if (user.nickname) {
+    return `Hello, ${user.nickname}!`
+  }
+  return `Hello, ${user.name}!`
+
+  // 方式2：空值合并
+  return `Hello, ${user.nickname ?? user.name}!`
+
+  // 方式3：可选链 + 空值合并
+  return `Hello, ${user.nickname?.toUpperCase() ?? user.name}!`
+}
+```
+
+## 只读属性
+
+使用 `readonly` 标记只读属性：
+
+```typescript
+interface Point {
+  readonly x: number
+  readonly y: number
+}
+
+const point: Point = { x: 10, y: 20 }
+
+// point.x = 30;  // ❌ 错误：无法分配到 "x" ，因为它是只读属性
+
+// 常用于配置对象
+interface AppConfig {
+  readonly apiUrl: string
+  readonly apiKey: string
+  readonly version: string
+}
+
+const config: AppConfig = {
+  apiUrl: 'https://api.example.com',
+  apiKey: 'secret-key',
+  version: '1.0.0',
+}
+```
+
+### readonly vs const
+
+```typescript
+// const：用于变量，变量本身不能重新赋值
+const x = 10
+// x = 20;  // ❌ 错误
+
+// readonly：用于属性，属性不能被修改
+interface Obj {
+  readonly prop: number
+}
+
+const obj: Obj = { prop: 10 }
+// obj.prop = 20;  // ❌ 错误
+// 但 obj 本身可以重新赋值（如果用 let）
+
+// 组合使用
+const config = {
+  apiUrl: 'xxx', // ❌ 这样写不对
+} // 对象字面量不能直接用 readonly
+
+// 正确方式
+interface Config {
+  readonly apiUrl: string
+}
+const config2: Config = { apiUrl: 'xxx' }
+```
+
+### 只读数组
+
+```typescript
+interface Data {
+  readonly items: readonly number[]
+}
+
+const data: Data = {
+  items: [1, 2, 3],
+}
+
+// data.items = [4, 5, 6];  // ❌ 不能重新赋值
+// data.items.push(4);      // ❌ 不能修改数组
+// data.items[0] = 10;      // ❌ 不能修改元素
+```
+
+## 属性类型
+
+### 基础类型属性
+
+```typescript
+interface User {
+  id: number
+  name: string
+  isActive: boolean
+  createdAt: Date
+  tags: string[]
+  metadata: object
+}
+```
+
+### 嵌套对象
+
+```typescript
+interface Address {
+  street: string
+  city: string
+  country: string
+  zipCode?: string
+}
+
+interface Company {
+  name: string
+  address: Address // 嵌套接口
+}
+
+interface Employee {
+  name: string
+  company: Company
+  homeAddress?: Address
+}
+
+const employee: Employee = {
+  name: '张三',
+  company: {
+    name: 'Acme Inc',
+    address: {
+      street: '中关村大街1号',
+      city: '北京',
+      country: '中国',
+    },
+  },
+}
+```
+
+### 方法属性
+
+```typescript
+interface Calculator {
+  // 方法简写语法
+  add(a: number, b: number): number
+  subtract(a: number, b: number): number
+
+  // 属性语法（等价）
+  multiply: (a: number, b: number) => number
+  divide: (a: number, b: number) => number
+}
+
+const calc: Calculator = {
+  add(a, b) {
+    return a + b
+  },
+  subtract(a, b) {
+    return a - b
+  },
+  multiply: (a, b) => a * b,
+  divide: (a, b) => a / b,
+}
+```
+
+## 接口描述函数
+
+接口可以描述函数类型：
+
+```typescript
+// 调用签名
+interface SearchFunc {
+  (source: string, keyword: string): boolean
+}
+
+const search: SearchFunc = (src, kw) => {
+  return src.includes(kw)
+}
+
+search('hello world', 'world') // true
+
+// 带属性的函数
+interface Counter {
+  (): number // 调用签名
+  count: number // 属性
+  reset(): void // 方法
+}
+
+function createCounter(): Counter {
+  const counter = (() => {
+    counter.count++
+    return counter.count
+  }) as Counter
+
+  counter.count = 0
+  counter.reset = () => {
+    counter.count = 0
+  }
+
+  return counter
+}
+
+const counter = createCounter()
+console.log(counter()) // 1
+console.log(counter()) // 2
+counter.reset()
+console.log(counter()) // 1
+```
+
+## 接口描述数组
+
+```typescript
+// 索引签名描述数组
+interface StringArray {
+  [index: number]: string
+  length: number
+}
+
+const arr: StringArray = ['a', 'b', 'c']
+console.log(arr[0]) // 'a'
+console.log(arr.length) // 3
+
+// 类数组对象
+interface ArrayLike<T> {
+  readonly length: number
+  [index: number]: T
+}
+
+function toArray<T>(arrayLike: ArrayLike<T>): T[] {
+  return Array.from(arrayLike)
+}
+```
+
+## 多余属性检查
+
+TypeScript 对对象字面量有额外的属性检查：
+
+```typescript
+interface Point {
+  x: number
+  y: number
+}
+
+// ❌ 直接赋值时检查多余属性
+// const p: Point = { x: 1, y: 2, z: 3 };  // 错误
+
+// ✅ 通过变量赋值可以绕过
+const temp = { x: 1, y: 2, z: 3 }
+const p: Point = temp // 正确
+
+// ✅ 使用类型断言
+const p2 = { x: 1, y: 2, z: 3 } as Point
+
+// ✅ 添加索引签名（如果确实需要额外属性）
+interface FlexiblePoint {
+  x: number
+  y: number
+  [key: string]: number // 允许额外的 number 属性
+}
+
+const p3: FlexiblePoint = { x: 1, y: 2, z: 3 } // 正确
+```
+
+## 接口合并
+
+同名接口会自动合并：
+
+```typescript
+interface User {
+  name: string
+}
+
+interface User {
+  age: number
+}
+
+interface User {
+  email: string
+}
+
+// 合并后等价于：
+// interface User {
+//   name: string;
+//   age: number;
+//   email: string;
+// }
+
+const user: User = {
+  name: '张三',
+  age: 25,
+  email: 'test@test.com',
+}
+```
+
+### 合并规则
+
+```typescript
+// 非函数成员必须类型一致
+interface A {
+  x: number
+}
+
+interface A {
+  x: number // ✅ 相同类型可以
+  // x: string;  // ❌ 不同类型会报错
+}
+
+// 函数成员会变成重载
+interface Logger {
+  log(message: string): void
+}
+
+interface Logger {
+  log(message: string, level: string): void
+}
+
+// 合并后：
+// interface Logger {
+//   log(message: string, level: string): void;  // 后声明的在前
+//   log(message: string): void;
+// }
+```
+
+## 实际应用
+
+### API 数据结构
+
+```typescript
+interface ApiResponse<T> {
+  code: number
+  message: string
+  data: T
+  timestamp: number
+}
+
+interface PaginatedData<T> {
+  items: T[]
+  total: number
+  page: number
+  pageSize: number
+  hasMore: boolean
+}
+
+interface User {
+  id: number
+  name: string
+  email: string
+  avatar?: string
+}
+
+// 使用
+type UserListResponse = ApiResponse<PaginatedData<User>>
+
+async function fetchUsers(): Promise<UserListResponse> {
+  const response = await fetch('/api/users')
+  return response.json()
+}
+```
+
+### 组件 Props
+
+```typescript
+interface ButtonProps {
+  text: string
+  onClick: () => void
+  disabled?: boolean
+  loading?: boolean
+  size?: 'small' | 'medium' | 'large'
+  type?: 'primary' | 'secondary' | 'danger'
+}
+
+function Button(props: ButtonProps) {
+  const {
+    text,
+    onClick,
+    disabled = false,
+    loading = false,
+    size = 'medium',
+    type = 'primary',
+  } = props
+
+  // 渲染按钮...
+}
+```
+
+### 配置对象
+
+```typescript
+interface DatabaseConfig {
+  readonly host: string
+  readonly port: number
+  readonly database: string
+  username?: string
+  password?: string
+  ssl?: boolean
+  pool?: {
+    min: number
+    max: number
+  }
+}
+
+function createConnection(config: DatabaseConfig) {
+  // 创建数据库连接...
+}
+```
+
+## 常见问题
+
+### 🙋 接口和 type 定义对象有什么区别？
+
+在定义对象结构时基本等价，主要区别：
+
+```typescript
+// 接口可以合并声明
+interface User {
+  name: string
+}
+interface User {
+  age: number
+}
+
+// type 不能重复声明
+// type User = { name: string };
+// type User = { age: number };  // ❌ 错误
+```
+
+### 🙋 接口属性可以是 undefined 吗？
+
+可以，但有区别：
+
+```typescript
+interface A {
+  prop?: string // 可选：可以不存在
+}
+
+interface B {
+  prop: string | undefined // 必须存在，但值可以是 undefined
+}
+
+const a: A = {} // ✅ 正确
+const b: B = { prop: undefined } // ✅ 必须显式提供
+// const b2: B = {};  // ❌ 错误
+```
+
+### 🙋 如何让接口的所有属性都变成可选/只读？
+
+使用工具类型：
+
+```typescript
+interface User {
+  id: number
+  name: string
+  email: string
+}
+
+type PartialUser = Partial<User> // 所有属性可选
+type ReadonlyUser = Readonly<User> // 所有属性只读
+```
+
+## 总结
+
+| 特性     | 语法                  | 用途           |
+| -------- | --------------------- | -------------- |
+| 基本接口 | `interface Name { }`  | 定义对象结构   |
+| 可选属性 | `prop?: type`         | 属性可以不存在 |
+| 只读属性 | `readonly prop: type` | 属性不可修改   |
+| 方法属性 | `method(): type`      | 定义对象方法   |
+| 接口合并 | 同名 interface        | 扩展已有接口   |
+
+下一篇我们将学习接口的进阶用法，包括函数类型接口、可索引类型、混合类型等。

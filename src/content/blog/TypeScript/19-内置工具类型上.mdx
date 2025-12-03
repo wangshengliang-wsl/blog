@@ -1,0 +1,314 @@
+---
+title: '内置工具类型（上）'
+description: 'TypeScript 内置工具类型详解：Partial、Required、Readonly、Pick、Omit 的用法与实现原理'
+pubDate: 2024-02-02
+toc: true
+ogImage: true
+category: 'TypeScript'
+tags: ['TypeScript', '工具类型', 'Partial', 'Pick', 'Omit']
+---
+
+TypeScript 内置了许多实用的工具类型，可以帮助我们进行常见的类型转换。本篇介绍 Partial、Required、Readonly、Pick、Omit 这五个最常用的工具类型。
+
+## Partial\<T\>
+
+将所有属性变为可选：
+
+```typescript
+// TypeScript 5.x
+
+interface User {
+  id: number
+  name: string
+  email: string
+  age: number
+}
+
+// 所有属性变为可选
+type PartialUser = Partial<User>
+// { id?: number; name?: string; email?: string; age?: number }
+
+// 常用于更新操作
+function updateUser(id: number, updates: Partial<User>): void {
+  // 只更新提供的字段
+}
+
+updateUser(1, { name: '新名字' }) // ✅ 只更新 name
+updateUser(1, { age: 30, email: 'new@test.com' }) // ✅ 更新多个字段
+
+// 实现原理
+type MyPartial<T> = {
+  [K in keyof T]?: T[K]
+}
+```
+
+## Required\<T\>
+
+将所有属性变为必需（与 Partial 相反）：
+
+```typescript
+interface Config {
+  host?: string
+  port?: number
+  timeout?: number
+}
+
+// 所有属性变为必需
+type RequiredConfig = Required<Config>
+// { host: string; port: number; timeout: number }
+
+// 常用于验证后的配置
+function validateConfig(config: Config): RequiredConfig {
+  return {
+    host: config.host ?? 'localhost',
+    port: config.port ?? 3000,
+    timeout: config.timeout ?? 5000,
+  }
+}
+
+// 实现原理
+type MyRequired<T> = {
+  [K in keyof T]-?: T[K] // -? 移除可选
+}
+```
+
+## Readonly\<T\>
+
+将所有属性变为只读：
+
+```typescript
+interface User {
+  id: number
+  name: string
+}
+
+type ReadonlyUser = Readonly<User>
+// { readonly id: number; readonly name: string }
+
+const user: ReadonlyUser = { id: 1, name: '张三' }
+// user.name = '李四';  // ❌ 错误：只读属性
+
+// 常用于不可变数据
+function freeze<T>(obj: T): Readonly<T> {
+  return Object.freeze(obj)
+}
+
+// 实现原理
+type MyReadonly<T> = {
+  readonly [K in keyof T]: T[K]
+}
+```
+
+## Pick\<T, K\>
+
+从类型中选取部分属性：
+
+```typescript
+interface User {
+  id: number
+  name: string
+  email: string
+  password: string
+  createdAt: Date
+}
+
+// 选取部分属性
+type UserBasic = Pick<User, 'id' | 'name'>
+// { id: number; name: string }
+
+type UserPublic = Pick<User, 'id' | 'name' | 'email'>
+// { id: number; name: string; email: string }
+
+// 常用于 API 响应过滤
+function getPublicProfile(user: User): Pick<User, 'id' | 'name' | 'email'> {
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+  }
+}
+
+// 实现原理
+type MyPick<T, K extends keyof T> = {
+  [P in K]: T[P]
+}
+```
+
+## Omit\<T, K\>
+
+从类型中排除部分属性（与 Pick 相反）：
+
+```typescript
+interface User {
+  id: number
+  name: string
+  email: string
+  password: string
+}
+
+// 排除敏感字段
+type SafeUser = Omit<User, 'password'>
+// { id: number; name: string; email: string }
+
+// 排除多个字段
+type UserInput = Omit<User, 'id' | 'password'>
+// { name: string; email: string }
+
+// 常用于创建 DTO
+type CreateUserDto = Omit<User, 'id'>
+type UpdateUserDto = Partial<Omit<User, 'id'>>
+
+// 实现原理
+type MyOmit<T, K extends keyof any> = Pick<T, Exclude<keyof T, K>>
+```
+
+## 组合使用
+
+```typescript
+interface User {
+  id: number
+  name: string
+  email: string
+  password: string
+  role: string
+  createdAt: Date
+  updatedAt: Date
+}
+
+// 创建用户时的输入
+type CreateUser = Omit<User, 'id' | 'createdAt' | 'updatedAt'>
+
+// 更新用户时的输入
+type UpdateUser = Partial<Omit<User, 'id' | 'createdAt' | 'updatedAt'>>
+
+// 公开的用户信息
+type PublicUser = Readonly<Pick<User, 'id' | 'name' | 'email'>>
+
+// API 响应
+interface ApiResponse<T> {
+  data: T
+  status: number
+}
+
+type UserResponse = ApiResponse<PublicUser>
+type UsersResponse = ApiResponse<PublicUser[]>
+```
+
+## 实际应用
+
+### 表单状态管理
+
+```typescript
+interface FormData {
+  username: string
+  email: string
+  password: string
+  confirmPassword: string
+}
+
+interface FormState {
+  values: Partial<FormData>
+  errors: Partial<Record<keyof FormData, string>>
+  touched: Partial<Record<keyof FormData, boolean>>
+  isValid: boolean
+  isSubmitting: boolean
+}
+
+function createFormState(): FormState {
+  return {
+    values: {},
+    errors: {},
+    touched: {},
+    isValid: false,
+    isSubmitting: false,
+  }
+}
+```
+
+### 数据库实体
+
+```typescript
+interface Entity {
+  id: string
+  createdAt: Date
+  updatedAt: Date
+}
+
+// 排除自动生成的字段
+type CreateDto<T extends Entity> = Omit<T, keyof Entity>
+
+// 更新时 id 必需，其他可选
+type UpdateDto<T extends Entity> = Pick<T, 'id'> &
+  Partial<Omit<T, keyof Entity>>
+
+interface User extends Entity {
+  name: string
+  email: string
+}
+
+type CreateUserDto = CreateDto<User>
+// { name: string; email: string }
+
+type UpdateUserDto = UpdateDto<User>
+// { id: string } & { name?: string; email?: string }
+```
+
+## 常见问题
+
+### 🙋 Partial 是深层的吗？
+
+不是，只影响第一层：
+
+```typescript
+interface User {
+  name: string
+  address: {
+    city: string
+    street: string
+  }
+}
+
+type PartialUser = Partial<User>
+// { name?: string; address?: { city: string; street: string } }
+// address 内部属性仍然必需
+
+// 深层 Partial
+type DeepPartial<T> = {
+  [K in keyof T]?: T[K] extends object ? DeepPartial<T[K]> : T[K]
+}
+```
+
+### 🙋 Pick 和 Omit 哪个更好用？
+
+取决于场景：
+
+- 选取少量属性：用 Pick
+- 排除少量属性：用 Omit
+
+```typescript
+interface User {
+  id: number
+  name: string
+  email: string
+  password: string
+  role: string
+}
+
+// 只需要 2 个属性 -> Pick
+type A = Pick<User, 'id' | 'name'>
+
+// 只排除 1 个属性 -> Omit
+type B = Omit<User, 'password'>
+```
+
+## 总结
+
+| 工具类型 | 作用         | 语法          |
+| -------- | ------------ | ------------- |
+| Partial  | 所有属性可选 | `Partial<T>`  |
+| Required | 所有属性必需 | `Required<T>` |
+| Readonly | 所有属性只读 | `Readonly<T>` |
+| Pick     | 选取部分属性 | `Pick<T, K>`  |
+| Omit     | 排除部分属性 | `Omit<T, K>`  |
+
+下一篇我们将继续学习 Record、Exclude、Extract 等工具类型。

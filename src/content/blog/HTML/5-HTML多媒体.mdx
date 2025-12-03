@@ -1,0 +1,645 @@
+---
+title: 'HTML 多媒体：音视频与响应式图片'
+description: '掌握 HTML5 多媒体元素，学习响应式图片、音视频嵌入、媒体控制 API 与无障碍字幕'
+pubDate: 2025-12-03
+toc: true
+ogImage: true
+category: 'HTML'
+tags: ['HTML', 'HTML5', '多媒体', '响应式图片', '音视频']
+---
+
+现代 Web 早已不是纯文本时代。图片、音频、视频是网页不可或缺的组成部分。HTML5 提供了强大的原生多媒体支持，无需 Flash 等插件。
+
+## 🎯 图片基础
+
+### `<img>` 元素
+
+```html
+<img
+  src="photo.jpg"
+  alt="一张城市夜景照片"
+  width="800"
+  height="600"
+  loading="lazy"
+/>
+```
+
+### 核心属性
+
+| 属性       | 必需 | 说明                                  |
+| ---------- | ---- | ------------------------------------- |
+| `src`      | ✅   | 图片路径                              |
+| `alt`      | ✅   | 替代文本（图片无法显示时/屏幕阅读器） |
+| `width`    | 推荐 | 图片宽度（避免布局抖动）              |
+| `height`   | 推荐 | 图片高度（避免布局抖动）              |
+| `loading`  | 推荐 | `lazy`（懒加载）/ `eager`（立即加载） |
+| `decoding` | 可选 | `async`（异步解码）/ `sync` / `auto`  |
+
+### `alt` 属性的正确用法
+
+```html
+<!-- ✅ 描述图片内容 -->
+<img src="chart.png" alt="2024年第四季度销售额环比增长15%" />
+
+<!-- ✅ 功能性图片描述功能 -->
+<img src="search-icon.svg" alt="搜索" />
+
+<!-- ✅ 装饰性图片用空 alt -->
+<img src="decorative-line.svg" alt="" />
+
+<!-- ❌ 避免冗余描述 -->
+<img src="logo.png" alt="图片：公司 logo 图片" />
+
+<!-- ✅ 正确写法 -->
+<img src="logo.png" alt="Acme 公司" />
+```
+
+🔶 **可访问性**：`alt` 属性对屏幕阅读器用户至关重要。描述性图片要写明内容，装饰性图片用空 `alt=""`（不是省略属性）。
+
+### 图片格式选择
+
+| 格式 | 特点                     | 适用场景                 |
+| ---- | ------------------------ | ------------------------ |
+| JPEG | 有损压缩，体积小         | 照片                     |
+| PNG  | 无损压缩，支持透明       | 图标、截图、需要透明的图 |
+| GIF  | 支持动画，256 色         | 简单动画                 |
+| WebP | 体积更小，支持透明和动画 | 通用（需检查兼容性）     |
+| AVIF | 最新格式，压缩率最高     | 新项目（兼容性有限）     |
+| SVG  | 矢量格式，无限缩放       | 图标、logo、插画         |
+
+## 响应式图片
+
+不同设备屏幕尺寸和分辨率差异巨大，需要提供不同尺寸的图片。
+
+### `srcset` 与像素密度
+
+为高分辨率屏幕（Retina）提供清晰图片：
+
+```html
+<img
+  src="photo-400.jpg"
+  srcset="photo-400.jpg 1x, photo-800.jpg 2x, photo-1200.jpg 3x"
+  alt="风景照片"
+/>
+```
+
+浏览器会根据设备像素比（DPR）自动选择：
+
+- 普通屏幕（1x）：加载 `photo-400.jpg`
+- Retina 屏幕（2x）：加载 `photo-800.jpg`
+- 超高清屏幕（3x）：加载 `photo-1200.jpg`
+
+### `srcset` 与宽度描述符
+
+更灵活的方式，告诉浏览器每张图的实际宽度：
+
+```html
+<img
+  src="photo-800.jpg"
+  srcset="
+    photo-400.jpg   400w,
+    photo-800.jpg   800w,
+    photo-1200.jpg 1200w,
+    photo-1600.jpg 1600w
+  "
+  sizes="(max-width: 600px) 100vw, 50vw"
+  alt="风景照片"
+/>
+```
+
+`sizes` 告诉浏览器图片在页面中的显示宽度：
+
+- 视口宽度 ≤ 600px 时：图片占 100% 视口宽度
+- 其他情况：图片占 50% 视口宽度
+
+浏览器会结合 `srcset` 和 `sizes` 智能选择最合适的图片。
+
+### `<picture>` 元素
+
+需要根据条件加载**完全不同**的图片时使用：
+
+```html
+<picture>
+  <!-- WebP 格式（优先） -->
+  <source type="image/webp" srcset="photo.webp" />
+
+  <!-- AVIF 格式（如果支持） -->
+  <source type="image/avif" srcset="photo.avif" />
+
+  <!-- 降级到 JPEG -->
+  <img src="photo.jpg" alt="风景照片" />
+</picture>
+```
+
+#### 艺术指导（Art Direction）
+
+不同屏幕显示不同构图的图片：
+
+```html
+<picture>
+  <!-- 手机：竖版裁剪 -->
+  <source media="(max-width: 768px)" srcset="hero-mobile.jpg" />
+
+  <!-- 平板：方形裁剪 -->
+  <source media="(max-width: 1024px)" srcset="hero-tablet.jpg" />
+
+  <!-- 桌面：横版全景 -->
+  <img src="hero-desktop.jpg" alt="产品展示" />
+</picture>
+```
+
+#### 暗色模式适配
+
+```html
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="logo-dark.svg" />
+  <img src="logo-light.svg" alt="公司 Logo" />
+</picture>
+```
+
+## `<figure>` 与 `<figcaption>`
+
+为图片添加语义化的标题：
+
+```html
+<figure>
+  <img src="chart.png" alt="2024年用户增长趋势图" />
+  <figcaption>图 1：2024年各季度活跃用户数量对比，Q4 环比增长 23%</figcaption>
+</figure>
+```
+
+`<figure>` 不仅限于图片，也可用于代码、引用等：
+
+```html
+<figure>
+  <pre><code>console.log('Hello, World!');</code></pre>
+  <figcaption>示例：JavaScript Hello World</figcaption>
+</figure>
+
+<figure>
+  <blockquote>简单是终极的复杂。</blockquote>
+  <figcaption>—— 达芬奇</figcaption>
+</figure>
+```
+
+## 🎬 视频 `<video>`
+
+### 基础用法
+
+```html
+<video src="video.mp4" width="640" height="360" controls poster="thumbnail.jpg">
+  您的浏览器不支持 HTML5 视频
+</video>
+```
+
+### 属性详解
+
+| 属性           | 说明                                     |
+| -------------- | ---------------------------------------- |
+| `src`          | 视频文件路径                             |
+| `controls`     | 显示播放控件                             |
+| `autoplay`     | 自动播放（通常需配合 `muted`）           |
+| `muted`        | 静音                                     |
+| `loop`         | 循环播放                                 |
+| `poster`       | 视频封面图                               |
+| `preload`      | 预加载策略：`none` / `metadata` / `auto` |
+| `playsinline`  | iOS 内联播放（不全屏）                   |
+| `width/height` | 尺寸                                     |
+
+### 多格式兼容
+
+```html
+<video controls poster="cover.jpg">
+  <!-- 优先使用 WebM -->
+  <source src="video.webm" type="video/webm" />
+  <!-- 降级到 MP4 -->
+  <source src="video.mp4" type="video/mp4" />
+  <!-- 最终降级 -->
+  <p>您的浏览器不支持 HTML5 视频，请<a href="video.mp4">下载视频</a>观看。</p>
+</video>
+```
+
+### 自动播放策略
+
+现代浏览器限制自动播放以改善用户体验：
+
+```html
+<!-- ✅ 静音视频可以自动播放 -->
+<video autoplay muted loop playsinline>
+  <source src="background.mp4" type="video/mp4" />
+</video>
+
+<!-- ❌ 有声音的视频通常会被阻止自动播放 -->
+<video autoplay>
+  <source src="intro.mp4" type="video/mp4" />
+</video>
+```
+
+## 🎵 音频 `<audio>`
+
+### 基础用法
+
+```html
+<audio src="music.mp3" controls>您的浏览器不支持 HTML5 音频</audio>
+```
+
+### 多格式兼容
+
+```html
+<audio controls>
+  <source src="music.ogg" type="audio/ogg" />
+  <source src="music.mp3" type="audio/mpeg" />
+  <p>您的浏览器不支持 HTML5 音频</p>
+</audio>
+```
+
+### 属性
+
+| 属性       | 说明                           |
+| ---------- | ------------------------------ |
+| `controls` | 显示播放控件                   |
+| `autoplay` | 自动播放（大多数浏览器会阻止） |
+| `muted`    | 静音                           |
+| `loop`     | 循环播放                       |
+| `preload`  | 预加载策略                     |
+
+## 媒体控制 API
+
+JavaScript 可以完全控制音视频播放：
+
+### 基础控制
+
+```javascript
+const video = document.querySelector('video')
+
+// 播放/暂停
+video.play()
+video.pause()
+
+// 属性
+video.currentTime = 30 // 跳转到 30 秒
+video.volume = 0.5 // 音量（0-1）
+video.muted = true // 静音
+video.playbackRate = 1.5 // 播放速度
+
+// 只读属性
+console.log(video.duration) // 总时长
+console.log(video.paused) // 是否暂停
+console.log(video.ended) // 是否结束
+console.log(video.readyState) // 就绪状态
+```
+
+### 事件监听
+
+```javascript
+const video = document.querySelector('video')
+
+// 播放/暂停事件
+video.addEventListener('play', () => console.log('开始播放'))
+video.addEventListener('pause', () => console.log('暂停播放'))
+video.addEventListener('ended', () => console.log('播放结束'))
+
+// 时间更新
+video.addEventListener('timeupdate', () => {
+  const percent = (video.currentTime / video.duration) * 100
+  progressBar.style.width = `${percent}%`
+})
+
+// 加载事件
+video.addEventListener('loadedmetadata', () => {
+  console.log(`视频时长: ${video.duration}秒`)
+})
+
+video.addEventListener('canplay', () => {
+  console.log('可以开始播放')
+})
+
+// 错误处理
+video.addEventListener('error', () => {
+  console.error('视频加载失败')
+})
+```
+
+### 自定义播放器示例
+
+```html
+<div class="video-player">
+  <video id="myVideo" src="video.mp4"></video>
+
+  <div class="controls">
+    <button id="playBtn">▶️</button>
+    <input type="range" id="progress" value="0" max="100" />
+    <span id="time">0:00 / 0:00</span>
+    <input type="range" id="volume" value="100" max="100" />
+    <button id="fullscreenBtn">⛶</button>
+  </div>
+</div>
+
+<script>
+  const video = document.getElementById('myVideo')
+  const playBtn = document.getElementById('playBtn')
+  const progress = document.getElementById('progress')
+  const timeDisplay = document.getElementById('time')
+  const volumeSlider = document.getElementById('volume')
+  const fullscreenBtn = document.getElementById('fullscreenBtn')
+
+  // 播放/暂停
+  playBtn.addEventListener('click', () => {
+    if (video.paused) {
+      video.play()
+      playBtn.textContent = '⏸️'
+    } else {
+      video.pause()
+      playBtn.textContent = '▶️'
+    }
+  })
+
+  // 进度条
+  video.addEventListener('timeupdate', () => {
+    const percent = (video.currentTime / video.duration) * 100
+    progress.value = percent
+
+    // 更新时间显示
+    const current = formatTime(video.currentTime)
+    const duration = formatTime(video.duration)
+    timeDisplay.textContent = `${current} / ${duration}`
+  })
+
+  progress.addEventListener('input', () => {
+    video.currentTime = (progress.value / 100) * video.duration
+  })
+
+  // 音量
+  volumeSlider.addEventListener('input', () => {
+    video.volume = volumeSlider.value / 100
+  })
+
+  // 全屏
+  fullscreenBtn.addEventListener('click', () => {
+    if (document.fullscreenElement) {
+      document.exitFullscreen()
+    } else {
+      video.requestFullscreen()
+    }
+  })
+
+  // 格式化时间
+  function formatTime(seconds) {
+    const mins = Math.floor(seconds / 60)
+    const secs = Math.floor(seconds % 60)
+    return `${mins}:${secs.toString().padStart(2, '0')}`
+  }
+</script>
+```
+
+## 字幕与无障碍 `<track>`
+
+为视频添加字幕、描述等文本轨道：
+
+```html
+<video controls>
+  <source src="movie.mp4" type="video/mp4" />
+
+  <!-- 字幕 -->
+  <track
+    kind="subtitles"
+    src="subtitles-zh.vtt"
+    srclang="zh"
+    label="中文字幕"
+    default
+  />
+  <track kind="subtitles" src="subtitles-en.vtt" srclang="en" label="English" />
+
+  <!-- 旁白描述（为视障用户） -->
+  <track
+    kind="descriptions"
+    src="descriptions.vtt"
+    srclang="zh"
+    label="画面描述"
+  />
+</video>
+```
+
+### `<track>` 属性
+
+| 属性      | 说明                                                                  |
+| --------- | --------------------------------------------------------------------- |
+| `kind`    | 轨道类型：`subtitles`/`captions`/`descriptions`/`chapters`/`metadata` |
+| `src`     | VTT 文件路径                                                          |
+| `srclang` | 语言代码                                                              |
+| `label`   | 用户可见的标签                                                        |
+| `default` | 默认启用                                                              |
+
+### WebVTT 字幕格式
+
+```vtt
+WEBVTT
+
+00:00:01.000 --> 00:00:04.000
+欢迎观看本教程
+
+00:00:04.500 --> 00:00:08.000
+今天我们将学习 HTML5 视频
+
+00:00:08.500 --> 00:00:12.000
+首先，让我们了解基本概念
+```
+
+## 嵌入外部媒体
+
+### YouTube 视频
+
+```html
+<iframe
+  width="560"
+  height="315"
+  src="https://www.youtube.com/embed/VIDEO_ID"
+  title="视频标题"
+  frameborder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowfullscreen
+></iframe>
+```
+
+### Bilibili 视频
+
+```html
+<iframe
+  src="//player.bilibili.com/player.html?bvid=BV1xx411c7mD"
+  width="640"
+  height="360"
+  frameborder="0"
+  allowfullscreen
+></iframe>
+```
+
+🔶 **性能提示**：iframe 嵌入会影响页面加载性能，可考虑懒加载或点击后加载。
+
+## 🎯 实战：响应式图片画廊
+
+```html
+<!doctype html>
+<html lang="zh-Hans">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>图片画廊</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family: system-ui, sans-serif;
+        padding: 1rem;
+      }
+      h1 {
+        text-align: center;
+        margin-bottom: 2rem;
+      }
+
+      .gallery {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 1rem;
+      }
+
+      .gallery figure {
+        margin: 0;
+        border-radius: 0.5rem;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      }
+
+      .gallery img {
+        width: 100%;
+        height: 200px;
+        object-fit: cover;
+        display: block;
+        transition: transform 0.3s;
+      }
+
+      .gallery figure:hover img {
+        transform: scale(1.05);
+      }
+
+      .gallery figcaption {
+        padding: 1rem;
+        background: #f8f9fa;
+      }
+
+      .gallery figcaption h3 {
+        margin-bottom: 0.5rem;
+      }
+
+      .gallery figcaption p {
+        color: #666;
+        font-size: 0.875rem;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>风景摄影</h1>
+
+    <div class="gallery">
+      <figure>
+        <picture>
+          <source
+            type="image/webp"
+            srcset="mountain-400.webp 400w, mountain-800.webp 800w"
+            sizes="(max-width: 600px) 100vw, 33vw"
+          />
+          <img
+            src="mountain-800.jpg"
+            srcset="mountain-400.jpg 400w, mountain-800.jpg 800w"
+            sizes="(max-width: 600px) 100vw, 33vw"
+            alt="雪山日出，金色阳光照耀山峰"
+            loading="lazy"
+          />
+        </picture>
+        <figcaption>
+          <h3>雪山日出</h3>
+          <p>清晨的第一缕阳光洒在雪山之巅</p>
+        </figcaption>
+      </figure>
+
+      <figure>
+        <picture>
+          <source
+            type="image/webp"
+            srcset="lake-400.webp 400w, lake-800.webp 800w"
+            sizes="(max-width: 600px) 100vw, 33vw"
+          />
+          <img
+            src="lake-800.jpg"
+            srcset="lake-400.jpg 400w, lake-800.jpg 800w"
+            sizes="(max-width: 600px) 100vw, 33vw"
+            alt="宁静的湖面倒映着周围的森林"
+            loading="lazy"
+          />
+        </picture>
+        <figcaption>
+          <h3>静谧湖光</h3>
+          <p>如镜的湖面倒映出完美的倒影</p>
+        </figcaption>
+      </figure>
+
+      <figure>
+        <picture>
+          <source
+            type="image/webp"
+            srcset="sunset-400.webp 400w, sunset-800.webp 800w"
+            sizes="(max-width: 600px) 100vw, 33vw"
+          />
+          <img
+            src="sunset-800.jpg"
+            srcset="sunset-400.jpg 400w, sunset-800.jpg 800w"
+            sizes="(max-width: 600px) 100vw, 33vw"
+            alt="海边落日，橙红色天空与海浪"
+            loading="lazy"
+          />
+        </picture>
+        <figcaption>
+          <h3>海边落日</h3>
+          <p>夕阳将天空染成温暖的橙红色</p>
+        </figcaption>
+      </figure>
+    </div>
+  </body>
+</html>
+```
+
+## 常见问题
+
+### 🤔 图片懒加载的 `loading="lazy"` 兼容性如何？
+
+现代浏览器（Chrome 77+、Firefox 75+、Safari 15.4+）都支持。对于老浏览器会自动忽略该属性，正常加载图片，无需 polyfill。
+
+### 🤔 视频自动播放被阻止怎么办？
+
+1. 添加 `muted` 属性
+2. 用户交互后再调用 `video.play()`
+3. 处理 play() 返回的 Promise
+
+```javascript
+video.play().catch((error) => {
+  // 自动播放被阻止，显示播放按钮
+  playButton.style.display = 'block'
+})
+```
+
+### 🤔 如何选择 `srcset` 的图片尺寸？
+
+常见断点：400w、800w、1200w、1600w、2000w。根据实际使用场景调整，考虑：
+
+- 最大显示宽度
+- 目标设备的屏幕密度
+- 带宽成本
+
+## 参考资料
+
+- [MDN: 响应式图片](https://developer.mozilla.org/zh-CN/docs/Learn/HTML/Multimedia_and_embedding/Responsive_images)
+- [MDN: video 元素](https://developer.mozilla.org/zh-CN/docs/Web/HTML/Element/video)
+- [web.dev: 图片优化](https://web.dev/learn/images/)
+- [WebVTT 规范](https://w3c.github.io/webvtt/)

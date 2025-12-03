@@ -1,0 +1,407 @@
+---
+title: '泛型实战'
+description: 'TypeScript 泛型实战：泛型组件、泛型 API 封装、常见设计模式的泛型应用'
+pubDate: 2024-02-04
+toc: true
+ogImage: true
+category: 'TypeScript'
+tags: ['TypeScript', '泛型', '实战', '设计模式', 'API封装']
+---
+
+学习了泛型的基础知识后，本篇通过实际案例展示泛型在真实项目中的应用。
+
+## 通用 API 响应处理
+
+```typescript
+// TypeScript 5.x
+
+// 通用响应类型
+interface ApiResponse<T> {
+  code: number
+  message: string
+  data: T
+  timestamp: number
+}
+
+// 分页响应
+interface PaginatedData<T> {
+  items: T[]
+  total: number
+  page: number
+  pageSize: number
+  hasMore: boolean
+}
+
+// 通用请求函数
+async function request<T>(
+  url: string,
+  options?: RequestInit
+): Promise<ApiResponse<T>> {
+  const response = await fetch(url, options)
+  return response.json()
+}
+
+// 使用
+interface User {
+  id: number
+  name: string
+  email: string
+}
+
+const userResponse = await request<User>('/api/user/1')
+console.log(userResponse.data.name) // 类型安全
+
+const usersResponse = await request<PaginatedData<User>>('/api/users')
+console.log(usersResponse.data.items[0].name) // 类型安全
+```
+
+## 状态管理
+
+```typescript
+// 通用状态管理器
+class Store<S extends object> {
+  private state: S
+  private listeners: Set<(state: S) => void> = new Set()
+
+  constructor(initialState: S) {
+    this.state = initialState
+  }
+
+  getState(): Readonly<S> {
+    return this.state
+  }
+
+  setState<K extends keyof S>(key: K, value: S[K]): void
+  setState(partial: Partial<S>): void
+  setState<K extends keyof S>(
+    keyOrPartial: K | Partial<S>,
+    value?: S[K]
+  ): void {
+    if (typeof keyOrPartial === 'string') {
+      this.state = { ...this.state, [keyOrPartial]: value }
+    } else {
+      this.state = { ...this.state, ...keyOrPartial }
+    }
+    this.notify()
+  }
+
+  subscribe(listener: (state: S) => void): () => void {
+    this.listeners.add(listener)
+    return () => this.listeners.delete(listener)
+  }
+
+  private notify(): void {
+    this.listeners.forEach((l) => l(this.state))
+  }
+}
+
+// 使用
+interface AppState {
+  user: { name: string } | null
+  theme: 'light' | 'dark'
+  loading: boolean
+}
+
+const store = new Store<AppState>({
+  user: null,
+  theme: 'light',
+  loading: false,
+})
+
+store.setState('loading', true)
+store.setState({ user: { name: '张三' } })
+```
+
+## 表单处理
+
+```typescript
+// 表单字段类型
+interface FormField<T> {
+  value: T
+  error?: string
+  touched: boolean
+  validate(): boolean
+}
+
+// 表单类型
+type FormFields<T> = {
+  [K in keyof T]: FormField<T[K]>
+}
+
+// 表单管理器
+class FormManager<T extends object> {
+  private fields: FormFields<T>
+  private validators: Partial<
+    Record<keyof T, (value: any) => string | undefined>
+  >
+
+  constructor(
+    initialValues: T,
+    validators?: Partial<Record<keyof T, (value: any) => string | undefined>>
+  ) {
+    this.validators = validators || {}
+    this.fields = {} as FormFields<T>
+
+    for (const key in initialValues) {
+      this.fields[key] = {
+        value: initialValues[key],
+        touched: false,
+        validate: () => this.validateField(key),
+      }
+    }
+  }
+
+  private validateField(key: keyof T): boolean {
+    const validator = this.validators[key]
+    if (validator) {
+      const error = validator(this.fields[key].value)
+      this.fields[key].error = error
+      return !error
+    }
+    return true
+  }
+
+  setValue<K extends keyof T>(key: K, value: T[K]): void {
+    this.fields[key].value = value
+    this.fields[key].touched = true
+    this.validateField(key)
+  }
+
+  getValues(): T {
+    const values = {} as T
+    for (const key in this.fields) {
+      values[key] = this.fields[key].value
+    }
+    return values
+  }
+
+  isValid(): boolean {
+    return Object.keys(this.fields).every((key) =>
+      this.validateField(key as keyof T)
+    )
+  }
+}
+
+// 使用
+interface LoginForm {
+  email: string
+  password: string
+}
+
+const form = new FormManager<LoginForm>(
+  { email: '', password: '' },
+  {
+    email: (v) => (!v.includes('@') ? '无效的邮箱' : undefined),
+    password: (v) => (v.length < 6 ? '密码至少6位' : undefined),
+  }
+)
+
+form.setValue('email', 'test@test.com')
+form.setValue('password', '123456')
+console.log(form.isValid()) // true
+```
+
+## 事件系统
+
+```typescript
+type EventHandler<T> = (payload: T) => void
+
+class EventEmitter<EventMap extends Record<string, any>> {
+  private handlers = new Map<keyof EventMap, Set<Function>>()
+
+  on<K extends keyof EventMap>(
+    event: K,
+    handler: EventHandler<EventMap[K]>
+  ): () => void {
+    if (!this.handlers.has(event)) {
+      this.handlers.set(event, new Set())
+    }
+    this.handlers.get(event)!.add(handler)
+    return () => this.off(event, handler)
+  }
+
+  off<K extends keyof EventMap>(
+    event: K,
+    handler: EventHandler<EventMap[K]>
+  ): void {
+    this.handlers.get(event)?.delete(handler)
+  }
+
+  emit<K extends keyof EventMap>(event: K, payload: EventMap[K]): void {
+    this.handlers.get(event)?.forEach((handler) => handler(payload))
+  }
+
+  once<K extends keyof EventMap>(
+    event: K,
+    handler: EventHandler<EventMap[K]>
+  ): void {
+    const wrapper: EventHandler<EventMap[K]> = (payload) => {
+      handler(payload)
+      this.off(event, wrapper)
+    }
+    this.on(event, wrapper)
+  }
+}
+
+// 使用
+interface AppEvents {
+  'login': { userId: string; timestamp: number }
+  'logout': undefined
+  'error': Error
+  'data:update': { type: string; data: unknown }
+}
+
+const emitter = new EventEmitter<AppEvents>()
+
+emitter.on('login', ({ userId, timestamp }) => {
+  console.log(`User ${userId} logged in at ${timestamp}`)
+})
+
+emitter.emit('login', { userId: '123', timestamp: Date.now() })
+```
+
+## 依赖注入容器
+
+```typescript
+type Constructor<T = any> = new (...args: any[]) => T
+
+class Container {
+  private instances = new Map<Constructor, any>()
+  private factories = new Map<Constructor, () => any>()
+
+  register<T>(ctor: Constructor<T>, factory: () => T): void {
+    this.factories.set(ctor, factory)
+  }
+
+  registerSingleton<T>(ctor: Constructor<T>, factory: () => T): void {
+    this.factories.set(ctor, () => {
+      if (!this.instances.has(ctor)) {
+        this.instances.set(ctor, factory())
+      }
+      return this.instances.get(ctor)
+    })
+  }
+
+  resolve<T>(ctor: Constructor<T>): T {
+    const factory = this.factories.get(ctor)
+    if (!factory) {
+      throw new Error(`No registration for ${ctor.name}`)
+    }
+    return factory()
+  }
+}
+
+// 使用
+interface Logger {
+  log(message: string): void
+}
+
+class ConsoleLogger implements Logger {
+  log(message: string) {
+    console.log(message)
+  }
+}
+
+class UserService {
+  constructor(private logger: Logger) {}
+
+  createUser(name: string) {
+    this.logger.log(`Creating user: ${name}`)
+  }
+}
+
+const container = new Container()
+container.registerSingleton(ConsoleLogger, () => new ConsoleLogger())
+container.register(
+  UserService,
+  () => new UserService(container.resolve(ConsoleLogger))
+)
+
+const userService = container.resolve(UserService)
+userService.createUser('张三')
+```
+
+## 类型安全的路由
+
+```typescript
+// 路由定义
+type RouteParams<T extends string> =
+  T extends `${string}:${infer Param}/${infer Rest}`
+    ? { [K in Param | keyof RouteParams<Rest>]: string }
+    : T extends `${string}:${infer Param}`
+      ? { [K in Param]: string }
+      : {}
+
+// 路由器
+class Router<Routes extends Record<string, string>> {
+  private routes = new Map<keyof Routes, Function>()
+
+  register<K extends keyof Routes>(
+    path: K,
+    handler: (params: RouteParams<Routes[K] & string>) => void
+  ): void {
+    this.routes.set(path, handler)
+  }
+
+  navigate<K extends keyof Routes>(
+    path: K,
+    params: RouteParams<Routes[K] & string>
+  ): void {
+    const handler = this.routes.get(path)
+    if (handler) {
+      handler(params)
+    }
+  }
+}
+
+// 使用
+type AppRoutes = {
+  home: '/'
+  user: '/user/:id'
+  post: '/post/:postId/comment/:commentId'
+}
+
+const router = new Router<AppRoutes>()
+
+router.register('user', (params) => {
+  console.log(`User ID: ${params.id}`) // 类型安全
+})
+
+router.register('post', (params) => {
+  console.log(`Post: ${params.postId}, Comment: ${params.commentId}`)
+})
+
+router.navigate('user', { id: '123' })
+```
+
+## 常见问题
+
+### 🙋 泛型会增加运行时开销吗？
+
+不会。泛型只在编译时存在，编译后的 JavaScript 没有类型信息。
+
+### 🙋 如何调试复杂的泛型类型？
+
+使用类型别名展开：
+
+```typescript
+// 复杂类型
+type Complex<T> = T extends object ? { [K in keyof T]: Complex<T[K]> } : T
+
+// 调试：创建具体实例查看类型
+type Debug = Complex<{ a: { b: string } }>
+// 鼠标悬停查看展开后的类型
+```
+
+## 总结
+
+泛型的实战应用场景：
+
+- API 响应封装
+- 状态管理
+- 表单处理
+- 事件系统
+- 依赖注入
+- 路由系统
+
+下一篇我们将进入类型系统进阶，学习类型守卫。
