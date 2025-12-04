@@ -100,7 +100,6 @@ import '~/styles/music.css'
   interface Song {
     id: string
     name: string
-    duration: string
     url: string
   }
 
@@ -135,6 +134,97 @@ import '~/styles/music.css'
       return isDark ? 0x1a1a1a : 0xf5f5f5
     }
 
+    // Procedural Textures
+    const createVinylTexture = () => {
+      const size = 2048
+      const canvas = document.createElement('canvas')
+      canvas.width = size
+      canvas.height = size
+      const ctx = canvas.getContext('2d')
+      if (!ctx) return null
+
+      const centerX = size / 2
+      const centerY = size / 2
+
+      // Background
+      ctx.fillStyle = '#050505'
+      ctx.fillRect(0, 0, size, size)
+
+      // Draw grooves
+      // Simulating Fresnel/Anisotropic bands with gradients
+      const gradient = ctx.createRadialGradient(
+        centerX,
+        centerY,
+        280,
+        centerX,
+        centerY,
+        960
+      )
+      gradient.addColorStop(0, '#050505')
+      gradient.addColorStop(0.2, '#121212')
+      gradient.addColorStop(0.4, '#050505')
+      gradient.addColorStop(0.6, '#121212')
+      gradient.addColorStop(0.8, '#050505')
+      gradient.addColorStop(1, '#0a0a0a')
+
+      ctx.fillStyle = gradient
+      ctx.beginPath()
+      ctx.arc(centerX, centerY, 960, 0, Math.PI * 2)
+      ctx.arc(centerX, centerY, 280, 0, Math.PI * 2, true) // hole
+      ctx.fill()
+
+      // Fine grooves
+      ctx.globalAlpha = 0.4
+      for (let r = 280; r < 960; r += 1.5) {
+        // Track gaps
+        if (Math.random() < 0.005) r += 10
+
+        const intensity = Math.random() * 0.1 + 0.05
+        ctx.strokeStyle = `rgba(255, 255, 255, ${intensity})`
+        ctx.lineWidth = 0.8
+        ctx.beginPath()
+        ctx.arc(centerX, centerY, r, 0, Math.PI * 2)
+        ctx.stroke()
+      }
+      ctx.globalAlpha = 1.0
+
+      const texture = new THREE.CanvasTexture(canvas)
+      texture.colorSpace = THREE.SRGBColorSpace
+      // Anisotropy filtering for sharper angles
+      texture.anisotropy = renderer.capabilities.getMaxAnisotropy()
+      return texture
+    }
+
+    const createBrushedMetalTexture = (color = '#d0d0d0') => {
+      const canvas = document.createElement('canvas')
+      canvas.width = 512
+      canvas.height = 512
+      const ctx = canvas.getContext('2d')
+      if (!ctx) return null
+
+      ctx.fillStyle = color
+      ctx.fillRect(0, 0, 512, 512)
+
+      // Add noise/scratches
+      for (let i = 0; i < 20000; i++) {
+        const x = Math.random() * 512
+        const y = Math.random() * 512
+        const len = Math.random() * 40 + 10
+        const opacity = Math.random() * 0.05
+
+        ctx.strokeStyle = `rgba(0, 0, 0, ${opacity})`
+        ctx.lineWidth = 1
+        ctx.beginPath()
+        ctx.moveTo(x, y)
+        ctx.lineTo(x + len, y) // Horizontal scratches
+        ctx.stroke()
+      }
+
+      const texture = new THREE.CanvasTexture(canvas)
+      texture.colorSpace = THREE.SRGBColorSpace
+      return texture
+    }
+
     // Scene setup
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(getThemeBackgroundColor())
@@ -163,117 +253,79 @@ import '~/styles/music.css'
 
     // ==================== Lighting ====================
     // Ambient light - general illumination
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.4)
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.3)
     scene.add(ambientLight)
 
     // Main spotlight from above (creates vinyl reflection)
-    const spotLight = new THREE.SpotLight(0xffffff, 60)
-    spotLight.position.set(0, 10, 0)
-    spotLight.angle = Math.PI / 3
-    spotLight.penumbra = 0.4
-    spotLight.decay = 1.5
-    spotLight.distance = 25
+    const spotLight = new THREE.SpotLight(0xffffff, 80)
+    spotLight.position.set(0, 12, 0)
+    spotLight.angle = Math.PI / 4
+    spotLight.penumbra = 0.5
+    spotLight.decay = 1.2
+    spotLight.distance = 30
     spotLight.castShadow = true
     spotLight.shadow.mapSize.width = 2048
     spotLight.shadow.mapSize.height = 2048
-    spotLight.shadow.camera.near = 1
-    spotLight.shadow.camera.far = 25
+    spotLight.shadow.bias = -0.0001
     scene.add(spotLight)
     scene.add(spotLight.target)
 
-    // Front spotlight - illuminates vinyl grooves from front
-    const frontSpotLight = new THREE.SpotLight(0xffffff, 40)
-    frontSpotLight.position.set(0, 6, 8)
-    frontSpotLight.angle = Math.PI / 4
-    frontSpotLight.penumbra = 0.5
-    frontSpotLight.decay = 1.5
-    frontSpotLight.distance = 20
-    frontSpotLight.target.position.set(-0.3, 0.65, 0)
-    scene.add(frontSpotLight)
-    scene.add(frontSpotLight.target)
+    // Warm highlight light
+    const warmLight = new THREE.PointLight(0xffaa00, 20, 20)
+    warmLight.position.set(-3, 2, 3)
+    scene.add(warmLight)
 
-    // Side spotlight - creates vinyl texture highlight
-    const sideSpotLight = new THREE.SpotLight(0xffeedd, 35)
-    sideSpotLight.position.set(-6, 5, 4)
-    sideSpotLight.angle = Math.PI / 5
-    sideSpotLight.penumbra = 0.3
-    sideSpotLight.decay = 1.5
-    sideSpotLight.distance = 18
-    sideSpotLight.target.position.set(-0.3, 0.65, 0)
-    scene.add(sideSpotLight)
-    scene.add(sideSpotLight.target)
+    // Cool highlight light
+    const coolLight = new THREE.PointLight(0x00aaff, 20, 20)
+    coolLight.position.set(3, 2, -3)
+    scene.add(coolLight)
 
-    // Back spotlight - rim lighting effect
-    const backSpotLight = new THREE.SpotLight(0xddeeff, 30)
-    backSpotLight.position.set(4, 4, -6)
-    backSpotLight.angle = Math.PI / 5
-    backSpotLight.penumbra = 0.4
-    backSpotLight.decay = 1.5
-    backSpotLight.distance = 18
-    backSpotLight.target.position.set(-0.3, 0.65, 0)
-    scene.add(backSpotLight)
-    scene.add(backSpotLight.target)
-
-    // Rim lights for edge highlights
-    const rimLight1 = new THREE.DirectionalLight(0x4fc3f7, 0.5)
-    rimLight1.position.set(-8, 4, 8)
-    scene.add(rimLight1)
-
-    const rimLight2 = new THREE.DirectionalLight(0xff7043, 0.4)
-    rimLight2.position.set(8, 3, -8)
-    scene.add(rimLight2)
-
-    // Fill light from front
-    const fillLight = new THREE.DirectionalLight(0xffffff, 0.3)
-    fillLight.position.set(0, 5, 10)
-    scene.add(fillLight)
-
-    // Bottom fill light - shows vinyl underside detail
-    const bottomFillLight = new THREE.DirectionalLight(0xffffff, 0.15)
-    bottomFillLight.position.set(0, -2, 5)
-    scene.add(bottomFillLight)
+    // Rim light for metallic edges
+    const rimLight = new THREE.DirectionalLight(0xffffff, 1.5)
+    rimLight.position.set(0, 5, -10)
+    scene.add(rimLight)
 
     // ==================== Materials ====================
+    const vinylTexture = createVinylTexture()
+    const brushedMetalTexture = createBrushedMetalTexture()
+
     // Matte black material for turntable body
     const matteBlackMaterial = new THREE.MeshStandardMaterial({
-      color: 0x1a1a1a,
-      roughness: 0.85,
-      metalness: 0.1,
+      color: 0x151515,
+      roughness: 0.6,
+      metalness: 0.2,
     })
 
     // Brushed aluminum material
     const aluminumMaterial = new THREE.MeshStandardMaterial({
-      color: 0xd0d0d0,
-      roughness: 0.35,
-      metalness: 0.85,
+      color: 0xffffff,
+      map: brushedMetalTexture,
+      roughness: 0.25,
+      metalness: 0.8,
     })
 
     // Chrome/polished metal material
     const chromeMaterial = new THREE.MeshStandardMaterial({
-      color: 0xfafafa,
-      roughness: 0.1,
+      color: 0xffffff,
+      roughness: 0.05,
       metalness: 0.95,
     })
 
     // Rubber mat material
     const rubberMaterial = new THREE.MeshStandardMaterial({
-      color: 0x2a2a2a,
+      color: 0x202020,
       roughness: 0.9,
-      metalness: 0,
+      metalness: 0.05,
     })
 
-    // Vinyl material with reflective properties
+    // Vinyl material with texture
     const vinylMaterial = new THREE.MeshStandardMaterial({
-      color: 0x0a0a0a,
-      roughness: 0.1,
-      metalness: 0.15,
-    })
-
-    // Gold accent material
-    const goldMaterial = new THREE.MeshStandardMaterial({
-      color: 0xd4af37,
-      roughness: 0.3,
-      metalness: 0.9,
+      color: 0x080808,
+      map: vinylTexture,
+      bumpMap: vinylTexture,
+      bumpScale: 0.02,
+      roughness: 0.4,
+      metalness: 0.6,
     })
 
     // Red LED indicator
@@ -416,65 +468,34 @@ import '~/styles/music.css'
     vinyl.receiveShadow = true
     vinylGroup.add(vinyl)
 
-    // Vinyl grooves with light reflection - more grooves for better detail
-    for (let i = 0; i < 50; i++) {
-      const radius = 0.45 + (1.2 * i) / 50
-      const grooveGeometry = new THREE.TorusGeometry(radius, 0.0015, 4, 128)
-      const grooveMaterial = new THREE.MeshStandardMaterial({
-        color: i % 3 === 0 ? 0x1a1a1a : 0x121212,
-        roughness: 0.15,
-        metalness: 0.4,
-      })
-      const groove = new THREE.Mesh(grooveGeometry, grooveMaterial)
-      groove.rotation.x = Math.PI / 2
-      groove.position.y = 0.014
-      vinylGroup.add(groove)
-    }
-
-    // Vinyl highlight ring (catches light)
-    const highlightRingGeometry = new THREE.TorusGeometry(1.1, 0.2, 4, 128)
-    const highlightRingMaterial = new THREE.MeshStandardMaterial({
-      color: 0x1a1a1a,
-      roughness: 0.03,
-      metalness: 0.5,
-      transparent: true,
-      opacity: 0.25,
-    })
-    const highlightRing = new THREE.Mesh(
-      highlightRingGeometry,
-      highlightRingMaterial
-    )
-    highlightRing.rotation.x = Math.PI / 2
-    highlightRing.position.y = 0.015
-    vinylGroup.add(highlightRing)
-
     // Texture loader for album cover
     const textureLoader = new THREE.TextureLoader()
 
-    // Center label with cover image
-    const labelGeometry = new THREE.CylinderGeometry(0.42, 0.42, 0.03, 64)
-    const labelMaterial = new THREE.MeshStandardMaterial({
-      color: 0xcd853f,
-      roughness: 0.5,
-      metalness: 0.1,
-    })
-    const label = new THREE.Mesh(labelGeometry, labelMaterial)
-    label.position.y = 0.015
-    vinylGroup.add(label)
-
-    // Cover image plane on top of label
-    const coverGeometry = new THREE.CircleGeometry(0.38, 64)
+    // Cover image - full size covering the entire vinyl
+    const coverGeometry = new THREE.CircleGeometry(1.72, 128)
     const coverMaterial = new THREE.MeshStandardMaterial({
       color: 0xffffff,
-      roughness: 0.4,
+      roughness: 0.3,
       metalness: 0.1,
       transparent: true,
       opacity: 1,
     })
     const coverMesh = new THREE.Mesh(coverGeometry, coverMaterial)
     coverMesh.rotation.x = -Math.PI / 2
-    coverMesh.position.y = 0.032
+    coverMesh.position.y = 0.014
     vinylGroup.add(coverMesh)
+
+    // Vinyl edge ring for visual effect
+    const edgeRingGeometry = new THREE.TorusGeometry(1.73, 0.02, 16, 128)
+    const edgeRingMaterial = new THREE.MeshStandardMaterial({
+      color: 0x1a1a1a,
+      roughness: 0.2,
+      metalness: 0.6,
+    })
+    const edgeRing = new THREE.Mesh(edgeRingGeometry, edgeRingMaterial)
+    edgeRing.rotation.x = Math.PI / 2
+    edgeRing.position.y = 0.013
+    vinylGroup.add(edgeRing)
 
     // Function to update cover image
     function updateCoverImage(coverUrl: string) {
@@ -495,25 +516,6 @@ import '~/styles/music.css'
       )
     }
 
-    // Label ring decoration
-    const labelRingGeometry = new THREE.TorusGeometry(0.36, 0.015, 8, 32)
-    const labelRing = new THREE.Mesh(
-      labelRingGeometry,
-      new THREE.MeshStandardMaterial({ color: 0x8b6914, roughness: 0.4 })
-    )
-    labelRing.rotation.x = Math.PI / 2
-    labelRing.position.y = 0.033
-    vinylGroup.add(labelRing)
-
-    // Center hole
-    const holeGeometry = new THREE.CylinderGeometry(0.05, 0.05, 0.04, 16)
-    const hole = new THREE.Mesh(
-      holeGeometry,
-      new THREE.MeshStandardMaterial({ color: 0x050505 })
-    )
-    hole.position.y = 0.02
-    vinylGroup.add(hole)
-
     turntableGroup.add(vinylGroup)
 
     // ==================== Tonearm ====================
@@ -527,12 +529,23 @@ import '~/styles/music.css'
     // Tonearm pivot cap
     const pivotCapGeometry = new THREE.CylinderGeometry(0.18, 0.2, 0.08, 24)
     const pivotCap = new THREE.Mesh(pivotCapGeometry, chromeMaterial)
-    pivotCap.position.set(2.2, 0.79, -1.5)
+    pivotCap.position.set(2.2, 0.78, -1.5)
     turntableGroup.add(pivotCap)
 
     // Tonearm rotating group
     const tonearmGroup = new THREE.Group()
     tonearmGroup.position.set(2.2, 0.85, -1.5)
+
+    // Gimbal joint (connecting pivot to arm) - New Component
+    const gimbalGeometry = new THREE.BoxGeometry(0.2, 0.2, 0.25)
+    const gimbal = new THREE.Mesh(gimbalGeometry, matteBlackMaterial)
+    gimbal.position.set(0, -0.02, 0)
+    // Add some mechanical details to gimbal
+    const gimbalRingGeo = new THREE.CylinderGeometry(0.12, 0.12, 0.3, 16)
+    gimbalRingGeo.rotateX(Math.PI / 2)
+    const gimbalRing = new THREE.Mesh(gimbalRingGeo, chromeMaterial)
+    gimbal.add(gimbalRing)
+    tonearmGroup.add(gimbal)
 
     // Tonearm hitbox (invisible, larger for easier clicking)
     const hitboxGeometry = new THREE.BoxGeometry(2.8, 0.5, 0.6)
@@ -552,64 +565,112 @@ import '~/styles/music.css'
     armRest.position.set(0.3, -0.05, 0.5)
     tonearmGroup.add(armRest)
 
-    // Main arm tube (S-curve design)
+    // Main arm tube (S-curve design) - smoother and better looking
     const armCurve = new THREE.CatmullRomCurve3([
       new THREE.Vector3(0, 0, 0),
-      new THREE.Vector3(-0.5, 0.02, 0.15),
-      new THREE.Vector3(-1.2, 0, 0.25),
-      new THREE.Vector3(-1.8, -0.03, 0.35),
-      new THREE.Vector3(-2.2, -0.08, 0.4),
+      new THREE.Vector3(-0.4, 0.05, 0.15),
+      new THREE.Vector3(-1.2, 0.02, 0.3),
+      new THREE.Vector3(-1.9, -0.04, 0.38),
+      new THREE.Vector3(-2.25, -0.08, 0.42),
     ])
     const armTubeGeometry = new THREE.TubeGeometry(
       armCurve,
-      48,
-      0.03,
-      12,
+      64,
+      0.045,
+      16,
       false
     )
     const armTube = new THREE.Mesh(armTubeGeometry, chromeMaterial)
     armTube.castShadow = true
     tonearmGroup.add(armTube)
 
-    // Headshell
-    const headshellGeometry = new THREE.BoxGeometry(0.12, 0.04, 0.15)
-    const headshell = new THREE.Mesh(headshellGeometry, aluminumMaterial)
-    headshell.position.set(-2.3, -0.1, 0.42)
-    headshell.rotation.z = -0.15
-    tonearmGroup.add(headshell)
+    // Headshell - Sleek design
+    const headshellGroup = new THREE.Group()
+    headshellGroup.position.set(-2.25, -0.08, 0.42)
+    headshellGroup.rotation.z = -0.1
+    headshellGroup.rotation.y = 0.2
 
-    // Cartridge
-    const cartridgeGeometry = new THREE.BoxGeometry(0.08, 0.05, 0.1)
+    // Main flat part with rounded edges look
+    const headshellShape = new THREE.Shape()
+    headshellShape.moveTo(0, -0.09)
+    headshellShape.lineTo(0.35, -0.07)
+    headshellShape.lineTo(0.35, 0.07)
+    headshellShape.lineTo(0, 0.09)
+    headshellShape.lineTo(-0.05, 0)
+
+    const headshellGeo = new THREE.ExtrudeGeometry(headshellShape, {
+      depth: 0.02,
+      bevelEnabled: true,
+      bevelThickness: 0.01,
+      bevelSize: 0.01,
+      bevelSegments: 2,
+    })
+    headshellGeo.rotateX(-Math.PI / 2) // Flatten it
+
+    const headshellMesh = new THREE.Mesh(headshellGeo, matteBlackMaterial)
+    headshellMesh.position.y = 0.02
+    headshellGroup.add(headshellMesh)
+
+    // Finger lift - curved handle
+    const fingerLiftCurve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(0.2, 0.02, 0.08),
+      new THREE.Vector3(0.25, 0.05, 0.08),
+      new THREE.Vector3(0.3, 0.06, 0.08),
+    ])
+    const fingerLiftGeo = new THREE.TubeGeometry(
+      fingerLiftCurve,
+      8,
+      0.008,
+      8,
+      false
+    )
+    const fingerLift = new THREE.Mesh(fingerLiftGeo, chromeMaterial)
+    headshellGroup.add(fingerLift)
+
+    tonearmGroup.add(headshellGroup)
+
+    // Cartridge - attached under headshell
+    const cartridgeGeometry = new THREE.BoxGeometry(0.1, 0.12, 0.08)
     const cartridgeMaterial = new THREE.MeshStandardMaterial({
-      color: 0x2a2a2a,
-      roughness: 0.4,
-      metalness: 0.2,
+      color: 0x8b0000, // Deep red
+      roughness: 0.2,
+      metalness: 0.4,
     })
     const cartridge = new THREE.Mesh(cartridgeGeometry, cartridgeMaterial)
-    cartridge.position.set(-2.3, -0.16, 0.42)
-    tonearmGroup.add(cartridge)
+    cartridge.position.set(0.15, -0.06, 0)
+    headshellGroup.add(cartridge)
 
-    // Stylus/Needle
-    const needleGeometry = new THREE.ConeGeometry(0.01, 0.08, 8)
-    const needle = new THREE.Mesh(needleGeometry, goldMaterial)
+    // Stylus/Needle - Larger and more visible
+    const needleGeometry = new THREE.ConeGeometry(0.03, 0.12, 16)
+    const needleMaterial = new THREE.MeshStandardMaterial({
+      color: 0xffd700, // Gold
+      roughness: 0.1,
+      metalness: 1.0,
+      emissive: 0x333300, // Slight glow to be visible against black vinyl
+      emissiveIntensity: 0.2,
+    })
+    const needle = new THREE.Mesh(needleGeometry, needleMaterial)
     needle.rotation.x = Math.PI
-    needle.position.set(-2.3, -0.24, 0.42)
-    tonearmGroup.add(needle)
+    needle.position.set(0.15, -0.13, 0)
+    headshellGroup.add(needle)
 
-    // Counterweight
-    const counterweightGeometry = new THREE.CylinderGeometry(
-      0.12,
-      0.12,
-      0.18,
-      24
-    )
-    const counterweight = new THREE.Mesh(
-      counterweightGeometry,
-      aluminumMaterial
-    )
-    counterweight.rotation.z = Math.PI / 2
-    counterweight.position.set(0.35, 0, 0)
-    tonearmGroup.add(counterweight)
+    // Counterweight - detailed
+    const counterweightGroup = new THREE.Group()
+    counterweightGroup.position.set(0.4, 0, 0)
+
+    const cwMainGeo = new THREE.CylinderGeometry(0.15, 0.15, 0.2, 32)
+    const cwMain = new THREE.Mesh(cwMainGeo, chromeMaterial)
+    cwMain.rotation.z = Math.PI / 2
+    counterweightGroup.add(cwMain)
+
+    // Scale ring on counterweight
+    const cwRingGeo = new THREE.CylinderGeometry(0.152, 0.152, 0.05, 32)
+    const cwRing = new THREE.Mesh(cwRingGeo, matteBlackMaterial)
+    cwRing.rotation.z = Math.PI / 2
+    cwRing.position.set(-0.08, 0, 0)
+    counterweightGroup.add(cwRing)
+
+    tonearmGroup.add(counterweightGroup)
 
     // Anti-skate weight
     const antiSkateGeometry = new THREE.SphereGeometry(0.04, 16, 16)
@@ -724,13 +785,11 @@ import '~/styles/music.css'
     let audioElement: HTMLAudioElement | null = null
     let volume = 0.7
 
-    // Tonearm angles
+    // Tonearm angles - two fixed positions only
     let tonearmAngle = 0.9
-    const tonearmPlayStartAngle = -0.15 // Outer groove position
-    const tonearmPlayEndAngle = -0.55 // Inner groove position
-    const tonearmRestAngle = 0.9 // Rest position
+    const tonearmPlayAngle = -0.2 // Fixed position on vinyl edge when playing
+    const tonearmRestAngle = 0.9 // Rest position outside vinyl
     let isTonearmDown = false
-    let playbackProgress = 0
 
     // Animation variables
     let vinylRotation = 0
@@ -944,8 +1003,7 @@ import '~/styles/music.css'
       if (wasPlaying) {
         setTimeout(() => {
           isTonearmDown = true
-          playbackProgress = 0
-          animateTonearm(tonearmPlayStartAngle)
+          animateTonearm(tonearmPlayAngle)
           // Play the first song of the new album
           playSong(0)
         }, 600)
@@ -960,8 +1018,7 @@ import '~/styles/music.css'
       setTimeout(() => {
         if (!isTonearmDown) {
           isTonearmDown = true
-          playbackProgress = 0
-          animateTonearm(tonearmPlayStartAngle)
+          animateTonearm(tonearmPlayAngle)
           // Play the first song
           playSong(0)
         }
@@ -974,8 +1031,7 @@ import '~/styles/music.css'
       // If tonearm is not down, lower it first
       if (!isTonearmDown && currentAlbum) {
         isTonearmDown = true
-        playbackProgress = 0
-        animateTonearm(tonearmPlayStartAngle)
+        animateTonearm(tonearmPlayAngle)
       }
 
       playSong(index)
@@ -992,9 +1048,6 @@ import '~/styles/music.css'
       currentAlbum = album
       currentSongIndex = 0
       vinylGroup.visible = true
-
-      // Update label color
-      labelMaterial.color.setStyle(album.color || '#8B4513')
 
       // Load album cover image onto vinyl
       if (album.cover) {
@@ -1014,12 +1067,9 @@ import '~/styles/music.css'
       currentSongIndex = index
       const song = currentAlbum.songs[index]
 
-      // Reset progress
-      playbackProgress = 0
-
       // Animate tonearm back to outer groove with smooth animation
       if (isTonearmDown) {
-        animateTonearm(tonearmPlayStartAngle)
+        animateTonearm(tonearmPlayAngle)
       }
 
       if (!audioElement) {
@@ -1094,14 +1144,12 @@ import '~/styles/music.css'
       if (isTonearmDown) {
         // Lift tonearm - stop playback
         isTonearmDown = false
-        playbackProgress = 0
         animateTonearm(tonearmRestAngle)
         stopPlayback()
       } else {
         // Lower tonearm - start playback from outer groove
         isTonearmDown = true
-        playbackProgress = 0
-        animateTonearm(tonearmPlayStartAngle)
+        animateTonearm(tonearmPlayAngle)
         startPlayback()
       }
     }
@@ -1121,19 +1169,8 @@ import '~/styles/music.css'
     function handleTimeUpdate() {
       if (!audioElement) return
 
-      // Update playback progress
-      if (audioElement.duration > 0) {
-        playbackProgress = audioElement.currentTime / audioElement.duration
-
-        // Update tonearm position based on progress (outer to inner)
-        if (isTonearmDown && isPlaying) {
-          const targetAngle =
-            tonearmPlayStartAngle +
-            (tonearmPlayEndAngle - tonearmPlayStartAngle) * playbackProgress
-          tonearmAngle = targetAngle
-          tonearmGroup.rotation.y = targetAngle
-        }
-      }
+      // Update playback progress for UI only
+      // Note: Progress tracking removed as it was not being used
 
       window.dispatchEvent(
         new CustomEvent('playback-progress', {
@@ -1210,9 +1247,9 @@ import '~/styles/music.css'
     function animate() {
       requestAnimationFrame(animate)
 
-      // Vinyl rotation - continuous when playing
+      // Vinyl rotation - continuous when playing (clockwise from top view)
       if (isPlaying && isTonearmDown && vinylGroup.visible) {
-        vinylRotation += 0.02 // ~33 RPM equivalent
+        vinylRotation -= 0.02 // ~33 RPM equivalent, clockwise
         vinylGroup.rotation.y = vinylRotation
         platterGroup.rotation.y = vinylRotation
       }
@@ -1255,25 +1292,13 @@ import '~/styles/music.css'
         // Dark theme: brighter lights for contrast
         ambientLight.intensity = 0.4
         spotLight.intensity = 60
-        frontSpotLight.intensity = 40
-        sideSpotLight.intensity = 35
-        backSpotLight.intensity = 30
-        rimLight1.intensity = 0.5
-        rimLight2.intensity = 0.4
-        fillLight.intensity = 0.3
-        bottomFillLight.intensity = 0.15
+        rimLight.intensity = 1.5
         renderer.toneMappingExposure = 1.4
       } else {
         // Light theme: softer lights to avoid overexposure
         ambientLight.intensity = 0.5
         spotLight.intensity = 40
-        frontSpotLight.intensity = 25
-        sideSpotLight.intensity = 20
-        backSpotLight.intensity = 18
-        rimLight1.intensity = 0.35
-        rimLight2.intensity = 0.25
-        fillLight.intensity = 0.3
-        bottomFillLight.intensity = 0.1
+        rimLight.intensity = 1.2
         renderer.toneMappingExposure = 1.1
       }
     }

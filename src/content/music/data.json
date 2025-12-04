@@ -4,238 +4,68 @@
     "name": "David Tao",
     "description": "陶喆首张同名专辑，1997年发行，开启华语R&B新纪元",
     "artist": "陶喆",
-    "cover": "https://p1.music.126.net/example-cover.jpg",
+    "cover": "/img/david-tao.png",
     "color": "#1a1a2e",
     "songs": [
       {
         "id": "david-tao-1",
-        "name": "飞机场的10:30",
-        "duration": "4:45",
-        "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
+        "name": "飞机场的十点半",
+        "duration": "0:00",
+        "url": "/music/david-tao/飞机场的十点半.mp3"
       },
       {
         "id": "david-tao-2",
         "name": "爱，很简单",
-        "duration": "4:30",
-        "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3"
+        "duration": "0:00",
+        "url": "/music/david-tao/爱很简单.mp3"
       },
       {
         "id": "david-tao-3",
         "name": "流沙",
-        "duration": "4:15",
-        "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3"
+        "duration": "0:00",
+        "url": "/music/david-tao/流沙.mp3"
       },
       {
         "id": "david-tao-4",
         "name": "望春风",
-        "duration": "4:20",
-        "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3"
+        "duration": "0:00",
+        "url": "/music/david-tao/望春风.mp3"
       },
       {
         "id": "david-tao-5",
         "name": "王八蛋",
-        "duration": "3:50",
-        "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3"
+        "duration": "0:00",
+        "url": "/music/david-tao/王八蛋.mp3"
       },
       {
         "id": "david-tao-6",
         "name": "是是非非",
-        "duration": "4:10",
-        "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3"
+        "duration": "0:00",
+        "url": "/music/david-tao/是是非非.mp3"
       },
       {
         "id": "david-tao-7",
         "name": "心乱飞",
-        "duration": "4:05",
-        "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3"
+        "duration": "0:00",
+        "url": "/music/david-tao/心乱飞.mp3"
       },
       {
         "id": "david-tao-8",
         "name": "再见以前先说再见",
-        "duration": "4:25",
-        "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3"
+        "duration": "0:00",
+        "url": "/music/david-tao/再见以前先说再见.mp3"
       },
       {
         "id": "david-tao-9",
         "name": "沙滩",
-        "duration": "4:40",
-        "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
+        "duration": "0:00",
+        "url": "/music/david-tao/沙滩.mp3"
       },
       {
         "id": "david-tao-10",
         "name": "十七岁",
-        "duration": "4:00",
-        "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3"
-      },
-      {
-        "id": "david-tao-11",
-        "name": "找自己",
-        "duration": "4:35",
-        "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3"
-      }
-    ]
-  },
-  {
-    "id": "im-ok",
-    "name": "I'm ok",
-    "description": "陶喆第二张专辑，1999年发行，延续R&B风格，展现音乐才华",
-    "artist": "陶喆",
-    "cover": "https://p1.music.126.net/example-cover.jpg",
-    "color": "#8B4513",
-    "songs": [
-      {
-        "id": "im-ok-1",
-        "name": "找自己",
-        "duration": "4:35",
-        "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
-      },
-      {
-        "id": "im-ok-2",
-        "name": "小镇姑娘",
-        "duration": "4:20",
-        "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3"
-      },
-      {
-        "id": "im-ok-3",
-        "name": "普通朋友",
-        "duration": "4:45",
-        "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3"
-      },
-      {
-        "id": "im-ok-4",
-        "name": "I'm ok",
-        "duration": "4:10",
-        "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3"
-      },
-      {
-        "id": "im-ok-5",
-        "name": "说走就走",
-        "duration": "4:00",
-        "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3"
-      },
-      {
-        "id": "im-ok-6",
-        "name": "天天",
-        "duration": "4:30",
-        "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3"
-      },
-      {
-        "id": "im-ok-7",
-        "name": "马戏团",
-        "duration": "3:55",
-        "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3"
-      },
-      {
-        "id": "im-ok-8",
-        "name": "多谢你",
-        "duration": "4:15",
-        "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3"
-      },
-      {
-        "id": "im-ok-9",
-        "name": "夜来香",
-        "duration": "4:25",
-        "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
-      },
-      {
-        "id": "im-ok-10",
-        "name": "流沙",
-        "duration": "4:15",
-        "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3"
-      },
-      {
-        "id": "im-ok-11",
-        "name": "不一样",
-        "duration": "4:05",
-        "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3"
-      }
-    ]
-  },
-  {
-    "id": "black-orange",
-    "name": "黑色柳丁",
-    "description": "陶喆第三张专辑，2002年发行，融合多种音乐风格，展现成熟音乐理念",
-    "artist": "陶喆",
-    "cover": "https://p1.music.126.net/example-cover.jpg",
-    "color": "#2d3436",
-    "songs": [
-      {
-        "id": "black-orange-1",
-        "name": "黑色柳丁",
-        "duration": "4:20",
-        "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
-      },
-      {
-        "id": "black-orange-2",
-        "name": "今天晚间新闻",
-        "duration": "1:30",
-        "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3"
-      },
-      {
-        "id": "black-orange-3",
-        "name": "Dear God",
-        "duration": "4:45",
-        "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3"
-      },
-      {
-        "id": "black-orange-4",
-        "name": "Angel",
-        "duration": "4:30",
-        "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3"
-      },
-      {
-        "id": "black-orange-5",
-        "name": "讨厌红楼梦",
-        "duration": "4:15",
-        "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3"
-      },
-      {
-        "id": "black-orange-6",
-        "name": "蝴蝶",
-        "duration": "4:25",
-        "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3"
-      },
-      {
-        "id": "black-orange-7",
-        "name": "宫保鸡丁",
-        "duration": "3:50",
-        "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3"
-      },
-      {
-        "id": "black-orange-8",
-        "name": "Melody",
-        "duration": "4:40",
-        "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3"
-      },
-      {
-        "id": "black-orange-9",
-        "name": "月亮代表谁的心",
-        "duration": "4:20",
-        "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
-      },
-      {
-        "id": "black-orange-10",
-        "name": "二十二",
-        "duration": "4:10",
-        "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3"
-      },
-      {
-        "id": "black-orange-11",
-        "name": "My Anata",
-        "duration": "3:45",
-        "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3"
-      },
-      {
-        "id": "black-orange-12",
-        "name": "摇篮曲",
-        "duration": "4:00",
-        "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3"
-      },
-      {
-        "id": "black-orange-13",
-        "name": "Katrina",
-        "duration": "4:35",
-        "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3"
+        "duration": "0:00",
+        "url": "/music/david-tao/十七岁.mp3"
       }
     ]
   }

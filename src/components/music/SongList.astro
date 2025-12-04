@@ -24,6 +24,22 @@ import '~/styles/music.css'
     </div>
   </div>
 
+  <!-- 专辑详情悬浮窗 -->
+  <div class="album-popup" id="album-popup">
+    <div class="album-popup-cover" id="album-popup-cover"></div>
+    <div class="album-popup-content">
+      <h3 class="album-popup-name" id="album-popup-name" aria-label="专辑名称">
+        专辑名称
+      </h3>
+      <p class="album-popup-artist" id="album-popup-artist"></p>
+      <p class="album-popup-desc" id="album-popup-desc"></p>
+      <div class="album-popup-meta">
+        <span class="i-ri-music-2-line"></span>
+        <span id="album-popup-songs"></span>
+      </div>
+    </div>
+  </div>
+
   <!-- 歌曲列表 -->
   <div class="song-list" id="song-list">
     <div class="empty-song-list" id="empty-song-list">
@@ -141,6 +157,7 @@ import '~/styles/music.css'
   .song-list {
     flex: 1;
     overflow-y: auto;
+    overscroll-behavior: contain;
     padding: 0.5rem;
     scrollbar-width: thin;
   }
@@ -231,6 +248,84 @@ import '~/styles/music.css'
     opacity: 0.6;
   }
 
+  /* Album popup styles */
+  .album-popup {
+    position: fixed;
+    width: 220px;
+    background: rgba(40, 40, 40, 0.98);
+    backdrop-filter: blur(20px);
+    border-radius: 12px;
+    padding: 0.75rem;
+    box-shadow:
+      0 8px 24px rgba(0, 0, 0, 0.4),
+      0 0 0 1px rgba(255, 255, 255, 0.08);
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 1000;
+    pointer-events: none;
+    color: #fff;
+  }
+
+  :global(:not(.dark)) .album-popup {
+    background: rgba(255, 255, 255, 0.98);
+    box-shadow:
+      0 8px 24px rgba(0, 0, 0, 0.12),
+      0 0 0 1px rgba(0, 0, 0, 0.06);
+    color: #1a1a1a;
+  }
+
+  .album-popup.visible {
+    opacity: 1;
+    visibility: visible;
+  }
+
+  .album-popup-cover {
+    width: 100%;
+    aspect-ratio: 1;
+    border-radius: 8px;
+    background-size: cover;
+    background-position: center;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+    margin-bottom: 0.75rem;
+  }
+
+  .album-popup-content {
+    text-align: center;
+  }
+
+  .album-popup-name {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    margin: 0 0 0.125rem;
+    color: inherit;
+  }
+
+  .album-popup-artist {
+    font-size: 0.75rem;
+    opacity: 0.7;
+    margin: 0 0 0.5rem;
+    color: inherit;
+  }
+
+  .album-popup-desc {
+    font-size: 0.6875rem;
+    line-height: 1.5;
+    opacity: 0.85;
+    margin: 0 0 0.5rem;
+    color: inherit;
+  }
+
+  .album-popup-meta {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    font-size: 0.6875rem;
+    opacity: 0.6;
+    color: inherit;
+  }
+
   @media (max-width: 768px) {
     .song-list-container {
       height: auto;
@@ -239,6 +334,16 @@ import '~/styles/music.css'
       padding-right: 0;
       border-radius: 16px;
     }
+
+    .album-popup {
+      display: none;
+    }
+  }
+
+  @media (max-width: 1200px) {
+    .album-popup {
+      display: none;
+    }
   }
 </style>
 
@@ -246,7 +351,6 @@ import '~/styles/music.css'
   interface Song {
     id: string
     name: string
-    duration: string
     url: string
   }
 
@@ -276,6 +380,14 @@ import '~/styles/music.css'
     const totalTimeEl = document.getElementById('total-time')
     const nowPlaying = document.getElementById('now-playing')
     const progressBar = document.getElementById('progress-bar')
+
+    // Album popup elements
+    const albumPopup = document.getElementById('album-popup')
+    const albumPopupCover = document.getElementById('album-popup-cover')
+    const albumPopupName = document.getElementById('album-popup-name')
+    const albumPopupArtist = document.getElementById('album-popup-artist')
+    const albumPopupDesc = document.getElementById('album-popup-desc')
+    const albumPopupSongs = document.getElementById('album-popup-songs')
 
     let currentAlbum: Album | null = null
 
@@ -346,7 +458,6 @@ import '~/styles/music.css'
           <span class="song-index">${index + 1}</span>
           <div class="song-info">
             <div class="song-name">${song.name}</div>
-            <div class="song-duration">${song.duration}</div>
           </div>
           <div class="playing-indicator" style="display: none;">
             <span></span><span></span><span></span><span></span>
@@ -462,5 +573,65 @@ import '~/styles/music.css'
     document.addEventListener('mouseup', () => {
       isDraggingProgress = false
     })
+
+    // Album popup hover logic
+    function showAlbumPopup() {
+      if (!currentAlbum || !albumPopup) return
+
+      // Update popup content
+      if (albumPopupCover) {
+        albumPopupCover.style.backgroundImage = `url(${currentAlbum.cover})`
+      }
+      if (albumPopupName) {
+        albumPopupName.textContent = currentAlbum.name
+      }
+      if (albumPopupArtist) {
+        albumPopupArtist.textContent = currentAlbum.artist
+      }
+      if (albumPopupDesc) {
+        albumPopupDesc.textContent = currentAlbum.description
+      }
+      if (albumPopupSongs) {
+        albumPopupSongs.textContent = `${currentAlbum.songs.length} 首歌曲`
+      }
+
+      // Position popup to the left of the sidebar, aligned with album info
+      if (currentAlbumInfo) {
+        const rect = currentAlbumInfo.getBoundingClientRect()
+        const popupWidth = 220
+        const gap = 12
+
+        // Position at the same vertical level as album info
+        let top = rect.top
+
+        // Keep popup within viewport (minimum 80px from top to avoid header)
+        const minTop = 80
+        const maxTop = window.innerHeight - 320
+        top = Math.max(minTop, Math.min(maxTop, top))
+
+        albumPopup.style.top = `${top}px`
+        albumPopup.style.left = `${rect.left - popupWidth - gap}px`
+      }
+
+      // Trigger animation
+      requestAnimationFrame(() => {
+        albumPopup.classList.add('visible')
+      })
+    }
+
+    function hideAlbumPopup() {
+      if (albumPopup) {
+        albumPopup.classList.remove('visible')
+      }
+    }
+
+    // Add hover listeners to album description
+    albumDescription?.addEventListener('mouseenter', showAlbumPopup)
+    albumDescription?.addEventListener('mouseleave', hideAlbumPopup)
+
+    // Also trigger on album-details hover
+    const albumDetails = document.querySelector('.album-details')
+    albumDetails?.addEventListener('mouseenter', showAlbumPopup)
+    albumDetails?.addEventListener('mouseleave', hideAlbumPopup)
   })
 </script>

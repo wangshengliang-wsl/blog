@@ -2,7 +2,6 @@
 interface Song {
   id: string
   name: string
-  duration: string
   url: string
 }
 
@@ -37,10 +36,8 @@ const { album, index: _index } = Astro.props
       class="vinyl-disc"
       style={`--cover-url: url(${album.cover}); --vinyl-color: ${album.color};`}
     >
-      <div class="grooves"></div>
       <div class="cover-center" style={`background-image: url(${album.cover})`}>
       </div>
-      <div class="center-hole"></div>
     </div>
 
     <!-- 唱片信息 -->
@@ -123,42 +120,22 @@ const { album, index: _index } = Astro.props
     }
   }
 
-  .grooves {
-    position: absolute;
-    inset: 12px;
-    border-radius: 50%;
-    background: repeating-radial-gradient(
-      circle at center,
-      transparent 0px,
-      transparent 1px,
-      rgba(255, 255, 255, 0.05) 1px,
-      rgba(255, 255, 255, 0.05) 2px
-    );
-  }
-
   .cover-center {
     position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 24px;
-    height: 24px;
+    inset: 2px;
     border-radius: 50%;
     background-size: cover;
     background-position: center;
-    box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
+    box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.3);
   }
 
-  .center-hole {
+  .cover-center::after {
+    content: '';
     position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 6px;
-    height: 6px;
+    inset: 0;
     border-radius: 50%;
-    background: #222;
-    box-shadow: inset 0 0 2px rgba(0, 0, 0, 0.5);
+    border: 2px solid rgba(0, 0, 0, 0.2);
+    pointer-events: none;
   }
 
   .vinyl-info {
