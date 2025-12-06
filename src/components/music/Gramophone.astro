@@ -4,22 +4,6 @@ import '~/styles/music.css'
 
 <div class="gramophone-wrapper">
   <div id="gramophone-canvas" class="gramophone-canvas"></div>
-
-  <!-- 提示信息 -->
-  <div class="gramophone-hints">
-    <div class="hint-item">
-      <span class="i-ri-hand-coin-line"></span>
-      <span>点击唱臂播放</span>
-    </div>
-    <div class="hint-item">
-      <span class="i-ri-drag-move-line"></span>
-      <span>拖拽旋转视角</span>
-    </div>
-    <div class="hint-item">
-      <span class="i-ri-zoom-in-line"></span>
-      <span>滚轮缩放</span>
-    </div>
-  </div>
 </div>
 
 <style>
@@ -40,43 +24,6 @@ import '~/styles/music.css'
     overflow: hidden;
   }
 
-  .gramophone-hints {
-    position: absolute;
-    top: 0.75rem;
-    left: 50%;
-    transform: translateX(-50%);
-    display: flex;
-    gap: 0.5rem;
-    padding: 0.5rem 0.75rem;
-    background: rgba(0, 0, 0, 0.6);
-    backdrop-filter: blur(8px);
-    border-radius: 20px;
-    z-index: 10;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-  }
-
-  .hint-item {
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-    font-size: 0.65rem;
-    color: rgba(255, 255, 255, 0.8);
-    white-space: nowrap;
-    padding: 0.25rem 0.5rem;
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 12px;
-    transition: all 0.2s ease;
-  }
-
-  .hint-item:hover {
-    background: rgba(255, 255, 255, 0.2);
-  }
-
-  .hint-item span:first-child {
-    font-size: 0.75rem;
-    opacity: 0.9;
-  }
-
   @media (max-width: 768px) {
     .gramophone-wrapper {
       min-height: 400px;
@@ -84,12 +31,6 @@ import '~/styles/music.css'
 
     .gramophone-canvas {
       min-height: 350px;
-    }
-
-    .gramophone-hints {
-      flex-direction: column;
-      gap: 0.5rem;
-      padding: 0.5rem 1rem;
     }
   }
 </style>
