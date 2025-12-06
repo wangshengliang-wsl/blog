@@ -63,6 +63,17 @@ import '~/styles/music.css'
       <span id="current-time">0:00</span>
       <span id="total-time">0:00</span>
     </div>
+
+    <!-- 倍速控制 -->
+    <div class="speed-control">
+      <span class="speed-label">倍速</span>
+      <div class="speed-options">
+        <button class="speed-btn" data-rate="0.5">0.5x</button>
+        <button class="speed-btn active" data-rate="1.0">1.0x</button>
+        <button class="speed-btn" data-rate="1.5">1.5x</button>
+        <button class="speed-btn" data-rate="2.0">2.0x</button>
+      </div>
+    </div>
   </div>
 </aside>
 
@@ -248,6 +259,48 @@ import '~/styles/music.css'
     opacity: 0.6;
   }
 
+  .speed-control {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid rgba(128, 128, 128, 0.1);
+  }
+
+  .speed-label {
+    font-size: 0.75rem;
+    opacity: 0.6;
+  }
+
+  .speed-options {
+    display: flex;
+    gap: 0.25rem;
+  }
+
+  .speed-btn {
+    font-size: 0.7rem;
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    border: 1px solid transparent;
+    background: transparent;
+    opacity: 0.6;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .speed-btn:hover {
+    opacity: 1;
+    background: rgba(128, 128, 128, 0.1);
+  }
+
+  .speed-btn.active {
+    opacity: 1;
+    background: rgba(139, 69, 19, 0.1);
+    color: #8b4513;
+    border-color: rgba(139, 69, 19, 0.2);
+  }
+
   /* Album popup styles */
   .album-popup {
     position: fixed;
@@ -366,6 +419,9 @@ import '~/styles/music.css'
 
   document.addEventListener('astro:page-load', () => {
     const songList = document.getElementById('song-list')
+    if (!songList || songList.dataset.initialized === 'true') return
+    songList.dataset.initialized = 'true'
+
     const emptySongList = document.getElementById('empty-song-list')
     const currentAlbumName = document.getElementById('current-album-name')
     const songCount = document.getElementById('song-count')
@@ -505,19 +561,6 @@ import '~/styles/music.css'
       return `${mins}:${secs.toString().padStart(2, '0')}`
     }
 
-    function highlightCurrentSong(index: number) {
-      const songItems = songList?.querySelectorAll('.song-item')
-      songItems?.forEach((item, i) => {
-        if (i === index) {
-          item.classList.add('current')
-          // 自动滚动到当前歌曲
-          item.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-        } else {
-          item.classList.remove('current')
-        }
-      })
-    }
-
     function updateNowPlaying(songIndex: number) {
       if (!nowPlaying || !currentAlbum) return
       const song = currentAlbum.songs[songIndex]
@@ -572,6 +615,25 @@ import '~/styles/music.css'
 
     document.addEventListener('mouseup', () => {
       isDraggingProgress = false
+    })
+
+    const speedBtns = document.querySelectorAll('.speed-btn')
+    let lastHighlightedIndex = -1
+
+    // Speed control
+    speedBtns.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const rate = parseFloat(btn.getAttribute('data-rate') || '1.0')
+
+        // Update UI
+        speedBtns.forEach((b) => b.classList.remove('active'))
+        btn.classList.add('active')
+
+        // Dispatch event
+        window.dispatchEvent(
+          new CustomEvent('set-playback-rate', { detail: rate })
+        )
+      })
     })
 
     // Album popup hover logic
@@ -633,5 +695,21 @@ import '~/styles/music.css'
     const albumDetails = document.querySelector('.album-details')
     albumDetails?.addEventListener('mouseenter', showAlbumPopup)
     albumDetails?.addEventListener('mouseleave', hideAlbumPopup)
+
+    function highlightCurrentSong(index: number) {
+      if (index === lastHighlightedIndex) return
+      lastHighlightedIndex = index
+
+      const songItems = songList?.querySelectorAll('.song-item')
+      songItems?.forEach((item, i) => {
+        if (i === index) {
+          item.classList.add('current')
+          // 自动滚动到当前歌曲
+          item.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+        } else {
+          item.classList.remove('current')
+        }
+      })
+    }
   })
 </script>

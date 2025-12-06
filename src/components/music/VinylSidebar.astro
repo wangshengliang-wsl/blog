@@ -204,6 +204,10 @@ const { albums } = Astro.props
     const searchInput = document.getElementById(
       'vinyl-search-input'
     ) as HTMLInputElement
+
+    if (!searchInput || searchInput.dataset.initialized === 'true') return
+    searchInput.dataset.initialized = 'true'
+
     const searchClearBtn = document.getElementById('search-clear')
     const vinylList = document.getElementById('vinyl-list')
     const emptyState = document.getElementById('empty-state')

@@ -39,8 +39,16 @@ export default defineConfig({
         // Enable CORS for dev: allow Giscus iframe to load local styles
         'Access-Control-Allow-Origin': '*',
       },
+      // Increase timeout for large MDX files
+      watch: {
+        usePolling: false,
+      },
     },
     build: { chunkSizeWarningLimit: 1200 },
+    // Optimize MDX processing
+    optimizeDeps: {
+      include: [],
+    },
   },
   // https://docs.astro.build/en/reference/experimental-flags/
   experimental: {

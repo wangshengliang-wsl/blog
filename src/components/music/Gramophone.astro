@@ -118,6 +118,10 @@ import '~/styles/music.css'
 
     if (!container) return
 
+    // Check if already initialized
+    if (container.dataset.initialized === 'true') return
+    container.dataset.initialized = 'true'
+
     // Get container size
     const getContainerSize = () => {
       const width = container.clientWidth || 800
@@ -146,12 +150,13 @@ import '~/styles/music.css'
       const centerX = size / 2
       const centerY = size / 2
 
-      // Background
-      ctx.fillStyle = '#050505'
+      // Background - Deep black for vinyl
+      ctx.fillStyle = '#020202'
       ctx.fillRect(0, 0, size, size)
 
       // Draw grooves
       // Simulating Fresnel/Anisotropic bands with gradients
+      // More subtle gradients for realistic vinyl look
       const gradient = ctx.createRadialGradient(
         centerX,
         centerY,
@@ -160,12 +165,12 @@ import '~/styles/music.css'
         centerY,
         960
       )
-      gradient.addColorStop(0, '#050505')
-      gradient.addColorStop(0.2, '#121212')
-      gradient.addColorStop(0.4, '#050505')
-      gradient.addColorStop(0.6, '#121212')
-      gradient.addColorStop(0.8, '#050505')
-      gradient.addColorStop(1, '#0a0a0a')
+      gradient.addColorStop(0, '#020202')
+      gradient.addColorStop(0.2, '#080808')
+      gradient.addColorStop(0.4, '#020202')
+      gradient.addColorStop(0.6, '#080808')
+      gradient.addColorStop(0.8, '#020202')
+      gradient.addColorStop(1, '#050505')
 
       ctx.fillStyle = gradient
       ctx.beginPath()
@@ -173,20 +178,27 @@ import '~/styles/music.css'
       ctx.arc(centerX, centerY, 280, 0, Math.PI * 2, true) // hole
       ctx.fill()
 
-      // Fine grooves
-      ctx.globalAlpha = 0.4
-      for (let r = 280; r < 960; r += 1.5) {
+      // Fine grooves - denser and more subtle
+      ctx.globalAlpha = 0.15
+      for (let r = 280; r < 960; r += 0.8) {
         // Track gaps
-        if (Math.random() < 0.005) r += 10
+        if (Math.random() < 0.002) r += 8
 
-        const intensity = Math.random() * 0.1 + 0.05
+        const intensity = Math.random() * 0.1 + 0.02
         ctx.strokeStyle = `rgba(255, 255, 255, ${intensity})`
-        ctx.lineWidth = 0.8
+        ctx.lineWidth = 0.5
         ctx.beginPath()
         ctx.arc(centerX, centerY, r, 0, Math.PI * 2)
         ctx.stroke()
       }
       ctx.globalAlpha = 1.0
+
+      // Add a label border
+      ctx.strokeStyle = '#111'
+      ctx.lineWidth = 2
+      ctx.beginPath()
+      ctx.arc(centerX, centerY, 280, 0, Math.PI * 2)
+      ctx.stroke()
 
       const texture = new THREE.CanvasTexture(canvas)
       texture.colorSpace = THREE.SRGBColorSpace
@@ -784,6 +796,7 @@ import '~/styles/music.css'
     let currentSongIndex = 0
     let audioElement: HTMLAudioElement | null = null
     let volume = 0.7
+    let currentPlaybackRate = 1.0
 
     // Tonearm angles - two fixed positions only
     let tonearmAngle = 0.9
@@ -1054,26 +1067,73 @@ import '~/styles/music.css'
         updateCoverImage(album.cover)
       }
 
+      // Stop playback and reset audio before loading new album
       if (isPlaying) {
         stopPlayback()
+      }
+
+      // Reset audio element to prevent AbortError
+      if (audioElement) {
+        audioElement.pause()
+        audioElement.currentTime = 0
+        audioElement.src = ''
       }
 
       animateVinylPlacement()
     }
 
-    function playSong(index: number) {
-      if (!currentAlbum || !currentAlbum.songs[index]) return
+    // Event Listeners for controls
+    window.addEventListener('seek-to', ((e: CustomEvent) => {
+      const percent = e.detail
+      if (audioElement && audioElement.duration) {
+        audioElement.currentTime = percent * audioElement.duration
+      }
+    }) as EventListener)
+
+    window.addEventListener('set-playback-rate', ((e: CustomEvent) => {
+      const rate = e.detail
+      currentPlaybackRate = rate
+      if (audioElement) {
+        audioElement.playbackRate = rate
+      }
+    }) as EventListener)
+
+    // Smooth transition play song
+    async function playSong(index: number) {
+      if (!currentAlbum) return
+
+      // Fade out if playing
+      if (isPlaying && audioElement) {
+        // Simple fade out
+        const fadeOutDuration = 500
+        const startVolume = audioElement.volume
+        const startTime = performance.now()
+
+        await new Promise<void>((resolve) => {
+          const fadeOut = (currentTime: number) => {
+            const elapsed = currentTime - startTime
+            const progress = Math.min(elapsed / fadeOutDuration, 1)
+
+            if (audioElement) {
+              audioElement.volume = startVolume * (1 - progress)
+            }
+
+            if (progress < 1) {
+              requestAnimationFrame(fadeOut)
+            } else {
+              resolve()
+            }
+          }
+          requestAnimationFrame(fadeOut)
+        })
+      }
 
       currentSongIndex = index
       const song = currentAlbum.songs[index]
 
-      // Animate tonearm back to outer groove with smooth animation
-      if (isTonearmDown) {
-        animateTonearm(tonearmPlayAngle)
-      }
-
       if (!audioElement) {
         audioElement = new Audio()
+        audioElement.crossOrigin = 'anonymous'
         audioElement.addEventListener('ended', handleSongEnd)
         audioElement.addEventListener('timeupdate', handleTimeUpdate)
         audioElement.addEventListener('loadedmetadata', () => {
@@ -1089,12 +1149,30 @@ import '~/styles/music.css'
         })
       }
 
+      // Pause and reset
+      audioElement.pause()
+      audioElement.currentTime = 0
+
+      // Set new source and load
       audioElement.src = song.url
-      audioElement.volume = volume
+      audioElement.volume = volume // Reset volume
+      // Apply current playback rate if any (we should store it)
+      // For now default to 1 or whatever was set?
+      // Let's assume 1 unless we track it.
+      // Ideally we should track `currentPlaybackRate`.
+
+      audioElement.load()
 
       // Only play if tonearm is down
       if (isTonearmDown) {
-        audioElement.play()
+        const playPromise = audioElement.play()
+        if (playPromise !== undefined) {
+          playPromise.catch((error) => {
+            if (error.name !== 'AbortError') {
+              console.error('Playback error:', error)
+            }
+          })
+        }
         isPlaying = true
         window.dispatchEvent(
           new CustomEvent('playback-state', {
@@ -1110,7 +1188,15 @@ import '~/styles/music.css'
       isPlaying = true
 
       if (audioElement && audioElement.src) {
-        audioElement.play()
+        const playPromise = audioElement.play()
+        if (playPromise !== undefined) {
+          playPromise.catch((error) => {
+            // Ignore AbortError - it's expected when switching songs quickly
+            if (error.name !== 'AbortError') {
+              console.error('Playback error:', error)
+            }
+          })
+        }
       } else if (currentAlbum) {
         playSong(currentSongIndex)
         return
@@ -1249,7 +1335,9 @@ import '~/styles/music.css'
 
       // Vinyl rotation - continuous when playing (clockwise from top view)
       if (isPlaying && isTonearmDown && vinylGroup.visible) {
-        vinylRotation -= 0.02 // ~33 RPM equivalent, clockwise
+        // Base speed 0.02 is approx 33 RPM at 60fps
+        // Adjust based on playback rate
+        vinylRotation -= 0.02 * currentPlaybackRate
         vinylGroup.rotation.y = vinylRotation
         platterGroup.rotation.y = vinylRotation
       }

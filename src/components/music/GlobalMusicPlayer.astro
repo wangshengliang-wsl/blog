@@ -1,0 +1,535 @@
+---
+import VinylSidebar from '~/components/music/VinylSidebar.astro'
+import Gramophone from '~/components/music/Gramophone.astro'
+import SongList from '~/components/music/SongList.astro'
+
+import albumsData from '~/content/music/data.json'
+---
+
+<div id="global-music-player" transition:persist="music-player">
+  <div class="music-page-wrapper hidden" id="music-page-wrapper">
+    <div class="music-player-container">
+      <!-- 左侧唱片列表侧边栏 -->
+      <div class="sidebar-wrapper left">
+        <VinylSidebar albums={albumsData} />
+        <button
+          class="sidebar-toggle left-toggle"
+          id="left-sidebar-toggle"
+          aria-label="折叠唱片库"
+        >
+          <span class="i-ri-arrow-left-s-line"></span>
+        </button>
+      </div>
+
+      <!-- 中央留声机 -->
+      <div class="gramophone-section">
+        <Gramophone />
+      </div>
+
+      <!-- 右侧歌曲列表 -->
+      <div class="sidebar-wrapper right">
+        <button
+          class="sidebar-toggle right-toggle"
+          id="right-sidebar-toggle"
+          aria-label="折叠播放列表"
+        >
+          <span class="i-ri-arrow-right-s-line"></span>
+        </button>
+        <SongList />
+      </div>
+    </div>
+
+    <!-- 移动端底部控制栏 -->
+    <div class="mobile-controls">
+      <button
+        id="mobile-sidebar-toggle"
+        class="mobile-btn"
+        aria-label="唱片列表"
+      >
+        <span class="i-ri-album-line"></span>
+      </button>
+      <button id="mobile-songs-toggle" class="mobile-btn" aria-label="歌曲列表">
+        <span class="i-ri-list-unordered"></span>
+      </button>
+    </div>
+  </div>
+
+  <!-- 悬浮按钮 -->
+  <a
+    href="/music"
+    id="music-floating-btn"
+    class="music-floating-btn"
+    aria-label="回到音乐"
+  >
+    <span class="i-ri-disc-line spin-animation"></span>
+  </a>
+</div>
+
+<style>
+  #global-music-player {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    pointer-events: none;
+  }
+
+  .music-page-wrapper {
+    position: fixed;
+    inset: 0;
+    top: 4rem;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    pointer-events: auto;
+    transition:
+      transform 0.3s ease,
+      opacity 0.3s ease;
+  }
+
+  .music-page-wrapper.hidden {
+    transform: translateY(100%);
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .music-player-container {
+    flex: 1;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* 侧边栏包裹器 - 使用固定定位，不影响布局 */
+  .sidebar-wrapper {
+    position: absolute; /* Changed from fixed to absolute to stay within wrapper */
+    top: 0;
+    bottom: 0;
+    height: 100%;
+    z-index: 50;
+    transition: transform 0.3s ease;
+  }
+
+  .sidebar-wrapper.left {
+    left: 0;
+    width: 260px;
+  }
+
+  .sidebar-wrapper.right {
+    right: 0;
+    width: 260px;
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .sidebar-wrapper.left.collapsed {
+    transform: translateX(-260px);
+  }
+
+  .sidebar-wrapper.right.collapsed {
+    transform: translateX(260px);
+  }
+
+  /* 折叠按钮 */
+  .sidebar-toggle {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 20px;
+    height: 48px;
+    background: rgba(128, 128, 128, 0.08);
+    border: 1px solid rgba(128, 128, 128, 0.15);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    z-index: 10;
+  }
+
+  .sidebar-toggle:hover {
+    background: rgba(139, 69, 19, 0.1);
+    border-color: rgba(139, 69, 19, 0.3);
+  }
+
+  .sidebar-toggle span {
+    font-size: 1rem;
+    opacity: 0.6;
+    transition: transform 0.3s ease;
+  }
+
+  .sidebar-toggle:hover span {
+    opacity: 1;
+    color: #8b4513;
+  }
+
+  .left-toggle {
+    right: -20px;
+    border-radius: 0 6px 6px 0;
+    border-left: none;
+  }
+
+  .right-toggle {
+    left: -20px;
+    border-radius: 6px 0 0 6px;
+    border-right: none;
+  }
+
+  /* 折叠状态下的按钮图标翻转 */
+  .sidebar-wrapper.left.collapsed .left-toggle span {
+    transform: rotate(180deg);
+  }
+
+  .sidebar-wrapper.right.collapsed .right-toggle span {
+    transform: rotate(180deg);
+  }
+
+  .music-player-container :global(.vinyl-sidebar) {
+    width: 260px;
+    height: 100%;
+    margin: 0;
+    padding: 0 0.75rem;
+    border-radius: 0;
+    background: var(--c-bg);
+    border-right: 1px solid rgba(128, 128, 128, 0.1);
+  }
+
+  .music-player-container :global(.song-list-container) {
+    width: 260px;
+    height: 100%;
+    margin: 0;
+    padding: 0 0.75rem;
+    border-radius: 0;
+    background: var(--c-bg);
+    border-left: 1px solid rgba(128, 128, 128, 0.1);
+  }
+
+  .gramophone-section {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+    padding: 0.5rem;
+  }
+
+  .mobile-controls {
+    display: none;
+    position: absolute; /* Changed from fixed to absolute */
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--c-bg);
+    border-top: 1px solid rgba(128, 128, 128, 0.2);
+    padding: 0.75rem 1rem;
+    padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+    justify-content: center;
+    gap: 3rem;
+    z-index: 200;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.1);
+  }
+
+  .mobile-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: rgba(139, 69, 19, 0.1);
+    border: 2px solid rgba(139, 69, 19, 0.2);
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .mobile-btn:hover,
+  .mobile-btn:active {
+    background: rgba(139, 69, 19, 0.2);
+    border-color: rgba(139, 69, 19, 0.4);
+    transform: scale(1.05);
+  }
+
+  .mobile-btn span {
+    font-size: 1.5rem;
+    opacity: 0.8;
+    color: #8b4513;
+  }
+
+  /* Floating Button Styles */
+  .music-floating-btn {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: var(--c-bg);
+    border: 1px solid rgba(128, 128, 128, 0.2);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    pointer-events: auto;
+    z-index: 101;
+    transition: all 0.3s ease;
+    opacity: 0;
+    transform: scale(0.8);
+    pointer-events: none;
+  }
+
+  .music-floating-btn.visible {
+    opacity: 1;
+    transform: scale(1);
+    pointer-events: auto;
+  }
+
+  .spin-animation {
+    animation: spin 3s linear infinite;
+  }
+
+  @keyframes spin {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  /* 平板适配 */
+  @media (max-width: 1024px) {
+    .sidebar-wrapper.left {
+      width: 200px;
+    }
+
+    .sidebar-wrapper.left.collapsed {
+      transform: translateX(-200px);
+    }
+
+    .sidebar-wrapper.right {
+      transform: translateX(260px);
+    }
+
+    .sidebar-toggle {
+      display: none;
+    }
+
+    .music-player-container :global(.vinyl-sidebar) {
+      width: 200px;
+    }
+
+    .music-player-container :global(.song-list-container) {
+      width: 260px;
+    }
+
+    .music-player-container :global(.song-list-container.active) {
+      transform: translateX(0);
+    }
+
+    .sidebar-wrapper.right.active {
+      transform: translateX(0);
+    }
+
+    .mobile-controls {
+      display: flex;
+    }
+  }
+
+  /* 移动端适配 */
+  @media (max-width: 768px) {
+    .music-page-wrapper {
+      bottom: 4.5rem;
+    }
+
+    .sidebar-wrapper.left {
+      width: 260px;
+      bottom: 4.5rem;
+      transform: translateX(-260px);
+      z-index: 150;
+    }
+
+    .sidebar-wrapper.right {
+      width: 260px;
+      bottom: 4.5rem;
+      transform: translateX(260px);
+      z-index: 150;
+    }
+
+    .music-player-container :global(.vinyl-sidebar) {
+      width: 260px;
+      box-shadow: 4px 0 20px rgba(0, 0, 0, 0.1);
+    }
+
+    .music-player-container :global(.vinyl-sidebar.active) {
+      transform: translateX(0);
+    }
+
+    .sidebar-wrapper.left.active {
+      transform: translateX(0);
+    }
+
+    .music-player-container :global(.song-list-container) {
+      width: 260px;
+      box-shadow: -4px 0 20px rgba(0, 0, 0, 0.1);
+    }
+
+    .sidebar-wrapper.right.active {
+      transform: translateX(0);
+    }
+
+    .gramophone-section {
+      padding: 0.25rem;
+    }
+
+    .mobile-controls {
+      padding: 0.6rem 1rem;
+      padding-bottom: calc(0.6rem + env(safe-area-inset-bottom, 0px));
+    }
+
+    .mobile-btn {
+      width: 48px;
+      height: 48px;
+    }
+  }
+
+  /* 小屏幕手机适配 */
+  @media (max-width: 480px) {
+    .music-player-container :global(.vinyl-sidebar),
+    .music-player-container :global(.song-list-container) {
+      width: 85%;
+      max-width: 280px;
+      box-shadow: 0 0 20px rgba(0, 0, 0, 0.15);
+    }
+  }
+</style>
+
+<script>
+  interface MusicPlayerState {
+    isPlaying: boolean
+    isInitialized: boolean
+    clickListenerAttached?: boolean
+  }
+
+  declare global {
+    interface Window {
+      MusicPlayerState: MusicPlayerState
+    }
+  }
+
+  // Initialize global state for music player if not exists
+  if (!window.MusicPlayerState) {
+    window.MusicPlayerState = {
+      isPlaying: false,
+      isInitialized: false,
+    }
+  }
+
+  function updatePlayerVisibility() {
+    const wrapper = document.getElementById('music-page-wrapper')
+    const floatingBtn = document.getElementById('music-floating-btn')
+    const isMusicPage =
+      window.location.pathname === '/music' ||
+      window.location.pathname === '/music/'
+
+    if (isMusicPage) {
+      wrapper?.classList.remove('hidden')
+      floatingBtn?.classList.remove('visible')
+    } else {
+      wrapper?.classList.add('hidden')
+      // Show floating button if music is playing or if user has interacted
+      // For now, let's show it if we are not on music page
+      // Ideally check if playing.
+      // We can listen to a custom event 'playback-state' which SongList/Gramophone emits
+      if (window.MusicPlayerState.isPlaying) {
+        floatingBtn?.classList.add('visible')
+      } else {
+        floatingBtn?.classList.remove('visible')
+      }
+    }
+  }
+
+  // Listen for playback state changes to toggle floating button
+  window.addEventListener('playback-state', ((e: CustomEvent) => {
+    const { isPlaying } = e.detail
+    window.MusicPlayerState.isPlaying = isPlaying
+    updatePlayerVisibility()
+  }) as EventListener)
+
+  // Setup event listeners on page load
+  document.addEventListener('astro:page-load', () => {
+    updatePlayerVisibility()
+
+    // Floating button is now an anchor tag, so no need for manual navigation logic
+    // Astro's View Transitions will handle it automatically.
+
+    // Re-attach sidebar toggle listeners if needed, but since we use transition:persist,
+    // the DOM elements are preserved. However, if we navigate away and back,
+    // we might need to check if listeners are still active.
+    // Actually, the script in index.astro (now here) handles sidebar toggles.
+    // We need to include that logic here too, but ensure it doesn't duplicate.
+
+    // Sidebar logic
+    const sidebarToggle = document.getElementById('mobile-sidebar-toggle')
+    const songsToggle = document.getElementById('mobile-songs-toggle')
+    const leftSidebarToggle = document.getElementById('left-sidebar-toggle')
+    const rightSidebarToggle = document.getElementById('right-sidebar-toggle')
+    const leftWrapper = document.querySelector('.sidebar-wrapper.left')
+    const rightWrapper = document.querySelector('.sidebar-wrapper.right')
+
+    // We can't easily check if listener exists on standard elements without a flag.
+    // But since the element is persisted, we can tag it.
+
+    if (leftSidebarToggle && !leftSidebarToggle.dataset.hasListener) {
+      leftSidebarToggle.addEventListener('click', () => {
+        leftWrapper?.classList.toggle('collapsed')
+      })
+      leftSidebarToggle.dataset.hasListener = 'true'
+    }
+
+    if (rightSidebarToggle && !rightSidebarToggle.dataset.hasListener) {
+      rightSidebarToggle.addEventListener('click', () => {
+        rightWrapper?.classList.toggle('collapsed')
+      })
+      rightSidebarToggle.dataset.hasListener = 'true'
+    }
+
+    if (sidebarToggle && !sidebarToggle.dataset.hasListener) {
+      sidebarToggle.addEventListener('click', () => {
+        leftWrapper?.classList.toggle('active')
+        rightWrapper?.classList.remove('active')
+      })
+      sidebarToggle.dataset.hasListener = 'true'
+    }
+
+    if (songsToggle && !songsToggle.dataset.hasListener) {
+      songsToggle.addEventListener('click', () => {
+        rightWrapper?.classList.toggle('active')
+        leftWrapper?.classList.remove('active')
+      })
+      songsToggle.dataset.hasListener = 'true'
+    }
+
+    // Click outside to close panels
+    // This one is on document, so it WILL be added every time.
+    // We need to be careful.
+    // We can use a named function and remove it first?
+    // Or just check a global flag.
+    if (!window.MusicPlayerState.clickListenerAttached) {
+      document.addEventListener('click', (e) => {
+        const target = e.target as HTMLElement
+        if (
+          !target.closest('.sidebar-wrapper') &&
+          !target.closest('.mobile-controls')
+        ) {
+          leftWrapper?.classList.remove('active')
+          rightWrapper?.classList.remove('active')
+        }
+      })
+      window.MusicPlayerState.clickListenerAttached = true
+    }
+  })
+</script>
