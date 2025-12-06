@@ -237,6 +237,49 @@ import '~/styles/music.css'
       return texture
     }
 
+    const createWoodTexture = () => {
+      const canvas = document.createElement('canvas')
+      canvas.width = 1024
+      canvas.height = 1024
+      const ctx = canvas.getContext('2d')
+      if (!ctx) return null
+
+      // Base color - Dark Walnut
+      ctx.fillStyle = '#3e2723'
+      ctx.fillRect(0, 0, 1024, 1024)
+
+      // Wood grain
+      for (let i = 0; i < 600; i++) {
+        const x = Math.random() * 1024
+        const y = Math.random() * 1024
+        const w = Math.random() * 200 + 50
+        const h = Math.random() * 4 + 1
+        const opacity = Math.random() * 0.15 + 0.05
+
+        ctx.fillStyle = `rgba(20, 10, 5, ${opacity})`
+        ctx.beginPath()
+        ctx.ellipse(x, y, w, h, Math.random() * 0.1, 0, Math.PI * 2)
+        ctx.fill()
+      }
+
+      // Add some noise
+      const imageData = ctx.getImageData(0, 0, 1024, 1024)
+      const data = imageData.data
+      for (let i = 0; i < data.length; i += 4) {
+        const noise = (Math.random() - 0.5) * 10
+        data[i] += noise
+        data[i + 1] += noise
+        data[i + 2] += noise
+      }
+      ctx.putImageData(imageData, 0, 0)
+
+      const texture = new THREE.CanvasTexture(canvas)
+      texture.colorSpace = THREE.SRGBColorSpace
+      texture.wrapS = THREE.RepeatWrapping
+      texture.wrapT = THREE.RepeatWrapping
+      return texture
+    }
+
     // Scene setup
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(getThemeBackgroundColor())
@@ -300,12 +343,21 @@ import '~/styles/music.css'
     // ==================== Materials ====================
     const vinylTexture = createVinylTexture()
     const brushedMetalTexture = createBrushedMetalTexture()
+    const woodTexture = createWoodTexture()
 
-    // Matte black material for turntable body
+    // Matte black material for mechanical parts
     const matteBlackMaterial = new THREE.MeshStandardMaterial({
       color: 0x151515,
       roughness: 0.6,
       metalness: 0.2,
+    })
+
+    // Wood material for turntable body
+    const woodMaterial = new THREE.MeshStandardMaterial({
+      map: woodTexture,
+      color: 0x8d6e63, // Tint to warm it up
+      roughness: 0.3,
+      metalness: 0.1,
     })
 
     // Brushed aluminum material
@@ -314,6 +366,13 @@ import '~/styles/music.css'
       map: brushedMetalTexture,
       roughness: 0.25,
       metalness: 0.8,
+    })
+
+    // Gold material for accents
+    const goldMaterial = new THREE.MeshStandardMaterial({
+      color: 0xffd700,
+      roughness: 0.15,
+      metalness: 1.0,
     })
 
     // Chrome/polished metal material
@@ -390,11 +449,11 @@ import '~/styles/music.css'
     )
 
     const baseExtrudeSettings = {
-      depth: 0.4,
+      depth: 0.5, // Slightly thicker
       bevelEnabled: true,
-      bevelThickness: 0.05,
-      bevelSize: 0.05,
-      bevelSegments: 3,
+      bevelThickness: 0.08, // More pronounced bevel
+      bevelSize: 0.08,
+      bevelSegments: 5, // Smoother bevel
     }
 
     const baseGeometry = new THREE.ExtrudeGeometry(
@@ -402,24 +461,25 @@ import '~/styles/music.css'
       baseExtrudeSettings
     )
     baseGeometry.rotateX(-Math.PI / 2)
-    const baseMesh = new THREE.Mesh(baseGeometry, matteBlackMaterial)
+    const baseMesh = new THREE.Mesh(baseGeometry, woodMaterial)
     baseMesh.position.y = 0
     baseMesh.receiveShadow = true
     baseMesh.castShadow = true
     turntableGroup.add(baseMesh)
 
-    // Feet (isolators)
-    const footGeometry = new THREE.CylinderGeometry(0.2, 0.25, 0.15, 24)
+    // Feet (isolators) - Gold Spikes
+    const footGeometry = new THREE.ConeGeometry(0.25, 0.4, 32)
     const footPositions = [
-      [-2.5, -0.075, -2],
-      [2.5, -0.075, -2],
-      [-2.5, -0.075, 2],
-      [2.5, -0.075, 2],
+      [-2.5, -0.2, -2],
+      [2.5, -0.2, -2],
+      [-2.5, -0.2, 2],
+      [2.5, -0.2, 2],
     ]
 
     footPositions.forEach((pos) => {
-      const foot = new THREE.Mesh(footGeometry, rubberMaterial)
+      const foot = new THREE.Mesh(footGeometry, goldMaterial)
       foot.position.set(pos[0], pos[1], pos[2])
+      foot.rotation.x = Math.PI // Point down
       turntableGroup.add(foot)
     })
 
