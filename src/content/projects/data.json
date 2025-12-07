@@ -3,35 +3,35 @@
     "id": "OutfitAI",
     "link": "https://www.outfit-mksaas.site/",
     "desc": "OutfitAI - AI 驱动的虚拟试衣体验平台",
-    "icon": "i-ph-t-shirt-duotone",
+    "icon": "i-ph-dress-duotone",
     "category": "SaaS"
   },
   {
     "id": "TypeCN",
     "link": "https://type-cn-supabase.vercel.app/",
     "desc": "TypeCN - 通过互动练习和游戏化学习掌握中文打字",
-    "icon": "i-ph-keyboard-duotone",
+    "icon": "i-ph-translate-duotone",
     "category": "SaaS"
   },
   {
     "id": "Travel China Guide",
     "link": "https://www.wangshengliang.site/",
     "desc": "Travel China Guide - 中国旅游指南网站",
-    "icon": "i-ph-airplane-tilt-duotone",
+    "icon": "i-ph-map-trifold-duotone",
     "category": "SaaS"
   },
   {
     "id": "ui-comp-cli",
     "link": "https://github.com/wangshengliang-wsl/ui-comp-cli",
     "desc": "ui-comp-cli - 用于创建 UI 组件或模板的命令行工具",
-    "icon": "i-skill-icons-npm-dark",
+    "icon": "i-ph-squares-four-duotone",
     "category": "npm"
   },
   {
     "id": "ai-tool-navigation-website",
     "link": "https://github.com/wangshengliang-wsl/ai-tool-navigation-website",
     "desc": "ai-tool-navigation-website - AI 工具导航网站",
-    "icon": "i-ph-compass-duotone",
+    "icon": "i-ph-compass-rose-duotone",
     "category": "导航站"
   },
   {
@@ -45,35 +45,35 @@
     "id": "vibe-guide",
     "link": "https://vibe-guide-seven.vercel.app/",
     "desc": "vibe-guide - 创建 Vibe 编码规范文档的工具",
-    "icon": "i-ph-book-open-duotone",
+    "icon": "i-ph-notebook-duotone",
     "category": "工具站"
   },
   {
     "id": "midjourney-supabase-app",
     "link": "https://github.com/wangshengliang-wsl/midjourney-supabase-app",
     "desc": "midjourney-supabase-app - Midjourney 图片生成应用",
-    "icon": "i-ph-robot-duotone",
+    "icon": "i-ph-sparkle-duotone",
     "category": "工具站"
   },
   {
     "id": "chrome-extension-zhihu",
     "link": "https://github.com/wangshengliang-wsl/chrome-extension-zhihu",
     "desc": "chrome-extension-zhihu - 知乎浏览器扩展插件",
-    "icon": "i-logos-chrome",
+    "icon": "i-ph-puzzle-piece-duotone",
     "category": "浏览器插件"
   },
   {
     "id": "ai-gallery",
     "link": "https://github.com/wangshengliang-wsl/ai-gallery",
     "desc": "ai-gallery - AI 图片画廊小程序",
-    "icon": "i-ph-image-square-duotone",
+    "icon": "i-ph-images-duotone",
     "category": "小程序"
   },
   {
     "id": "todo-supabase-app",
     "link": "https://github.com/wangshengliang-wsl/todo-supabase-app",
     "desc": "todo-supabase-app - 待办事项管理应用",
-    "icon": "i-ph-check-square-duotone",
+    "icon": "i-ph-check-circle-duotone",
     "category": "工具站"
   },
   {
@@ -87,63 +87,63 @@
     "id": "weather-ootd",
     "link": "https://github.com/wangshengliang-wsl/weather-ootd",
     "desc": "weather-ootd - 天气穿搭推荐小程序",
-    "icon": "i-ph-cloud-sun-duotone",
+    "icon": "i-ph-rainbow-cloud-duotone",
     "category": "小程序"
   },
   {
     "id": "happyaicoding",
     "link": "https://github.com/wangshengliang-wsl/happyaicoding-template",
     "desc": "happyaicoding - AI 编程学习网站",
-    "icon": "i-ph-laptop-duotone",
+    "icon": "i-ph-code-block-duotone",
     "category": "工具站"
   },
   {
     "id": "deps-cli",
     "link": "https://github.com/wangshengliang-wsl/deps-cli",
     "desc": "deps-cli - 依赖管理命令行工具",
-    "icon": "i-skill-icons-npm-dark",
+    "icon": "i-ph-package-duotone",
     "category": "npm"
   },
   {
     "id": "vistoso",
     "link": "https://github.com/wangshengliang-wsl/vistoso",
     "desc": "vistoso - 颜色查询命令行工具",
-    "icon": "i-ph-palette-duotone",
+    "icon": "i-ph-paint-bucket-duotone",
     "category": "npm"
   },
   {
     "id": "use-fns",
     "link": "https://github.com/wangshengliang-wsl/use-fns",
     "desc": "use-fns - Hooks 函数集合库",
-    "icon": "i-skill-icons-react-dark",
+    "icon": "i-ph-webhooks-logo-duotone",
     "category": "npm"
   },
   {
     "id": "locale-pkg",
     "link": "https://github.com/wangshengliang-wsl/locale-pkg",
     "desc": "locale-pkg - 显示本地包信息的工具",
-    "icon": "i-ph-globe-duotone",
+    "icon": "i-ph-globe-hemisphere-east-duotone",
     "category": "npm"
   },
   {
     "id": "pkg-installer",
     "link": "https://github.com/wangshengliang-wsl/pkg-installer",
     "desc": "pkg-installer - 包安装器命令行工具",
-    "icon": "i-ph-download-simple-duotone",
+    "icon": "i-ph-terminal-window-duotone",
     "category": "npm"
   },
   {
     "id": "VoiceAccountClient",
     "link": "https://github.com/wangshengliang-wsl/VoiceAccountClient",
     "desc": "VoiceAccountClient - 语音记账 iOS 客户端",
-    "icon": "i-skill-icons-swift",
+    "icon": "i-ph-waveform-duotone",
     "category": "iOS"
   },
   {
     "id": "VoiceAccountServer",
     "link": "https://github.com/wangshengliang-wsl/VoiceAccountServer",
     "desc": "VoiceAccountServer - 语音记账服务端",
-    "icon": "i-ph-hard-drives-duotone",
+    "icon": "i-ph-coins-duotone",
     "category": "iOS"
   }
 ]
