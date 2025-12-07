@@ -1,7 +1,7 @@
 ---
 title: Projects
-subtitle: Tech Stack & Credits for the Astro AntfuStyle Theme
-description: Tech Stack & Credits for the Astro AntfuStyle Theme
+subtitle: showcase the projects I've created.
+description: showcase the projects I've created.
 bgType: dot
 toc: true
 ogImage: true
@@ -26,7 +26,7 @@ import { withBasePath } from '~/utils/path'
     subtitle={frontmatter.subtitle}
     isCentered={true}
   >
-    <div slot="head" class="flex flex-wrap justify-center items-center gap-4">
+    {/* <div slot="head" class="flex flex-wrap justify-center items-center gap-4">
       <Link class="btn-orange" href={withBasePath('/releases/')}>
         <span class="i-ph-rocket-launch-duotone"></span>
         <span class="ml-1.5">Latest Releases</span>
@@ -35,7 +35,7 @@ import { withBasePath } from '~/utils/path'
         <span class="i-lucide-git-pull-request"></span>
         <span class="ml-1.5">Recent Pull Requests</span>
       </Link>
-    </div>
+    </div> */}
     <GroupView collectionType="projects" pageToc={frontmatter.toc} />
   </StandardLayout>
 </BaseLayout>
