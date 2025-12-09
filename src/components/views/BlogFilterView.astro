@@ -27,22 +27,25 @@ interface PostWithReadTime {
   globalIdx: number
 }
 
-const postsWithReadTime: PostWithReadTime[] = []
-let globalIdx = 0
+// 并行渲染以避免逐篇渲染导致的超时
+const postsInDisplayOrder = categorizedBlogItems.flatMap(([category, posts]) =>
+  posts.map((post) => ({ post, category }))
+)
 
-for (const [category, posts] of categorizedBlogItems) {
-  for (const post of posts) {
+const postsWithReadTime: PostWithReadTime[] = await Promise.all(
+  postsInDisplayOrder.map(async ({ post, category }, globalIdx) => {
     const { remarkPluginFrontmatter } = await render(post)
     const minutesRead =
-      post.data.minutesRead || remarkPluginFrontmatter.minutesRead
-    postsWithReadTime.push({
+      post.data.minutesRead || remarkPluginFrontmatter.minutesRead || 0
+
+    return {
       post,
       minutesRead,
       category,
-      globalIdx: globalIdx++,
-    })
-  }
-}
+      globalIdx,
+    }
+  })
+)
 ---
 
 {
