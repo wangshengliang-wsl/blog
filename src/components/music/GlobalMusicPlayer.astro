@@ -50,7 +50,7 @@ const { internalNavs, socialLinks } = UI
         {
           internalNavs.map((item) => (
             <a href={resolvePath(item.path)} class="mobile-nav-link">
-              {item.text}
+              {'text' in item ? item.text : item.title}
             </a>
           ))
         }
@@ -62,7 +62,7 @@ const { internalNavs, socialLinks } = UI
               rel="me"
               target="_blank"
             >
-              <span class={item.icon} />
+              {'icon' in item ? <span class={item.icon} /> : item.title}
             </a>
           ))
         }
@@ -596,7 +596,9 @@ const { internalNavs, socialLinks } = UI
     }
 
     // Mobile sidebar toggles - use event delegation on the container
-    const mobileControls = document.querySelector('.mobile-controls')
+    const mobileControls = document.querySelector(
+      '.mobile-controls'
+    ) as HTMLElement | null
     if (mobileControls && !mobileControls.dataset.hasListener) {
       mobileControls.addEventListener('click', (e) => {
         const target = e.target as HTMLElement
