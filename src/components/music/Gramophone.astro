@@ -72,13 +72,6 @@ import '~/styles/music.css'
 
     const initialSize = getContainerSize()
 
-    // Helper function to get theme background color
-    const getThemeBackgroundColor = () => {
-      const isDark = document.documentElement.classList.contains('dark')
-      // Return appropriate background color based on theme
-      return isDark ? 0x1a1a1a : 0xf5f5f5
-    }
-
     // Procedural Textures
     const createVinylTexture = () => {
       const size = 2048
@@ -223,7 +216,7 @@ import '~/styles/music.css'
 
     // Scene setup
     const scene = new THREE.Scene()
-    scene.background = new THREE.Color(getThemeBackgroundColor())
+    scene.background = null // 透明背景
 
     // Camera - top-down 45 degree view
     const camera = new THREE.PerspectiveCamera(
@@ -236,8 +229,9 @@ import '~/styles/music.css'
     // Renderer setup
     const renderer = new THREE.WebGLRenderer({
       antialias: true,
-      alpha: false,
+      alpha: true, // 启用透明背景
     })
+    renderer.setClearColor(0x000000, 0) // 透明背景
     renderer.setSize(initialSize.width, initialSize.height)
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     renderer.shadowMap.enabled = true
@@ -1371,10 +1365,9 @@ import '~/styles/music.css'
     // ==================== Theme Adaptation ====================
     const updateThemeColors = () => {
       const isDark = document.documentElement.classList.contains('dark')
-      const bgColor = getThemeBackgroundColor()
 
-      // Update scene background
-      scene.background = new THREE.Color(bgColor)
+      // 背景保持透明，不更新
+      // scene.background = null
 
       // Adjust lighting based on theme
       if (isDark) {
