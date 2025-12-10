@@ -1,0 +1,106 @@
+---
+title: '认识 Vite'
+pubDate: 2024-01-15
+category: 'Vue'
+tags: ['Vue3', 'Vite']
+description: 'Vite 的核心原理：利用浏览器原生 ESM，实现极速开发体验'
+---
+
+## Vite 是什么
+
+Vite 既是**脚手架**（创建项目）也是**构建工具**（开发 + 生产构建）。
+
+- 开发环境：使用 esbuild 预构建
+- 生产环境：使用 rollup 打包
+
+## Webpack 的痛点
+
+启动项目时，Webpack 需要先打包整个项目：
+
+```
+入口 → 依赖分析 → 打包 → 启动服务器
+         ↓
+    项目越大越慢
+```
+
+## Vite 的解决方案
+
+利用浏览器原生 ESM，按需加载：
+
+```
+启动服务器 → 浏览器请求模块 → 即时编译返回
+         ↓
+    启动速度极快
+```
+
+## 核心原理
+
+### 1. 原生 ESM
+
+浏览器支持 `import` 语法，直接请求模块：
+
+```html
+<script type="module" src="/src/main.js"></script>
+```
+
+```js
+// main.js
+import { createApp } from 'vue' // 浏览器直接请求
+import App from './App.vue' // 浏览器直接请求
+```
+
+### 2. 即时编译
+
+请求 `.vue` 文件时，Vite 服务器即时编译为 JS：
+
+```
+请求 App.vue → Vite 编译 → 返回 JS
+```
+
+### 3. 依赖预构建
+
+`node_modules` 中的依赖使用 esbuild 预构建：
+
+- 将 CommonJS/UMD 转换为 ESM
+- 合并小模块，减少请求数
+
+### 4. 热更新（HMR）
+
+基于 WebSocket 的精确热更新：
+
+- 修改 `.vue` 文件，只更新该组件
+- 保持应用状态
+
+## 对比 Webpack
+
+| 特性       | Webpack      | Vite           |
+| ---------- | ------------ | -------------- |
+| 启动速度   | 慢（先打包） | 快（按需编译） |
+| 热更新     | 较慢         | 极快           |
+| 生产构建   | webpack      | rollup         |
+| 配置复杂度 | 复杂         | 简单           |
+
+## 创建项目
+
+```bash
+npm create vite@latest my-project -- --template vue
+```
+
+## 目录结构
+
+```
+my-project/
+├── index.html       # 入口 HTML
+├── vite.config.js   # Vite 配置
+├── src/
+│   ├── main.js      # 入口文件
+│   └── App.vue
+└── package.json
+```
+
+## 为什么 Vite 这么快
+
+1. **开发时不打包**：利用浏览器原生 ESM
+2. **按需编译**：只编译当前需要的文件
+3. **esbuild 预构建**：Go 语言编写，比 JS 快 10-100 倍
+4. **精确的 HMR**：只更新变化的模块

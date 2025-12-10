@@ -1,0 +1,122 @@
+---
+title: '路由滚动行为'
+pubDate: 2024-01-15
+category: 'Vue'
+tags: ['Vue3', 'Vue Router']
+description: '自定义路由切换时的页面滚动位置'
+---
+
+## 基本用法
+
+```js
+const router = createRouter({
+  history: createWebHistory(),
+  routes,
+  scrollBehavior(to, from, savedPosition) {
+    // 返回期望滚动到的位置
+  },
+})
+```
+
+**参数说明**：
+
+- `to`：目标路由
+- `from`：离开的路由
+- `savedPosition`：浏览器前进/后退时保存的位置
+
+## 常见场景
+
+### 始终滚动到顶部
+
+```js
+scrollBehavior() {
+  return { top: 0 }
+}
+```
+
+### 平滑滚动
+
+```js
+scrollBehavior() {
+  return { top: 0, behavior: 'smooth' }
+}
+```
+
+### 恢复保存的位置
+
+```js
+scrollBehavior(to, from, savedPosition) {
+  if (savedPosition) {
+    return savedPosition  // 浏览器前进/后退时恢复位置
+  }
+  return { top: 0 }
+}
+```
+
+### 滚动到锚点
+
+```js
+scrollBehavior(to) {
+  if (to.hash) {
+    return {
+      el: to.hash,  // '#section' -> 滚动到 id="section" 的元素
+      behavior: 'smooth'
+    }
+  }
+  return { top: 0 }
+}
+```
+
+### 滚动到指定元素
+
+```js
+scrollBehavior() {
+  return {
+    el: '#main-content',
+    top: 10  // 元素上方 10px
+  }
+}
+```
+
+## 延迟滚动
+
+等待过渡动画完成后再滚动：
+
+```js
+scrollBehavior(to, from, savedPosition) {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve({ top: 0, behavior: 'smooth' })
+    }, 300)  // 等待过渡完成
+  })
+}
+```
+
+## 完整示例
+
+```js
+const router = createRouter({
+  history: createWebHistory(),
+  routes,
+  scrollBehavior(to, from, savedPosition) {
+    // 浏览器前进/后退
+    if (savedPosition) {
+      return { ...savedPosition, behavior: 'smooth' }
+    }
+
+    // 有锚点
+    if (to.hash) {
+      return { el: to.hash, behavior: 'smooth' }
+    }
+
+    // 默认滚动到顶部
+    return { top: 0, behavior: 'smooth' }
+  },
+})
+```
+
+## 注意事项
+
+1. 只在 History 模式下有效（需要 `history.pushState` 支持）
+2. Hash 模式不支持 `scrollBehavior`
+3. `savedPosition` 只在浏览器前进/后退时有值

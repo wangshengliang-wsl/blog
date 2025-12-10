@@ -1,0 +1,92 @@
+---
+title: '模板编译器原理（一）'
+pubDate: 2024-01-15
+category: 'Vue'
+tags: ['Vue3', '面试']
+description: '面试题：说一下 Vue 中 Compiler 的实现原理是什么？'
+---
+
+## 面试题
+
+> 说一下 Vue 中 Compiler 的实现原理是什么？
+
+## 编译流程
+
+```
+模板 → [解析器] → 模板AST → [转换器] → JS AST → [生成器] → 渲染函数
+```
+
+## 一、解析器：模板 → 模板 AST
+
+### 有限状态机（FSM）
+
+解析器通过有限状态机逐字符解析模板字符串。
+
+```js
+'<p>Vue</p>'
+```
+
+状态转换过程：
+
+1. 初始状态 → 遇到 `<` → 标签开始状态
+2. 标签开始状态 → 遇到 `p` → 标签名称状态
+3. 标签名称状态 → 遇到 `>` → 初始状态（记录标签 p）
+4. 初始状态 → 遇到 `V` → 文本状态
+5. ...依此类推
+
+### Token 化
+
+解析后得到 token 列表：
+
+```js
+;[
+  { type: 'tag', name: 'p' },
+  { type: 'text', content: 'Vue' },
+  { type: 'tagEnd', name: 'p' },
+]
+```
+
+### 构建 AST
+
+使用栈维护父子关系：
+
+```js
+'<div><p>Vue</p><p>React</p></div>'
+```
+
+遍历 token，遇到开始标签入栈，遇到结束标签出栈：
+
+```
+1. div tag   → 栈: [Root, div]
+2. p tag     → 栈: [Root, div, p]
+3. Vue text  → p.children.push(textNode)
+4. p tagEnd  → 栈: [Root, div]
+5. p tag     → 栈: [Root, div, p]
+6. React text→ p.children.push(textNode)
+7. p tagEnd  → 栈: [Root, div]
+8. div tagEnd→ 栈: [Root]
+```
+
+最终生成模板 AST：
+
+```js
+{
+  type: 'Root',
+  children: [{
+    type: 'Element',
+    tag: 'div',
+    children: [
+      { type: 'Element', tag: 'p', children: [{ type: 'Text', content: 'Vue' }] },
+      { type: 'Element', tag: 'p', children: [{ type: 'Text', content: 'React' }] }
+    ]
+  }]
+}
+```
+
+## 二、转换器：模板 AST → JS AST
+
+将模板 AST 转换为 JavaScript AST，这一步会进行各种优化处理。
+
+## 三、生成器：JS AST → 渲染函数
+
+根据 JS AST 生成渲染函数代码字符串。

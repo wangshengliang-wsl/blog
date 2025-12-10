@@ -1,0 +1,209 @@
+---
+title: '导航守卫完整流程'
+pubDate: 2024-01-15
+category: 'Vue'
+tags: ['VueRouter', '源码']
+description: 'Vue Router 导航守卫完整执行流程源码解析'
+---
+
+## navigate 完整实现
+
+```ts
+function navigate(to, from) {
+  let guards = []
+
+  // 提取变化的路由记录
+  const [leavingRecords, updatingRecords, enteringRecords] =
+    extractChangingRecords(to, from)
+
+  // 1. beforeRouteLeave（离开的组件）
+  guards = extractComponentsGuards(
+    leavingRecords.reverse(), // 从子到父
+    'beforeRouteLeave',
+    to,
+    from
+  )
+
+  // 添加组件实例上的 leaveGuards
+  for (const record of leavingRecords) {
+    record.leaveGuards.forEach((guard) => {
+      guards.push(guardToPromiseFn(guard, to, from))
+    })
+  }
+
+  guards.push(canceledNavigationCheck)
+
+  return (
+    runGuardQueue(guards)
+      // 2. beforeEach（全局）
+      .then(() => {
+        guards = []
+        for (const guard of beforeGuards.list()) {
+          guards.push(guardToPromiseFn(guard, to, from))
+        }
+        guards.push(canceledNavigationCheck)
+        return runGuardQueue(guards)
+      })
+      // 3. beforeRouteUpdate（复用的组件）
+      .then(() => {
+        guards = extractComponentsGuards(
+          updatingRecords,
+          'beforeRouteUpdate',
+          to,
+          from
+        )
+        for (const record of updatingRecords) {
+          record.updateGuards.forEach((guard) => {
+            guards.push(guardToPromiseFn(guard, to, from))
+          })
+        }
+        guards.push(canceledNavigationCheck)
+        return runGuardQueue(guards)
+      })
+      // 4. beforeEnter（路由配置）
+      .then(() => {
+        guards = []
+        for (const record of enteringRecords) {
+          if (record.beforeEnter) {
+            if (isArray(record.beforeEnter)) {
+              for (const beforeEnter of record.beforeEnter) {
+                guards.push(guardToPromiseFn(beforeEnter, to, from))
+              }
+            } else {
+              guards.push(guardToPromiseFn(record.beforeEnter, to, from))
+            }
+          }
+        }
+        guards.push(canceledNavigationCheck)
+        return runGuardQueue(guards)
+      })
+      // 5. 解析异步组件
+      .then(() => {
+        to.matched.forEach((record) => {
+          record.enterCallbacks = {}
+        })
+        guards = extractComponentsGuards(
+          enteringRecords,
+          'beforeRouteEnter',
+          to,
+          from
+        )
+        guards.push(canceledNavigationCheck)
+        return runGuardQueue(guards)
+      })
+      // 6. beforeResolve（全局）
+      .then(() => {
+        guards = []
+        for (const guard of beforeResolveGuards.list()) {
+          guards.push(guardToPromiseFn(guard, to, from))
+        }
+        guards.push(canceledNavigationCheck)
+        return runGuardQueue(guards)
+      })
+      .catch((err) =>
+        isNavigationFailure(err, ErrorTypes.NAVIGATION_CANCELLED)
+          ? err
+          : Promise.reject(err)
+      )
+  )
+}
+```
+
+## extractComponentsGuards
+
+提取组件内守卫：
+
+```ts
+function extractComponentsGuards(
+  matched: RouteRecordNormalized[],
+  guardType: GuardType,
+  to: RouteLocationNormalized,
+  from: RouteLocationNormalizedLoaded
+) {
+  const guards = []
+
+  for (const record of matched) {
+    for (const name in record.components) {
+      const rawComponent = record.components[name]
+
+      if (isRouteComponent(rawComponent)) {
+        // 同步组件
+        const options = rawComponent.__vccOpts || rawComponent
+        const guard = options[guardType]
+        guard && guards.push(guardToPromiseFn(guard, to, from, record, name))
+      } else {
+        // 异步组件
+        guards.push(() =>
+          rawComponent().then((resolved) => {
+            const guard = resolved[guardType]
+            return guard && guardToPromiseFn(guard, to, from, record, name)()
+          })
+        )
+      }
+    }
+  }
+
+  return guards
+}
+```
+
+## canceledNavigationCheck
+
+检查导航是否被取消：
+
+```ts
+const canceledNavigationCheck = checkCanceledNavigationAndReject.bind(
+  null,
+  to,
+  from
+)
+
+function checkCanceledNavigationAndReject(to, from) {
+  const error = checkCanceledNavigation(to, from)
+  return error ? Promise.reject(error) : Promise.resolve()
+}
+
+function checkCanceledNavigation(to, from) {
+  if (pendingLocation !== to) {
+    return createRouterError(ErrorTypes.NAVIGATION_CANCELLED, { from, to })
+  }
+}
+```
+
+## 导航结果处理
+
+```ts
+navigate(to, from).then((failure) => {
+  if (failure) {
+    // 导航失败（被守卫拦截、重定向等）
+    if (isNavigationFailure(failure, ErrorTypes.NAVIGATION_GUARD_REDIRECT)) {
+      // 处理重定向
+      return pushWithRedirect(failure.to, to)
+    }
+  } else {
+    // 导航成功
+    failure = finalizeNavigation(to, from, true, replace)
+  }
+
+  // 触发 afterEach
+  triggerAfterEach(to, from, failure)
+
+  return failure
+})
+```
+
+## 守卫执行顺序总结
+
+```
+1. beforeRouteLeave（子 → 父）
+2. beforeEach
+3. beforeRouteUpdate（复用组件）
+4. beforeEnter（路由配置）
+5. 解析异步组件
+6. beforeRouteEnter（进入的组件）
+7. beforeResolve
+8. 导航确认
+9. afterEach
+10. DOM 更新
+11. beforeRouteEnter 的 next 回调
+```

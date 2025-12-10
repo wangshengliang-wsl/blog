@@ -1,0 +1,187 @@
+---
+title: 'v-model 的本质：编译分析'
+pubDate: 2024-01-15
+category: 'Vue'
+tags: ['Vue3', '原理', 'v-model']
+description: '通过编译结果分析 v-model 在表单元素和组件上的不同本质'
+---
+
+v-model 有两种使用场景：
+
+1. 表单元素双向绑定
+2. 父子组件数据传递
+
+## 场景 1：表单元素
+
+```vue
+<template>
+  <input v-model="message" />
+</template>
+
+<script setup>
+const message = ref('')
+</script>
+```
+
+编译后：
+
+```js
+h('input', {
+  'value': $setup.message,
+  'onUpdate:modelValue': ($event) => {
+    $setup.message = $event.target.value
+  },
+})
+```
+
+**本质**：`value` 绑定 + `input` 事件监听。
+
+等价于：
+
+```vue
+<input :value="message" @input="message = $event.target.value" />
+```
+
+## 场景 2：组件
+
+```vue
+<!-- 父组件 -->
+<Rating v-model="score" />
+```
+
+```vue
+<!-- 子组件 -->
+<script setup>
+const model = defineModel()
+</script>
+```
+
+### 父组件编译结果
+
+```js
+h(Rating, {
+  'modelValue': $setup.score,
+  'onUpdate:modelValue': ($event) => {
+    $setup.score = $event
+  },
+})
+```
+
+父组件传递了：
+
+- `modelValue` prop：当前值
+- `onUpdate:modelValue` 事件：更新回调
+
+### 子组件编译结果
+
+`defineModel()` 展开为：
+
+```js
+const props = defineProps(['modelValue'])
+const emit = defineEmits(['update:modelValue'])
+
+// model 是一个 computed
+const model = computed({
+  get: () => props.modelValue,
+  set: (value) => emit('update:modelValue', value),
+})
+```
+
+## 具名 v-model
+
+```vue
+<UserForm v-model:firstName="first" v-model:lastName="last" />
+```
+
+编译后：
+
+```js
+h(UserForm, {
+  'firstName': $setup.first,
+  'onUpdate:firstName': ($event) => {
+    $setup.first = $event
+  },
+  'lastName': $setup.last,
+  'onUpdate:lastName': ($event) => {
+    $setup.last = $event
+  },
+})
+```
+
+子组件：
+
+```js
+const firstName = defineModel('firstName')
+const lastName = defineModel('lastName')
+```
+
+## v-model 修饰符
+
+```vue
+<MyInput v-model.trim.number="text" />
+```
+
+父组件传递：
+
+```js
+{
+  modelValue: $setup.text,
+  'onUpdate:modelValue': ...,
+  modelModifiers: { trim: true, number: true }
+}
+```
+
+子组件获取修饰符：
+
+```js
+const [model, modifiers] = defineModel()
+// modifiers = { trim: true, number: true }
+```
+
+## 原理图解
+
+```
+┌─────────────────────────────────────────────────────┐
+│                    父组件                           │
+│                                                     │
+│  score = ref(3)                                    │
+│                                                     │
+│  <Rating v-model="score" />                        │
+│      │                                              │
+│      │ 展开为                                       │
+│      ↓                                              │
+│  <Rating                                           │
+│    :modelValue="score"                             │
+│    @update:modelValue="score = $event"             │
+│  />                                                │
+└─────────────────────────────────────────────────────┘
+         │ props.modelValue
+         │ emit('update:modelValue', newVal)
+         ↓
+┌─────────────────────────────────────────────────────┐
+│                    子组件                           │
+│                                                     │
+│  const model = defineModel()                       │
+│                                                     │
+│  // 读取                                            │
+│  model.value  →  props.modelValue  →  父组件的 score│
+│                                                     │
+│  // 写入                                            │
+│  model.value = 5                                   │
+│      ↓                                              │
+│  emit('update:modelValue', 5)                      │
+│      ↓                                              │
+│  父组件 score = 5                                   │
+└─────────────────────────────────────────────────────┘
+```
+
+## 小结
+
+| 场景        | 本质                                     |
+| ----------- | ---------------------------------------- |
+| 表单元素    | value 绑定 + input 事件                  |
+| 组件        | modelValue prop + update:modelValue 事件 |
+| 具名        | xxx prop + update:xxx 事件               |
+| defineModel | props + emit 的语法糖                    |
+
+下一篇我们来看 setup 语法糖的演进。

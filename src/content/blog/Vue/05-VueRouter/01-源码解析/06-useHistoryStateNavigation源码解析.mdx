@@ -1,0 +1,162 @@
+---
+title: 'useHistoryStateNavigation 源码解析'
+pubDate: 2024-01-15
+category: 'Vue'
+tags: ['VueRouter', '源码']
+description: 'Vue Router 历史状态导航管理源码解析'
+---
+
+## 整体结构
+
+```ts
+function useHistoryStateNavigation(base: string) {
+  const { history, location } = window
+
+  // 当前位置
+  const currentLocation = {
+    value: createCurrentLocation(base, location)
+  }
+
+  // 历史状态
+  const historyState = {
+    value: history.state
+  }
+
+  // 首次进入，初始化状态
+  if (!historyState.value) {
+    changeLocation(currentLocation.value, {
+      back: null,
+      current: currentLocation.value,
+      forward: null,
+      position: history.length - 1,
+      replaced: true,
+      scroll: null
+    }, true)
+  }
+
+  function changeLocation() { ... }
+  function replace() { ... }
+  function push() { ... }
+
+  return {
+    location: currentLocation,
+    state: historyState,
+    push,
+    replace
+  }
+}
+```
+
+## createCurrentLocation
+
+根据 base 和当前 location 计算路径：
+
+```ts
+function createCurrentLocation(base: string, location: Location) {
+  const { pathname, search, hash } = location
+
+  // 处理 hash 模式
+  const hashPos = base.indexOf('#')
+  if (hashPos > -1) {
+    let pathFromHash = hash.slice(base.slice(hashPos).length)
+    if (pathFromHash[0] !== '/') pathFromHash = '/' + pathFromHash
+    return stripBase(pathFromHash, '')
+  }
+
+  // history 模式
+  const path = stripBase(pathname, base)
+  return path + search + hash
+}
+```
+
+示例：
+
+- URL: `https://example.com/app/home?q=1#section`
+- base: `/app`
+- 结果: `/home?q=1#section`
+
+## changeLocation
+
+底层封装，调用原生 History API：
+
+```ts
+function changeLocation(to, state, replace) {
+  const hashIndex = base.indexOf('#')
+
+  // 构建完整 URL
+  const url =
+    hashIndex > -1
+      ? (location.host && document.querySelector('base')
+          ? base
+          : base.slice(hashIndex)) + to
+      : createBaseLocation() + base + to
+
+  try {
+    // 调用原生 API
+    history[replace ? 'replaceState' : 'pushState'](state, '', url)
+    historyState.value = state
+  } catch (err) {
+    // 降级处理
+    location[replace ? 'replace' : 'assign'](url)
+  }
+}
+```
+
+## push 方法
+
+```ts
+function push(to: HistoryLocation, data?: HistoryState) {
+  const currentState = assign({}, historyState.value, {
+    forward: to,
+    scroll: computeScrollPosition(),
+  })
+
+  // 先 replace 更新当前状态的 forward 和 scroll
+  changeLocation(currentState.current, currentState, true)
+
+  // 再 push 新状态
+  const state = assign(
+    {},
+    buildState(currentLocation.value, to, null),
+    {
+      position: currentState.position + 1,
+    },
+    data
+  )
+
+  changeLocation(to, state, false)
+  currentLocation.value = to
+}
+```
+
+## replace 方法
+
+```ts
+function replace(to: HistoryLocation, data?: HistoryState) {
+  const state = assign(
+    {},
+    historyState.value,
+    buildState(historyState.value.back, to, historyState.value.forward, true),
+    data,
+    {
+      position: historyState.value.position,
+    }
+  )
+
+  changeLocation(to, state, true)
+  currentLocation.value = to
+}
+```
+
+## 状态结构
+
+```ts
+interface StateEntry {
+  back: HistoryLocation | null // 后退位置
+  current: HistoryLocation // 当前位置
+  forward: HistoryLocation | null // 前进位置
+  position: number // 在历史栈中的位置
+  replaced: boolean // 是否是 replace
+  scroll: ScrollPosition | null // 滚动位置
+}
+```

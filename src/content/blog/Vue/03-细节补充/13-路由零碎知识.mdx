@@ -1,0 +1,192 @@
+---
+title: 'Vue Router 实用配置'
+pubDate: 2024-01-15
+category: 'Vue'
+tags: ['Vue3', 'Vue Router']
+description: '路由别名、命名视图、重定向、元数据、懒加载等常用配置'
+---
+
+## 路由别名（alias）
+
+为同一个路由提供多种访问路径：
+
+```js
+const routes = [
+  {
+    path: '/user/:id/profile',
+    component: UserProfile,
+    alias: '/profile/:id', // 两个路径都能访问
+  },
+]
+```
+
+**用途**：
+
+- 简化深层嵌套路径
+- 兼容旧路径
+
+## 命名视图（Named Views）
+
+一个路由对应多个组件，渲染到不同的 `<router-view>`：
+
+```js
+const routes = [
+  {
+    path: '/',
+    components: {
+      // 注意是 components（复数）
+      default: MainContent,
+      sidebar: Sidebar,
+      header: Header,
+    },
+  },
+]
+```
+
+```vue
+<template>
+  <router-view name="header" />
+  <router-view name="sidebar" />
+  <router-view />
+  <!-- default -->
+</template>
+```
+
+## 重定向（redirect）
+
+```js
+const routes = [
+  // 字符串形式
+  { path: '/home', redirect: '/' },
+
+  // 对象形式
+  { path: '/user/:id', redirect: { name: 'profile' } },
+
+  // 函数形式（动态重定向）
+  {
+    path: '/search/:query',
+    redirect: (to) => {
+      return { path: '/results', query: { q: to.params.query } }
+    },
+  },
+]
+```
+
+## 路由元数据（meta）
+
+附加自定义信息到路由：
+
+```js
+const routes = [
+  {
+    path: '/admin',
+    component: Admin,
+    meta: {
+      requiresAuth: true,
+      title: '管理后台',
+      roles: ['admin'],
+    },
+  },
+]
+```
+
+**常见用途**：
+
+```js
+// 权限控制
+router.beforeEach((to) => {
+  if (to.meta.requiresAuth && !isLoggedIn()) {
+    return '/login'
+  }
+})
+
+// 设置页面标题
+router.afterEach((to) => {
+  document.title = to.meta.title || '默认标题'
+})
+```
+
+## 路由懒加载
+
+```js
+const routes = [
+  {
+    path: '/about',
+    // 动态导入，访问时才加载
+    component: () => import('../views/About.vue'),
+  },
+]
+```
+
+**优势**：
+
+- 首屏加载更快
+- 按需加载
+- 自动代码分割
+
+**注意**：Vue Router 会自动处理动态导入，无需使用 `defineAsyncComponent`。
+
+## 命名路由
+
+```js
+const routes = [
+  {
+    path: '/user/:id',
+    name: 'user', // 路由名称
+    component: User,
+  },
+]
+```
+
+```vue
+<!-- 使用名称导航 -->
+<router-link :to="{ name: 'user', params: { id: 123 } }">
+  用户详情
+</router-link>
+```
+
+```js
+// 编程式导航
+router.push({ name: 'user', params: { id: 123 } })
+```
+
+## 嵌套路由
+
+```js
+const routes = [
+  {
+    path: '/user/:id',
+    component: User,
+    children: [
+      { path: '', component: UserHome }, // /user/:id
+      { path: 'profile', component: UserProfile }, // /user/:id/profile
+      { path: 'posts', component: UserPosts }, // /user/:id/posts
+    ],
+  },
+]
+```
+
+```vue
+<!-- User.vue -->
+<template>
+  <div>
+    <h1>用户页面</h1>
+    <router-view />
+    <!-- 子路由出口 -->
+  </div>
+</template>
+```
+
+## 配置速查
+
+| 配置       | 说明         |
+| ---------- | ------------ |
+| path       | 路由路径     |
+| name       | 路由名称     |
+| component  | 路由组件     |
+| components | 命名视图组件 |
+| redirect   | 重定向       |
+| alias      | 别名         |
+| children   | 嵌套路由     |
+| meta       | 元数据       |
+| props      | 组件传参     |

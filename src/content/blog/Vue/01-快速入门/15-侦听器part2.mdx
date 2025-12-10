@@ -1,0 +1,229 @@
+---
+title: 'Vue3 watchEffect 与 watch 进阶'
+pubDate: 2024-01-15
+category: 'Vue'
+tags: ['Vue3', 'watchEffect', 'watch']
+description: '掌握 watchEffect 自动追踪依赖、回调触发时机、以及手动停止侦听器'
+---
+
+## watchEffect：自动追踪依赖
+
+`watch` 需要显式指定侦听源，`watchEffect` 则**自动追踪**回调中用到的响应式数据：
+
+```ts
+// watch：显式指定
+watch(
+  todoId,
+  async () => {
+    const res = await fetch(`/api/todos/${todoId.value}`)
+    data.value = await res.json()
+  },
+  { immediate: true }
+)
+
+// watchEffect：自动追踪
+watchEffect(async () => {
+  const res = await fetch(`/api/todos/${todoId.value}`)
+  data.value = await res.json()
+})
+```
+
+🎯 **优势**：
+
+- 不用写两遍依赖
+- 多个依赖时更简洁
+- 只追踪回调中**实际使用**的属性
+
+### 只追踪用到的属性
+
+```ts
+const state = reactive({
+  user: { name: 'Tom', age: 18 },
+  settings: { theme: 'dark' },
+})
+
+watchEffect(() => {
+  // 只追踪 user.name，修改 age 或 settings 不会触发
+  console.log(state.user.name)
+})
+```
+
+## watch vs watchEffect
+
+| 特性     | watch                    | watchEffect    |
+| -------- | ------------------------ | -------------- |
+| 指定依赖 | 需要显式指定             | 自动追踪       |
+| 立即执行 | 需要 `immediate: true`   | 默认立即执行   |
+| 获取旧值 | ✅ 有 `(newVal, oldVal)` | ❌ 没有        |
+| 精确控制 | ✅ 更精确                | 依赖可能不明显 |
+
+🎯 **选择建议**：
+
+- 需要旧值、或想明确指定依赖 → `watch`
+- 依赖多、逻辑简单 → `watchEffect`
+
+## 回调触发时机
+
+默认情况下，侦听器回调在 **DOM 更新之前** 执行：
+
+```vue
+<script setup>
+import { ref, watch } from 'vue'
+
+const show = ref(false)
+const divRef = ref(null)
+
+watch(show, () => {
+  // ❌ 此时 DOM 还没更新，拿不到元素
+  console.log(divRef.value?.offsetHeight)
+})
+</script>
+
+<template>
+  <div v-if="show" ref="divRef">内容</div>
+</template>
+```
+
+### flush: 'post'
+
+设置 `flush: 'post'` 让回调在 **DOM 更新之后** 执行：
+
+```ts
+watch(
+  show,
+  () => {
+    // ✅ DOM 已更新
+    console.log(divRef.value?.offsetHeight)
+  },
+  { flush: 'post' }
+)
+
+// 或使用 watchPostEffect（语法糖）
+watchPostEffect(() => {
+  console.log(divRef.value?.offsetHeight)
+})
+```
+
+### flush 选项
+
+| 值       | 执行时机           | 用途                 |
+| -------- | ------------------ | -------------------- |
+| `'pre'`  | DOM 更新前（默认） | 大多数情况           |
+| `'post'` | DOM 更新后         | 需要访问更新后的 DOM |
+| `'sync'` | 同步执行           | 极少用，性能差       |
+
+## 停止侦听器
+
+### 自动停止
+
+**同步**创建的侦听器会在组件卸载时自动停止：
+
+```vue
+<script setup>
+watchEffect(() => {}) // ✅ 自动停止
+watch(source, () => {}) // ✅ 自动停止
+</script>
+```
+
+### 手动停止
+
+**异步**创建的侦听器不会自动停止，需要手动处理：
+
+```vue
+<script setup>
+import { watchEffect, onUnmounted } from 'vue'
+
+let unwatch
+
+onMounted(() => {
+  // 异步创建
+  setTimeout(() => {
+    unwatch = watchEffect(() => {
+      // ...
+    })
+  }, 1000)
+})
+
+onUnmounted(() => {
+  unwatch?.() // 手动停止
+})
+</script>
+```
+
+### 条件停止
+
+```ts
+const count = ref(0)
+
+const unwatch = watch(count, (val) => {
+  console.log(val)
+
+  // 达到条件后停止侦听
+  if (val >= 10) {
+    unwatch()
+  }
+})
+```
+
+## 实战场景
+
+### 场景 1：自动保存草稿
+
+```vue
+<script setup>
+import { reactive, watchEffect } from 'vue'
+
+const form = reactive({
+  title: '',
+  content: '',
+})
+
+watchEffect(() => {
+  // 任何字段变化都保存
+  localStorage.setItem('draft', JSON.stringify(form))
+})
+</script>
+```
+
+### 场景 2：请求带多个参数
+
+```ts
+const page = ref(1)
+const pageSize = ref(10)
+const keyword = ref('')
+
+// 任一参数变化都重新请求
+watchEffect(async () => {
+  const res = await fetch(
+    `/api/list?page=${page.value}&size=${pageSize.value}&q=${keyword.value}`
+  )
+  list.value = await res.json()
+})
+```
+
+### 场景 3：DOM 更新后滚动
+
+```ts
+const messages = ref([])
+
+watch(
+  messages,
+  () => {
+    // DOM 更新后滚动到底部
+    chatContainer.value.scrollTop = chatContainer.value.scrollHeight
+  },
+  { flush: 'post' }
+)
+```
+
+## 小结
+
+| 需求             | 方案                                     |
+| ---------------- | ---------------------------------------- |
+| 自动追踪多个依赖 | `watchEffect`                            |
+| 需要新旧值对比   | `watch`                                  |
+| DOM 更新后执行   | `{ flush: 'post' }` 或 `watchPostEffect` |
+| 异步创建的侦听器 | 手动调用返回的 `unwatch()`               |
+| 条件停止         | 在回调中调用 `unwatch()`                 |
+
+下一篇我们来看模板引用 ref。

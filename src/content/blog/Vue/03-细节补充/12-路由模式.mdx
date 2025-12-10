@@ -1,0 +1,166 @@
+---
+title: 'Vue Router 路由模式'
+pubDate: 2024-01-15
+category: 'Vue'
+tags: ['Vue3', 'Vue Router']
+description: '理解 Hash、History、Memory 三种路由模式的原理和使用场景'
+---
+
+## 三种路由模式
+
+| 模式    | 创建方式             | URL 示例           | 环境     |
+| ------- | -------------------- | ------------------ | -------- |
+| Hash    | createWebHashHistory | example.com/#/home | 浏览器   |
+| History | createWebHistory     | example.com/home   | 浏览器   |
+| Memory  | createMemoryHistory  | 无 URL             | SSR/Node |
+
+## Hash 模式
+
+URL 中 `#` 后面的部分是 hash，**hash 变化不会请求服务器**。
+
+```js
+// router/index.js
+import { createRouter, createWebHashHistory } from 'vue-router'
+
+const router = createRouter({
+  history: createWebHashHistory(),
+  routes: [...]
+})
+```
+
+**特点**：
+
+- ✅ 无需服务器配置
+- ✅ 兼容性好
+- ❌ URL 不美观（带 #）
+- ❌ SEO 不友好
+
+**原理**：
+
+```js
+// 监听 hash 变化
+window.addEventListener('hashchange', () => {
+  const hash = location.hash.slice(1) // 去掉 #
+  // 根据 hash 加载对应组件
+})
+
+// 改变 hash
+location.hash = '/about'
+```
+
+## History 模式
+
+利用 HTML5 History API 管理浏览器历史记录。
+
+```js
+import { createRouter, createWebHistory } from 'vue-router'
+
+const router = createRouter({
+  history: createWebHistory(),
+  routes: [...]
+})
+```
+
+**特点**：
+
+- ✅ URL 美观
+- ✅ SEO 友好
+- ❌ 需要服务器配置
+- ❌ 刷新可能 404
+
+**原理**：
+
+```js
+// 添加历史记录
+history.pushState(null, '', '/about')
+
+// 替换当前记录
+history.replaceState(null, '', '/about')
+
+// 监听前进/后退
+window.addEventListener('popstate', () => {
+  const path = location.pathname
+  // 根据 path 加载对应组件
+})
+```
+
+**工作流程**：
+
+1. 拦截链接点击，调用 `event.preventDefault()`
+2. 使用 `history.pushState` 更新 URL
+3. 根据新 URL 匹配路由，渲染对应组件
+4. **全程没有发送 HTTP 请求**
+
+### History 模式的 404 问题
+
+刷新页面时会请求服务器，但服务器没有对应的后端路由。
+
+**解决方案**：配置服务器回退到 index.html
+
+```nginx
+# Nginx
+location / {
+  try_files $uri $uri/ /index.html;
+}
+```
+
+```js
+// Express
+app.use((req, res) => {
+  res.sendFile(path.join(__dirname, 'dist/index.html'))
+})
+```
+
+## Memory 模式
+
+不依赖浏览器 URL，适用于 SSR 和测试环境。
+
+```js
+import { createRouter, createMemoryHistory } from 'vue-router'
+
+const router = createRouter({
+  history: createMemoryHistory(),
+  routes: [...]
+})
+
+// 需要手动触发初始导航
+router.push('/')
+```
+
+**特点**：
+
+- ✅ 不依赖浏览器环境
+- ✅ 适合 SSR 和单元测试
+- ❌ 不会更新浏览器 URL
+
+## 如何选择
+
+| 场景                     | 推荐模式                |
+| ------------------------ | ----------------------- |
+| 一般 Web 应用            | History（需配置服务器） |
+| 静态托管（GitHub Pages） | Hash                    |
+| 无需 SEO 的后台管理系统  | Hash                    |
+| SSR / 单元测试           | Memory                  |
+
+## 配置 base 路径
+
+```js
+// 应用部署在子路径下
+const router = createRouter({
+  history: createWebHistory('/app/'),  // example.com/app/home
+  routes: [...]
+})
+```
+
+Vite 中使用环境变量：
+
+```js
+history: createWebHistory(import.meta.env.BASE_URL)
+```
+
+```js
+// vite.config.js
+export default {
+  base: '/app/',
+}
+```

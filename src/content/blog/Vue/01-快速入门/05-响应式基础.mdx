@@ -1,0 +1,214 @@
+---
+title: 'ref 自动解包规则详解'
+pubDate: 2024-01-15
+category: 'Vue'
+tags: ['Vue3', '响应式', 'ref', '解包']
+description: '深入理解 Vue3 中 ref 的自动解包机制，避免常见的响应式陷阱'
+---
+
+上一篇我们学了 `ref` 和 `reactive` 的基本用法。这篇来深入讲一个容易踩坑的话题：**ref 的自动解包**。
+
+🙋 什么是"解包"？
+
+就是自动访问 `.value`，不用手动写。比如在模板中：
+
+```vue
+<script setup>
+import { ref } from 'vue'
+const count = ref(0)
+</script>
+
+<template>
+  <!-- 自动解包，不需要 count.value -->
+  <div>{{ count }}</div>
+</template>
+```
+
+看起来很方便，但解包规则有点复杂，不同场景表现不同。搞不清楚就会踩坑。
+
+## 规则一：模板中只有顶级 ref 会解包
+
+```vue
+<script setup>
+import { ref } from 'vue'
+
+const count = ref(0) // 顶级 ref
+const obj = {
+  id: ref(1), // 非顶级 ref（藏在普通对象里）
+}
+</script>
+
+<template>
+  <div>{{ count }}</div>
+  <!-- ✅ 自动解包，显示 0 -->
+  <div>{{ obj.id }}</div>
+  <!-- ⚠️ 看起来正常，显示 1 -->
+</template>
+```
+
+等等，`obj.id` 好像也正常显示了？别被骗了，试试做运算：
+
+```vue
+<template>
+  <div>{{ count + 1 }}</div>
+  <!-- ✅ 显示 1 -->
+  <div>{{ obj.id + 1 }}</div>
+  <!-- ❌ 显示 [object Object]1 -->
+</template>
+```
+
+🔶 `obj.id` 没有解包，它还是一个 ref 对象，和数字相加就变成字符串拼接了。
+
+**正确写法**：
+
+```vue
+<template>
+  <div>{{ obj.id.value + 1 }}</div>
+  <!-- ✅ 手动 .value -->
+</template>
+```
+
+## 规则二：reactive 对象中的 ref 会自动解包
+
+把 ref 放进 `reactive` 对象，访问时会自动解包：
+
+```ts
+import { ref, reactive } from 'vue'
+
+const name = ref('Tom')
+const state = reactive({ name })
+
+console.log(state.name) // ✅ 'Tom'，自动解包
+console.log(name.value) // 'Tom'
+```
+
+🔶 但 `shallowReactive` 不会自动解包：
+
+```ts
+import { ref, shallowReactive } from 'vue'
+
+const name = ref('Tom')
+const state = shallowReactive({ name })
+
+console.log(state.name) // ❌ 返回 ref 对象本身
+console.log(state.name.value) // ✅ 'Tom'
+```
+
+## 规则三：数组/Map/Set 中的 ref 不会解包
+
+```ts
+import { ref, reactive } from 'vue'
+
+const books = reactive([ref('Vue3 指南')])
+console.log(books[0]) // ❌ ref 对象
+console.log(books[0].value) // ✅ 'Vue3 指南'
+
+const map = reactive(new Map([['count', ref(0)]]))
+console.log(map.get('count')) // ❌ ref 对象
+console.log(map.get('count').value) // ✅ 0
+```
+
+🤔 为什么数组里不解包？
+
+因为数组索引访问（`arr[0]`）和对象属性访问（`obj.name`）在 Proxy 实现上不同。Vue 选择只对对象属性做解包，数组保持原样。
+
+## 经典踩坑案例
+
+来看一道"面试题"：
+
+```vue
+<script setup>
+import { ref, shallowReactive } from 'vue'
+
+const name = ref('Tom')
+const obj = shallowReactive({ name })
+
+setTimeout(() => {
+  obj.name = 'Jerry' // 直接赋值字符串
+}, 1000)
+
+setTimeout(() => {
+  name.value = 'Spike' // 修改原 ref
+}, 2000)
+</script>
+
+<template>
+  <div>{{ obj.name }}</div>
+</template>
+```
+
+🙋 2 秒后显示什么？
+
+**答案**：还是 `Jerry`，不是 `Spike`。
+
+**原因**：
+
+1. 1 秒时，`obj.name = 'Jerry'` 把属性替换成了普通字符串，和原来的 `ref` 断开了联系
+2. 2 秒时修改 `name.value`，但 `obj.name` 已经不指向这个 ref 了
+
+**正确做法**：
+
+```ts
+// 方式 1：修改 ref 的 value
+obj.name.value = 'Jerry'
+
+// 方式 2：重新赋值一个新的 ref
+obj.name = ref('Jerry')
+```
+
+## 解包规则速查表
+
+| 场景                     | 是否自动解包 | 示例                         |
+| ------------------------ | ------------ | ---------------------------- |
+| 模板中顶级 ref           | ✅ 是        | `{{ count }}`                |
+| 模板中非顶级 ref         | ❌ 否        | `{{ obj.id }}` 需要 `.value` |
+| reactive 对象属性        | ✅ 是        | `state.name`                 |
+| shallowReactive 对象属性 | ❌ 否        | 需要 `.value`                |
+| 数组元素                 | ❌ 否        | `arr[0].value`               |
+| Map/Set 元素             | ❌ 否        | `map.get('key').value`       |
+
+## 实践建议
+
+既然解包规则这么复杂，怎么避免踩坑？
+
+🎯 **建议 1**：优先用 `ref`，保持一致性
+
+```ts
+// ✅ 统一用 ref，心智负担小
+const count = ref(0)
+const user = ref({ name: 'Tom' })
+const list = ref([1, 2, 3])
+```
+
+🎯 **建议 2**：需要解构时用 `toRefs`
+
+```ts
+import { reactive, toRefs } from 'vue'
+
+const state = reactive({ count: 0, name: 'Vue' })
+
+// ❌ 解构会丢失响应式
+const { count, name } = state
+
+// ✅ toRefs 保持响应式
+const { count, name } = toRefs(state)
+```
+
+🎯 **建议 3**：不确定时就写 `.value`
+
+```ts
+// 写了 .value 肯定不会错
+console.log(someRef.value)
+```
+
+## 小结
+
+ref 自动解包的核心规则：
+
+- **模板中**：只有顶级 ref 自动解包
+- **reactive 中**：属性会解包，数组/Map/Set 元素不会
+- **shallowReactive 中**：不会解包
+
+记不住没关系，踩一次坑就记住了 😅
+
+下一篇我们来看 Vue3 更多的响应式工具 API。

@@ -1,0 +1,142 @@
+---
+title: '最长递增子序列算法'
+pubDate: 2024-01-15
+category: 'Vue'
+tags: ['Vue3', '面试']
+description: 'Vue3 快速 diff 中使用的最长递增子序列（LIS）算法详解'
+---
+
+## 什么是最长递增子序列
+
+拆词理解：**最长** + **递增** + **子序列**
+
+```js
+const arr = [2, 1, 5, 3, 6, 4, 8, 9, 7][
+  // 子序列（元素顺序不变）
+  (1, 5)
+][(2, 5, 6)][(5, 3, 6)][ // ✓ // ✓ // ✗ 不是子序列
+  // 递增子序列
+  (1, 5, 6)
+][(2, 1, 5)][ // ✓ 递增 // ✗ 不是递增
+  // 最长递增子序列
+  (1, 3, 4, 8, 9)
+][(1, 3, 6, 8, 9)] // 长度 5 // 长度 5
+```
+
+## 在 Vue3 中的作用
+
+快速 diff 中，LIS 用于确定哪些节点不需要移动，减少 DOM 操作。
+
+## 暴力解法
+
+找出所有递增子序列，返回最长的那个。
+
+```js
+function getSequence(arr) {
+  let maxSeq = []
+
+  function find(index, subSeq) {
+    const current = arr[index]
+    const newSeq = [...subSeq, current]
+
+    for (let i = index + 1; i < arr.length; i++) {
+      if (arr[i] > current) {
+        find(i, newSeq)
+      }
+    }
+
+    if (newSeq.length > maxSeq.length) {
+      maxSeq = newSeq
+    }
+  }
+
+  for (let i = 0; i < arr.length; i++) {
+    find(i, [])
+  }
+
+  return maxSeq
+}
+```
+
+时间复杂度：O(2^n)
+
+## 动态规划
+
+```js
+function getSequence(arr) {
+  const n = arr.length
+  const dp = new Array(n).fill(1) // dp[i] = 以 arr[i] 结尾的 LIS 长度
+
+  for (let i = 1; i < n; i++) {
+    for (let j = 0; j < i; j++) {
+      if (arr[j] < arr[i]) {
+        dp[i] = Math.max(dp[i], dp[j] + 1)
+      }
+    }
+  }
+
+  return Math.max(...dp)
+}
+```
+
+时间复杂度：O(n²)
+
+## Vue3 的实现：贪心 + 二分
+
+Vue3 使用贪心 + 二分查找，时间复杂度 O(n log n)。
+
+**核心思想**：
+
+- 维护一个递增序列 result
+- 遍历数组，如果当前值大于 result 末尾，直接添加
+- 否则用二分查找找到第一个大于等于当前值的位置，替换它
+
+```js
+function getSequence(arr) {
+  const p = arr.slice() // 记录前驱索引
+  const result = [0] // 存储 LIS 的索引
+
+  for (let i = 0; i < arr.length; i++) {
+    const arrI = arr[i]
+    if (arrI === 0) continue
+
+    const j = result[result.length - 1]
+
+    // 贪心：当前值大于末尾，直接添加
+    if (arr[j] < arrI) {
+      p[i] = j
+      result.push(i)
+      continue
+    }
+
+    // 二分查找：找到第一个大于等于 arrI 的位置
+    let u = 0,
+      v = result.length - 1
+    while (u < v) {
+      const c = (u + v) >> 1
+      if (arr[result[c]] < arrI) {
+        u = c + 1
+      } else {
+        v = c
+      }
+    }
+
+    if (arrI < arr[result[u]]) {
+      if (u > 0) p[i] = result[u - 1]
+      result[u] = i
+    }
+  }
+
+  // 回溯重建序列
+  let u = result.length
+  let v = result[u - 1]
+  while (u-- > 0) {
+    result[u] = v
+    v = p[v]
+  }
+
+  return result
+}
+```
+
+**返回的是索引数组**，方便后续判断哪些节点不需要移动。

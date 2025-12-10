@@ -1,0 +1,209 @@
+---
+title: '组合式函数（Composables）'
+pubDate: 2024-01-15
+category: 'Vue'
+tags: ['Vue3', '进阶', 'Composition API']
+description: '使用组合式函数复用有状态的逻辑，替代 Vue2 的 mixin'
+---
+
+## 什么是组合式函数
+
+组合式函数是利用 Composition API 封装**有状态逻辑**的函数。
+
+- **组件**：复用结构 + 样式 + 逻辑
+- **组合式函数**：只复用逻辑（带状态）
+
+## 基础示例：鼠标追踪
+
+```js
+// composables/useMouse.js
+import { ref, onMounted, onUnmounted } from 'vue'
+
+export function useMouse() {
+  const x = ref(0)
+  const y = ref(0)
+
+  function update(e) {
+    x.value = e.pageX
+    y.value = e.pageY
+  }
+
+  onMounted(() => window.addEventListener('mousemove', update))
+  onUnmounted(() => window.removeEventListener('mousemove', update))
+
+  return { x, y }
+}
+```
+
+```vue
+<script setup>
+import { useMouse } from './composables/useMouse'
+
+const { x, y } = useMouse()
+</script>
+
+<template>
+  <p>鼠标位置: {{ x }}, {{ y }}</p>
+</template>
+```
+
+## 异步数据请求
+
+```js
+// composables/useFetch.js
+import { ref, watchEffect, toValue } from 'vue'
+
+export function useFetch(url) {
+  const data = ref(null)
+  const error = ref(null)
+  const loading = ref(true)
+
+  const fetchData = () => {
+    data.value = null
+    error.value = null
+    loading.value = true
+
+    fetch(toValue(url))
+      .then((res) => res.json())
+      .then((json) => (data.value = json))
+      .catch((err) => (error.value = err))
+      .finally(() => (loading.value = false))
+  }
+
+  // 支持响应式 url
+  watchEffect(fetchData)
+
+  return { data, error, loading }
+}
+```
+
+```vue
+<script setup>
+import { ref } from 'vue'
+import { useFetch } from './composables/useFetch'
+
+const url = ref('/api/users')
+const { data, error, loading } = useFetch(url)
+
+// 改变 url 会自动重新请求
+function changeUrl() {
+  url.value = '/api/posts'
+}
+</script>
+```
+
+## 组合式函数 vs Mixin
+
+| 问题           | Mixin                  | 组合式函数         |
+| -------------- | ---------------------- | ------------------ |
+| 数据来源不清晰 | ✗ 混入后难以追踪       | ✓ 显式导入和返回   |
+| 命名冲突       | ✗ 自动合并可能冲突     | ✓ 解构时可重命名   |
+| 隐式依赖       | ✗ mixin 间可能隐式依赖 | ✓ 参数传递显式依赖 |
+
+```js
+// 组合式函数解决命名冲突
+const { fetchData: fetchUsers } = useUsers()
+const { fetchData: fetchPosts } = usePosts()
+```
+
+## 最佳实践
+
+### 1. 命名约定
+
+以 `use` 开头，驼峰命名：
+
+```js
+useMouse()
+useFetch()
+useLocalStorage()
+```
+
+### 2. 参数处理
+
+支持 ref 和普通值，使用 `toValue`：
+
+```js
+export function useFetch(url) {
+  watchEffect(() => {
+    fetch(toValue(url)) // 处理 ref 或 getter
+  })
+}
+
+// 两种调用方式都支持
+useFetch('/api/users')
+useFetch(computed(() => `/api/users/${id.value}`))
+```
+
+### 3. 返回值
+
+返回普通对象（包含 ref），支持解构：
+
+```js
+// ✓ 推荐
+return { x, y, update }
+
+// ✗ 不推荐返回 reactive
+return reactive({ x, y }) // 解构会丢失响应性
+```
+
+如需对象形式使用：
+
+```js
+const mouse = reactive(useMouse())
+console.log(mouse.x) // 不需要 .value
+```
+
+### 4. 清理副作用
+
+```js
+export function useEventListener(target, event, callback) {
+  onMounted(() => target.addEventListener(event, callback))
+  onUnmounted(() => target.removeEventListener(event, callback))
+}
+```
+
+### 5. 调用限制
+
+- 只能在 `<script setup>` 或 `setup()` 中**同步**调用
+- 可以在 `onMounted` 等生命周期钩子中调用
+
+```js
+// ✗ 错误：异步调用
+setTimeout(() => {
+  const { x, y } = useMouse() // 错误！
+}, 1000)
+
+// ✓ 正确：生命周期钩子中调用
+onMounted(() => {
+  const { x, y } = useMouse() // 可以
+})
+```
+
+## 组合式函数嵌套
+
+```js
+// useEventListener.js
+export function useEventListener(target, event, callback) {
+  onMounted(() => target.addEventListener(event, callback))
+  onUnmounted(() => target.removeEventListener(event, callback))
+}
+
+// useMouse.js - 复用 useEventListener
+import { useEventListener } from './useEventListener'
+
+export function useMouse() {
+  const x = ref(0)
+  const y = ref(0)
+
+  useEventListener(window, 'mousemove', (e) => {
+    x.value = e.pageX
+    y.value = e.pageY
+  })
+
+  return { x, y }
+}
+```
+
+## 常用组合式函数
+
+推荐使用 [VueUse](https://vueuse.org/) 库，提供了 200+ 实用的组合式函数。

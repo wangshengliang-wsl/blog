@@ -1,0 +1,127 @@
+---
+title: 'Vuelidate 表单验证'
+pubDate: 2024-01-15
+category: 'Vue'
+tags: ['Vue3', '第三方库']
+description: '使用 Vuelidate 实现声明式的表单验证'
+---
+
+## 简介
+
+Vuelidate 是轻量级的表单验证库，支持声明式验证规则。
+
+## 安装
+
+```bash
+npm install @vuelidate/core @vuelidate/validators
+```
+
+## 基本用法
+
+```vue
+<template>
+  <form @submit.prevent="submitForm">
+    <input v-model="formData.email" placeholder="邮箱" />
+    <span v-if="v$.email.$error">{{ v$.email.$errors[0].$message }}</span>
+
+    <input v-model="formData.password" type="password" placeholder="密码" />
+    <span v-if="v$.password.$error">{{ v$.password.$errors[0].$message }}</span>
+
+    <button type="submit">提交</button>
+  </form>
+</template>
+
+<script setup>
+import { reactive } from 'vue'
+import { useVuelidate } from '@vuelidate/core'
+import { required, email, minLength } from '@vuelidate/validators'
+
+const formData = reactive({
+  email: '',
+  password: '',
+})
+
+const rules = {
+  email: { required, email },
+  password: { required, minLength: minLength(6) },
+}
+
+const v$ = useVuelidate(rules, formData)
+
+const submitForm = async () => {
+  const isValid = await v$.value.$validate()
+  if (isValid) {
+    console.log('表单有效', formData)
+  }
+}
+</script>
+```
+
+## 常用验证器
+
+| 验证器            | 说明           |
+| ----------------- | -------------- |
+| required          | 必填           |
+| email             | 邮箱格式       |
+| minLength(n)      | 最小长度       |
+| maxLength(n)      | 最大长度       |
+| minValue(n)       | 最小值         |
+| maxValue(n)       | 最大值         |
+| between(min, max) | 范围           |
+| numeric           | 数字           |
+| alpha             | 字母           |
+| alphaNum          | 字母数字       |
+| sameAs(ref)       | 与其他字段相同 |
+
+## 自定义错误消息
+
+```js
+import { helpers } from '@vuelidate/validators'
+
+const rules = {
+  email: {
+    required: helpers.withMessage('邮箱不能为空', required),
+    email: helpers.withMessage('请输入有效的邮箱', email),
+  },
+}
+```
+
+## 自定义验证器
+
+```js
+import { helpers } from '@vuelidate/validators'
+
+// 手机号验证
+const phone = helpers.withMessage(
+  '请输入有效的手机号',
+  helpers.regex(/^1[3-9]\d{9}$/)
+)
+
+// 自定义函数验证
+const customValidator = helpers.withMessage(
+  '验证失败',
+  (value) => value !== 'admin'
+)
+
+const rules = {
+  phone: { required, phone },
+  username: { required, customValidator },
+}
+```
+
+## 验证状态
+
+```js
+v$.email.$dirty // 是否被修改过
+v$.email.$error // 是否有错误
+v$.email.$invalid // 是否无效
+v$.email.$pending // 是否正在验证（异步）
+v$.email.$errors // 错误列表
+
+v$.$validate() // 触发所有验证
+v$.$reset() // 重置验证状态
+```
+
+## 文档
+
+https://vuelidate-next.netlify.app/

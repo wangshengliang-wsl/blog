@@ -1,0 +1,184 @@
+---
+title: '自定义指令'
+pubDate: 2024-01-15
+category: 'Vue'
+tags: ['Vue3', '进阶']
+description: '创建自定义指令复用 DOM 操作逻辑，了解指令的生命周期钩子和参数'
+---
+
+## 复用方式对比
+
+| 方式       | 复用内容           |
+| ---------- | ------------------ |
+| 组件       | 结构 + 样式 + 逻辑 |
+| 组合式函数 | 有状态的逻辑       |
+| 自定义指令 | DOM 操作逻辑       |
+
+## 基础示例：自动聚焦
+
+```vue
+<script setup>
+// 以 v 开头的驼峰变量会被识别为指令
+const vFocus = {
+  mounted: (el) => el.focus(),
+}
+</script>
+
+<template>
+  <input v-focus />
+</template>
+```
+
+## 全局注册
+
+```js
+// main.js
+app.directive('focus', {
+  mounted(el) {
+    el.focus()
+  },
+})
+
+// 简写：同时用于 mounted 和 updated
+app.directive('color', (el, binding) => {
+  el.style.color = binding.value
+})
+```
+
+## 指令钩子
+
+```js
+const myDirective = {
+  created(el, binding, vnode) {}, // 绑定前
+  beforeMount(el, binding, vnode) {}, // 挂载前
+  mounted(el, binding, vnode) {}, // 挂载后
+  beforeUpdate(el, binding, vnode) {}, // 更新前
+  updated(el, binding, vnode) {}, // 更新后
+  beforeUnmount(el, binding, vnode) {}, // 卸载前
+  unmounted(el, binding, vnode) {}, // 卸载后
+}
+```
+
+## binding 参数
+
+```vue
+<div v-example:foo.bar="baz"></div>
+```
+
+```js
+// binding 对象
+{
+  arg: 'foo',                    // 参数
+  modifiers: { bar: true },      // 修饰符
+  value: /* baz 的值 */,
+  oldValue: /* 更新前的值 */,
+  instance: /* 组件实例 */,
+  dir: /* 指令定义对象 */
+}
+```
+
+## 传递多个值
+
+```vue
+<div v-demo="{ color: 'red', text: 'hello' }"></div>
+```
+
+```js
+app.directive('demo', (el, binding) => {
+  console.log(binding.value.color) // 'red'
+  console.log(binding.value.text) // 'hello'
+})
+```
+
+## 实战示例
+
+### 权限控制指令
+
+```js
+// directives/permission.js
+export const vPermission = {
+  mounted(el, binding) {
+    const userPermissions = ['read', 'write'] // 用户权限
+    const required = binding.value
+
+    if (!userPermissions.includes(required)) {
+      el.parentNode?.removeChild(el)
+    }
+  },
+}
+```
+
+```vue
+<button v-permission="'delete'">删除</button>
+```
+
+### 相对时间指令
+
+```js
+// directives/time.js
+function formatTime(timestamp) {
+  const diff = Date.now() - timestamp
+  if (diff < 60000) return '刚刚'
+  if (diff < 3600000) return `${Math.floor(diff / 60000)}分钟前`
+  if (diff < 86400000) return `${Math.floor(diff / 3600000)}小时前`
+  return new Date(timestamp).toLocaleDateString()
+}
+
+export const vTime = {
+  mounted(el, binding) {
+    el.textContent = formatTime(binding.value)
+  },
+  updated(el, binding) {
+    el.textContent = formatTime(binding.value)
+  },
+}
+```
+
+```vue
+<span v-time="1702000000000"></span>
+```
+
+### 点击外部关闭
+
+```js
+export const vClickOutside = {
+  mounted(el, binding) {
+    el._clickOutside = (e) => {
+      if (!el.contains(e.target)) {
+        binding.value(e)
+      }
+    }
+    document.addEventListener('click', el._clickOutside)
+  },
+  unmounted(el) {
+    document.removeEventListener('click', el._clickOutside)
+  },
+}
+```
+
+```vue
+<div v-click-outside="closeDropdown">
+  <button>菜单</button>
+  <ul v-if="open">...</ul>
+</div>
+```
+
+## 选项式 API 写法
+
+```js
+export default {
+  directives: {
+    focus: {
+      mounted(el) {
+        el.focus()
+      },
+    },
+  },
+}
+```
+
+## 注意事项
+
+1. **不推荐在组件上使用**：自定义指令主要用于普通 DOM 元素
+2. **清理副作用**：在 `unmounted` 中移除事件监听器
+3. **避免复杂逻辑**：复杂逻辑考虑使用组合式函数

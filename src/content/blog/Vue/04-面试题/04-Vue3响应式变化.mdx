@@ -1,0 +1,143 @@
+---
+title: 'Vue3 响应式变化'
+pubDate: 2024-01-15
+category: 'Vue'
+tags: ['Vue3', '面试']
+description: '面试题：说一说 Vue3 响应式相较于 Vue2 有哪些改变？'
+---
+
+## 面试题
+
+> 说一说 Vue3 响应式相较于 Vue2 有哪些改变？
+
+## 变化一：数据拦截
+
+|          | Vue2                  | Vue3                          |
+| -------- | --------------------- | ----------------------------- |
+| 方式     | Object.defineProperty | Proxy + Object.defineProperty |
+| 拦截范围 | 单个属性              | 整个对象                      |
+| 新增属性 | 需要 $set             | 自动响应                      |
+| 删除属性 | 需要 $delete          | 自动响应                      |
+
+### Proxy 优势
+
+```js
+const proxy = new Proxy(target, {
+  get(target, key) {
+    /* 读取 */
+  },
+  set(target, key, value) {
+    /* 设置 */
+  },
+  deleteProperty(target, key) {
+    /* 删除 */
+  },
+  has(target, key) {
+    /* in 操作符 */
+  },
+  // ... 更多操作
+})
+```
+
+## 变化二：创建响应式数据
+
+|      | Vue2      | Vue3           |
+| ---- | --------- | -------------- |
+| 语法 | data 选项 | ref / reactive |
+
+### ref 实现原理
+
+```js
+class RefImpl {
+  constructor(value) {
+    // 对象用 reactive 处理，原始值直接存储
+    this._value = isObject(value) ? reactive(value) : value
+  }
+
+  get value() {
+    track(this, 'value') // 收集依赖
+    return this._value
+  }
+
+  set value(newVal) {
+    this._value = newVal
+    trigger(this, 'value') // 派发更新
+  }
+}
+```
+
+### reactive 实现原理
+
+```js
+function reactive(target) {
+  return new Proxy(target, {
+    get(target, key) {
+      track(target, key)
+      return Reflect.get(target, key)
+    },
+    set(target, key, value) {
+      Reflect.set(target, key, value)
+      trigger(target, key)
+      return true
+    },
+  })
+}
+```
+
+## 变化三：依赖收集
+
+|      | Vue2          | Vue3                |
+| ---- | ------------- | ------------------- |
+| 结构 | Watcher + Dep | WeakMap + Map + Set |
+| 粒度 | 组件级别      | 副作用函数级别      |
+
+### Vue3 依赖收集结构
+
+```
+WeakMap {
+  target1 → Map {
+    key1 → Set [effect1, effect2]
+    key2 → Set [effect3]
+  }
+  target2 → Map {
+    key3 → Set [effect4]
+  }
+}
+```
+
+```js
+// 简化版实现
+const targetMap = new WeakMap()
+
+function track(target, key) {
+  let depsMap = targetMap.get(target)
+  if (!depsMap) {
+    targetMap.set(target, (depsMap = new Map()))
+  }
+  let dep = depsMap.get(key)
+  if (!dep) {
+    depsMap.set(key, (dep = new Set()))
+  }
+  dep.add(activeEffect)
+}
+
+function trigger(target, key) {
+  const depsMap = targetMap.get(target)
+  if (!depsMap) return
+  const dep = depsMap.get(key)
+  if (dep) {
+    dep.forEach((effect) => effect())
+  }
+}
+```
+
+## 参考答案
+
+Vue3 响应式相比 Vue2 有三个主要变化：
+
+1. **数据拦截**：从 Object.defineProperty 改为 Proxy + Object.defineProperty
+   - ref 使用两者结合
+   - reactive 使用 Proxy
+2. **创建方式**：从 data 选项改为 ref/reactive 函数
+
+3. **依赖收集**：从 Watcher + Dep 改为 WeakMap + Map + Set，实现更细粒度的追踪（副作用函数级别而非组件级别）

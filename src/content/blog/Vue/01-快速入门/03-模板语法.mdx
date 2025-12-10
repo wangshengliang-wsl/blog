@@ -1,0 +1,217 @@
+---
+title: 'Vue 模板语法完全指南'
+pubDate: 2024-01-15
+category: 'Vue'
+tags: ['Vue3', '模板语法', '快速入门']
+description: '掌握 Vue 模板语法：文本插值、属性绑定、JS 表达式，从基础到进阶一篇搞定'
+---
+
+🙋 Vue 的 `<template>` 里能写什么？
+
+很多初学者以为模板就是普通 HTML，其实不然。Vue 模板在 HTML 基础上扩展了很多能力：动态数据绑定、属性绑定、表达式计算……这篇文章带你系统掌握这些语法。
+
+## 文本插值：双大括号 `{{}}`
+
+最基础的用法，用双大括号把数据"插"到模板里：
+
+```vue
+<template>
+  <div>Hello, {{ name }}!</div>
+</template>
+
+<script setup>
+const name = 'Vue3'
+</script>
+```
+
+页面会渲染出 `Hello, Vue3!`。这就是所谓的"Mustache 语法"（因为 `{{}}` 像两撇胡子 🥸）。
+
+## 渲染 HTML：v-html 指令
+
+🙋 如果数据本身是一段 HTML 代码呢？
+
+```vue
+<script setup>
+const htmlCode = '<span style="color:red">红色文字</span>'
+</script>
+
+<template>
+  <!-- ❌ 会原样输出 HTML 标签 -->
+  <div>{{ htmlCode }}</div>
+
+  <!-- ✅ 会渲染成真正的 HTML -->
+  <div v-html="htmlCode"></div>
+</template>
+```
+
+`v-html` 是 Vue 的**指令**（以 `v-` 开头的特殊属性）。用它可以把字符串当成 HTML 渲染。
+
+🔶 **安全警告**：永远不要对用户输入的内容使用 `v-html`，会导致 XSS 攻击。
+
+## 属性绑定：v-bind
+
+文本可以动态绑定，属性当然也可以。用 `v-bind` 指令：
+
+```vue
+<script setup>
+const imgUrl = 'https://example.com/avatar.png'
+const isDisabled = true
+</script>
+
+<template>
+  <!-- 完整写法 -->
+  <img v-bind:src="imgUrl" />
+
+  <!-- 简写（推荐） -->
+  <img :src="imgUrl" />
+
+  <!-- 布尔属性：isDisabled 为 true 时，button 会被禁用 -->
+  <button :disabled="isDisabled">点击</button>
+</template>
+```
+
+`:` 是 `v-bind:` 的简写，实际开发中几乎都用简写。
+
+### Vue 3.4+ 同名简写
+
+如果属性名和变量名相同，可以进一步简写：
+
+```vue
+<script setup>
+const id = 'my-element'
+const class = 'container'
+</script>
+
+<template>
+  <!-- Vue 3.4 之前 -->
+  <div :id="id" :class="class"></div>
+
+  <!-- Vue 3.4+ 可以这样写 -->
+  <div :id :class></div>
+</template>
+```
+
+### 批量绑定属性
+
+有多个属性要绑定？可以用对象一次性搞定：
+
+```vue
+<script setup>
+const attrs = {
+  'id': 'container',
+  'class': 'wrapper',
+  'data-index': 1,
+}
+</script>
+
+<template>
+  <div v-bind="attrs">内容</div>
+  <!-- 等价于 <div id="container" class="wrapper" data-index="1"> -->
+</template>
+```
+
+## 在模板中使用 JS 表达式
+
+模板里不只能放变量，还能写 JavaScript 表达式：
+
+```vue
+<script setup>
+const count = 10
+const isVip = true
+const message = 'hello'
+</script>
+
+<template>
+  <!-- 算术运算 -->
+  <div>{{ count + 1 }}</div>
+
+  <!-- 三元表达式 -->
+  <div>{{ isVip ? '尊贵VIP' : '普通用户' }}</div>
+
+  <!-- 方法调用 -->
+  <div>{{ message.toUpperCase() }}</div>
+
+  <!-- 模板字符串（用在属性绑定里） -->
+  <div :id="`item-${count}`"></div>
+</template>
+```
+
+🔶 **注意**：只能用**表达式**，不能用**语句**。
+
+```vue
+<!-- ❌ 这些是语句，会报错 -->
+{{ var a = 1 }}
+{{ if (ok) { return 'yes' } }}
+
+<!-- ✅ 用三元表达式替代 if -->
+{{ ok ? 'yes' : 'no' }}
+```
+
+🤔 怎么区分表达式和语句？
+
+一个简单的判断方法：能写在 `return` 后面的就是表达式。
+
+```js
+return count + 1        // ✅ 表达式
+return isVip ? 'a' : 'b' // ✅ 表达式
+return var a = 1         // ❌ 语句
+```
+
+## 模板中的全局对象访问
+
+模板是"沙盒化"的，出于安全考虑，只能访问[白名单内的全局对象](https://github.com/vuejs/core/blob/main/packages/shared/src/globalsAllowList.ts#L3)，比如 `Math`、`Date`、`JSON` 等：
+
+```vue
+<template>
+  <!-- ✅ Math 在白名单里 -->
+  <div>{{ Math.random() }}</div>
+  <div>{{ Math.floor(3.7) }}</div>
+
+  <!-- ✅ Date 也在 -->
+  <div>{{ new Date().toLocaleDateString() }}</div>
+</template>
+```
+
+🙋 想用自定义的全局对象怎么办？
+
+需要在 `main.js` 中通过 `app.config.globalProperties` 注册：
+
+```js
+// main.js
+import { createApp } from 'vue'
+import App from './App.vue'
+
+const app = createApp(App)
+
+// 注册全局对象
+app.config.globalProperties.$utils = {
+  formatDate(date) {
+    return date.toISOString().slice(0, 10)
+  },
+}
+
+app.mount('#app')
+```
+
+然后在任意组件模板中使用：
+
+```vue
+<template>
+  <div>{{ $utils.formatDate(new Date()) }}</div>
+</template>
+```
+
+## 小结
+
+Vue 模板语法的核心就这几个：
+
+| 语法           | 用途      | 示例                        |
+| -------------- | --------- | --------------------------- |
+| `{{ }}`        | 文本插值  | `{{ message }}`             |
+| `v-html`       | 渲染 HTML | `<div v-html="html"></div>` |
+| `:attr`        | 属性绑定  | `<img :src="url">`          |
+| `v-bind="obj"` | 批量绑定  | `<div v-bind="attrs">`      |
+
+模板里可以写 JS 表达式，但不能写语句。全局对象访问受限，需要用 `globalProperties` 注册。
+
+下一篇我们来看 Vue 最核心的概念——响应式数据。

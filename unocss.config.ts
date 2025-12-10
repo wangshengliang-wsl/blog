@@ -90,8 +90,18 @@ export default defineConfig({
   shortcuts: [
     [
       /^(\w+)-transition(?:-(\d+))?$/,
-      (match) =>
-        `transition-${match[1] === 'op' ? 'opacity' : match[1]} duration-${match[2] ? match[2] : '300'} ease-in-out`,
+      ([, rawProp, rawDur]) => {
+        const target =
+          rawProp === 'op'
+            ? 'opacity'
+            : rawProp === 'transition'
+              ? 'all'
+              : rawProp
+        const duration = rawDur || '300'
+        const transitionClass =
+          target === 'all' ? 'transition' : `transition-${target}`
+        return `${transitionClass} duration-${duration} ease-in-out`
+      },
     ],
     [
       /^shadow-custom_(-?\d+)_(-?\d+)_(-?\d+)_(-?\d+)$/,
@@ -114,6 +124,7 @@ export default defineConfig({
           purple: 'purple',
           pink: 'pink',
           indigo: 'indigo',
+          large: 'blue',
           cancel: 'gray',
           confirm: 'blue',
         }
@@ -143,17 +154,9 @@ export default defineConfig({
         'vertical-align': 'text-bottom',
       },
     }),
+    // 关闭远程字体拉取，避免网络超时告警。如需使用，请改回 provider 并配置本地/可用源。
     presetWebFonts({
-      fonts: {
-        sans: 'Inter:400,600,800',
-        mono: 'DM Mono:400,600',
-        condensed: 'Roboto Condensed',
-      },
-      provider: 'google',
-      timeouts: {
-        warning: 8000, // 警告超时时间 8 秒
-        failure: 15000, // 失败超时时间 15 秒
-      },
+      provider: 'none',
     }),
   ],
 

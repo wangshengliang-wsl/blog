@@ -1,0 +1,170 @@
+---
+title: 'createRouter 深入解析'
+pubDate: 2024-01-15
+category: 'Vue'
+tags: ['VueRouter', '源码']
+description: 'Vue Router createRouter 方法内部实现详解'
+---
+
+## install 方法
+
+Router 作为 Vue 插件，核心是 `install` 方法：
+
+```ts
+const router: Router = {
+  // ... 其他属性和方法
+
+  install(app: App) {
+    const router = this
+
+    // 1. 注册全局组件
+    app.component('RouterLink', RouterLink)
+    app.component('RouterView', RouterView)
+
+    // 2. 设置全局属性
+    app.config.globalProperties.$router = router
+    Object.defineProperty(app.config.globalProperties, '$route', {
+      get: () => unref(currentRoute),
+    })
+
+    // 3. 依赖注入
+    app.provide(routerKey, router)
+    app.provide(routeLocationKey, currentRoute)
+    app.provide(routerViewLocationKey, currentRoute)
+
+    // 4. 初始化导航
+    if (isBrowser && !started) {
+      started = true
+      push(routerHistory.location).catch((err) => {
+        // 处理初始导航错误
+      })
+    }
+
+    // 5. 设置响应式
+    const reactiveRoute = {}
+    for (const key in START_LOCATION_NORMALIZED) {
+      Object.defineProperty(reactiveRoute, key, {
+        get: () => currentRoute.value[key],
+      })
+    }
+    app.provide(routeLocationKey, reactive(reactiveRoute))
+  },
+}
+```
+
+## push 和 replace
+
+```ts
+function push(to: RouteLocationRaw) {
+  return pushWithRedirect(to)
+}
+
+function replace(to: RouteLocationRaw) {
+  return push(assign(locationAsObject(to), { replace: true }))
+}
+```
+
+两者的区别在于 `replace: true` 参数。
+
+## pushWithRedirect
+
+核心导航方法：
+
+```ts
+function pushWithRedirect(to, redirectedFrom) {
+  // 1. 解析目标路由
+  const targetLocation = (pendingLocation = resolve(to))
+  const from = currentRoute.value
+
+  // 2. 处理重定向
+  const shouldRedirect = handleRedirectRecord(targetLocation)
+  if (shouldRedirect) {
+    return pushWithRedirect(shouldRedirect, redirectedFrom || targetLocation)
+  }
+
+  // 3. 执行导航
+  return navigate(targetLocation, from).then((failure) => {
+    if (!failure) {
+      // 导航成功，更新历史
+      finalizeNavigation(targetLocation, from, true, replace)
+    }
+    return failure
+  })
+}
+```
+
+## navigate
+
+处理导航守卫：
+
+```ts
+function navigate(to, from) {
+  // 提取变化的路由记录
+  const [leavingRecords, updatingRecords, enteringRecords] =
+    extractChangingRecords(to, from)
+
+  // 按顺序执行导航守卫
+  return runGuardQueue(/* beforeRouteLeave */)
+    .then(() => runGuardQueue(/* beforeEach */))
+    .then(() => runGuardQueue(/* beforeRouteUpdate */))
+    .then(() => runGuardQueue(/* beforeEnter */))
+    .then(() => runGuardQueue(/* beforeRouteEnter */))
+    .then(() => runGuardQueue(/* beforeResolve */))
+}
+```
+
+## finalizeNavigation
+
+导航确认后的最终处理：
+
+```ts
+function finalizeNavigation(to, from, isPush, replace) {
+  // 1. 检查导航是否被取消
+  const error = checkCanceledNavigation(to, from)
+  if (error) return error
+
+  // 2. 标记为首次导航完成
+  const isFirstNavigation = from === START_LOCATION_NORMALIZED
+
+  // 3. 更新历史记录
+  if (isPush) {
+    if (replace || isFirstNavigation) {
+      routerHistory.replace(to.fullPath, to.state)
+    } else {
+      routerHistory.push(to.fullPath, to.state)
+    }
+  }
+
+  // 4. 更新当前路由
+  currentRoute.value = to
+
+  // 5. 处理滚动行为
+  handleScroll(to, from, isPush, isFirstNavigation)
+
+  // 6. 触发 afterEach
+  triggerAfterEach(to, from, failure)
+}
+```
+
+## resolve 方法
+
+解析路由位置：
+
+```ts
+function resolve(rawLocation, currentLocation) {
+  // 标准化位置
+  const location =
+    typeof rawLocation === 'string' ? parseURL(rawLocation) : rawLocation
+
+  // 使用 matcher 解析
+  const matchedRoute = matcher.resolve(location, currentLocation)
+
+  return {
+    fullPath,
+    hash,
+    query,
+    ...matchedRoute,
+    href,
+  }
+}
+```

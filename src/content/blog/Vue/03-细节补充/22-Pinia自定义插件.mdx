@@ -1,0 +1,144 @@
+---
+title: 'Pinia 自定义插件'
+pubDate: 2024-01-15
+category: 'Vue'
+tags: ['Vue3', 'Pinia']
+description: '通过插件扩展 Pinia 仓库的功能，如状态持久化、日志记录等'
+---
+
+## 插件能做什么
+
+- 为 store 添加新属性
+- 为 store 添加新方法
+- 包装现有方法
+- 监听 action 执行
+- 实现副作用（如本地存储）
+
+## 基本结构
+
+```js
+// plugins/myPlugin.js
+export function myPlugin(context) {
+  const { store } = context
+
+  // 添加属性
+  store.pluginData = 'hello'
+
+  // 添加方法
+  store.pluginMethod = () => console.log('plugin method')
+
+  // 或返回对象添加属性
+  return { secret: 'the cake is a lie' }
+}
+```
+
+## 注册插件
+
+```js
+// main.js
+import { createPinia } from 'pinia'
+import { myPlugin } from './plugins/myPlugin'
+
+const pinia = createPinia()
+pinia.use(myPlugin)
+```
+
+## 实用插件示例
+
+### 状态重置
+
+```js
+function resetPlugin({ store }) {
+  const initialState = JSON.parse(JSON.stringify(store.$state))
+
+  store.reset = () => {
+    store.$patch(JSON.parse(JSON.stringify(initialState)))
+  }
+}
+```
+
+### 指定仓库扩展
+
+```js
+function counterPlugin({ store }) {
+  if (store.$id === 'counter') {
+    return { extraProp: 'only for counter' }
+  }
+}
+```
+
+### 操作日志
+
+```js
+function loggerPlugin({ store }) {
+  store.$onAction(({ name, args, after, onError }) => {
+    console.log(`[${store.$id}] action: ${name}`, args)
+
+    after((result) => {
+      console.log(`[${store.$id}] action ${name} finished`, result)
+    })
+
+    onError((error) => {
+      console.error(`[${store.$id}] action ${name} failed`, error)
+    })
+  })
+}
+```
+
+### 状态变化监听
+
+```js
+function watchPlugin({ store }) {
+  store.$subscribe((mutation, state) => {
+    console.log('mutation:', mutation)
+    console.log('new state:', state)
+  })
+}
+```
+
+## context 对象
+
+```js
+function plugin(context) {
+  context.pinia // pinia 实例
+  context.app // Vue 应用实例
+  context.store // 当前 store
+  context.options // defineStore 的配置
+}
+```
+
+## 第三方插件
+
+### pinia-plugin-persistedstate
+
+状态持久化到 localStorage：
+
+```bash
+npm install pinia-plugin-persistedstate
+```
+
+```js
+import { createPinia } from 'pinia'
+import piniaPluginPersistedstate from 'pinia-plugin-persistedstate'
+
+const pinia = createPinia()
+pinia.use(piniaPluginPersistedstate)
+```
+
+```js
+// store
+export const useUserStore = defineStore('user', {
+  state: () => ({ name: '', token: '' }),
+  persist: true, // 启用持久化
+})
+
+// 或自定义配置
+export const useUserStore = defineStore('user', {
+  state: () => ({ name: '', token: '' }),
+  persist: {
+    key: 'user-store',
+    storage: sessionStorage,
+    paths: ['token'], // 只持久化 token
+  },
+})
+```

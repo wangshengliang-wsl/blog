@@ -1,0 +1,103 @@
+---
+title: 'Vue3 组件库选型与使用'
+pubDate: 2024-01-15
+category: 'Vue'
+tags: ['Vue3', 'ElementPlus', '组件库']
+description: '了解 Vue3 主流组件库，以 Element Plus 为例介绍安装和按需引入'
+---
+
+组件库就是别人封装好的 UI 组件集合，直接用就行，不用自己造轮子。
+
+## 主流组件库
+
+| 组件库                                    | 特点               | 适用场景     |
+| ----------------------------------------- | ------------------ | ------------ |
+| [Element Plus](https://element-plus.org/) | 企业级，组件丰富   | 后台管理系统 |
+| [Ant Design Vue](https://antdv.com/)      | 蚂蚁出品，设计规范 | 企业级应用   |
+| [Naive UI](https://www.naiveui.com/)      | TypeScript，灵活   | 各类项目     |
+| [Vant](https://vant-ui.github.io/vant/)   | 移动端             | H5 应用      |
+
+本文以最常用的 **Element Plus** 为例。
+
+## 按需引入（推荐）
+
+安装：
+
+```bash
+npm install element-plus
+npm install -D unplugin-vue-components unplugin-auto-import
+```
+
+配置 `vite.config.ts`：
+
+```ts
+import AutoImport from 'unplugin-auto-import/vite'
+import Components from 'unplugin-vue-components/vite'
+import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
+
+export default defineConfig({
+  plugins: [
+    AutoImport({ resolvers: [ElementPlusResolver()] }),
+    Components({ resolvers: [ElementPlusResolver()] }),
+  ],
+})
+```
+
+直接使用，插件自动引入：
+
+```vue
+<template>
+  <el-button type="primary">按钮</el-button>
+</template>
+```
+
+## 实战示例
+
+```vue
+<script setup>
+import { reactive, ref } from 'vue'
+
+const formRef = ref()
+const form = reactive({ name: '', email: '' })
+
+const rules = {
+  name: [{ required: true, message: '请输入姓名', trigger: 'blur' }],
+  email: [{ type: 'email', message: '邮箱格式不正确', trigger: 'blur' }],
+}
+
+const handleSubmit = async () => {
+  const valid = await formRef.value.validate()
+  if (valid) console.log('提交', form)
+}
+</script>
+
+<template>
+  <el-form :model="form" :rules="rules" ref="formRef" label-width="80px">
+    <el-form-item label="姓名" prop="name">
+      <el-input v-model="form.name" />
+    </el-form-item>
+    <el-form-item label="邮箱" prop="email">
+      <el-input v-model="form.email" />
+    </el-form-item>
+    <el-form-item>
+      <el-button type="primary" @click="handleSubmit">提交</el-button>
+    </el-form-item>
+  </el-form>
+</template>
+```
+
+## 国际化
+
+```vue
+<script setup>
+import zhCn from 'element-plus/es/locale/lang/zh-cn'
+</script>
+
+<template>
+  <el-config-provider :locale="zhCn">
+    <App />
+  </el-config-provider>
+</template>
+```
+
+至此，Vue3 快速入门系列完结。

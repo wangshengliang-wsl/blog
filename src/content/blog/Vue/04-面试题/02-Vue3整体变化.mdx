@@ -1,0 +1,105 @@
+---
+title: 'Vue3 整体变化'
+pubDate: 2024-01-15
+category: 'Vue'
+tags: ['Vue3', '面试']
+description: '面试题：说一下 Vue3 相比 Vue2 有什么新的变化？'
+---
+
+## 面试题
+
+> 说一下 Vue3 相比 Vue2 有什么新的变化？
+
+四大类变化：
+
+1. 源码优化
+2. 性能优化
+3. 语法 API 优化
+4. 引入 RFC
+
+## 一、源码优化
+
+### Monorepo
+
+Vue2 源码在 src 目录下，模块无法单独发布。
+
+Vue3 改为 Monorepo 管理，每个包可独立测试和发布：
+
+```
+packages/
+├── reactivity/    # 响应式系统
+├── runtime-core/  # 运行时核心
+├── runtime-dom/   # DOM 运行时
+├── compiler-core/ # 编译器核心
+├── compiler-dom/  # DOM 编译器
+└── vue/           # 完整构建
+```
+
+### TypeScript
+
+- Vue1.x：纯 JS
+- Vue2.x：Flow.js
+- Vue3.x：TypeScript
+
+## 二、性能优化
+
+### 源码体积缩小
+
+- 移除冷门功能（filter、inline-template）
+- Tree-shaking 优化
+
+### 数据劫持
+
+- Vue2：Object.defineProperty
+- Vue3：Proxy
+
+### 编译优化
+
+- 静态提升
+- 预字符串化
+- 缓存事件处理函数
+- Block Tree + PatchFlag
+
+### diff 算法
+
+- Vue2：双端 diff
+- Vue3：快速 diff
+
+## 三、语法 API 优化
+
+### CompositionAPI
+
+**Vue2 OptionsAPI 问题**：同一功能的代码分散在 data、methods、computed 等选项中。
+
+**Vue3 CompositionAPI**：同一功能的代码集中在一起。
+
+### 逻辑复用
+
+- Vue2：mixin（存在命名冲突、来源不清晰等问题）
+- Vue3：组合式函数（更清晰、更灵活）
+
+### createApp
+
+```js
+// Vue2 - 全局配置影响所有应用
+Vue.use(...)
+new Vue({...}).$mount('#app1')
+new Vue({...}).$mount('#app2')
+
+// Vue3 - 应用隔离
+createApp(App1).use(...).mount('#app1')
+createApp(App2).mount('#app2')
+```
+
+## 四、引入 RFC
+
+RFC（Request For Comments）用于收集社区对新功能的意见和建议，让 Vue 开发更加透明和社区驱动。
+
+## 参考答案
+
+Vue3 相比 Vue2 的变化可分为四类：
+
+1. **源码优化**：TypeScript 重构，Monorepo 管理，模块可独立引用
+2. **性能优化**：Proxy 响应式、快速 diff、编译优化，性能有质的飞跃
+3. **语法优化**：CompositionAPI 让功能逻辑更集中，组合式函数替代 mixin
+4. **引入 RFC**：社区驱动的提案流程

@@ -1,0 +1,127 @@
+---
+title: '虚拟列表优化（二）：白屏与性能'
+pubDate: 2024-01-15
+category: 'Vue'
+tags: ['Vue3', '性能优化']
+description: '通过缓冲区解决白屏问题，使用 IntersectionObserver 优化性能'
+---
+
+## 白屏问题
+
+快速滚动时，可视区内容来不及渲染，出现白屏闪烁。
+
+**原因**：只渲染可视区，滚动快时新内容来不及加载。
+
+## 解决方案：缓冲区
+
+在可视区上下各增加缓冲区：
+
+```
+┌─────────────────┐
+│   上方缓冲区     │  ← 提前渲染
+├─────────────────┤
+│                 │
+│    可视区域     │  ← 用户看到的
+│                 │
+├─────────────────┤
+│   下方缓冲区     │  ← 提前渲染
+└─────────────────┘
+```
+
+## 缓冲区实现
+
+```js
+const bufferScale = 1 // 缓冲比例
+
+// 上方缓冲数量
+const aboveCount = computed(() => {
+  return Math.min(startIndex.value, bufferScale * visibleCount.value)
+})
+
+// 下方缓冲数量
+const belowCount = computed(() => {
+  return Math.min(
+    listData.length - endIndex.value,
+    bufferScale * visibleCount.value
+  )
+})
+
+// 渲染数据（包含缓冲区）
+const visibleData = computed(() => {
+  const start = startIndex.value - aboveCount.value
+  const end = endIndex.value + belowCount.value
+  return listData.slice(start, end)
+})
+```
+
+## 重新计算偏移量
+
+```js
+const setStartOffset = () => {
+  let startOffset = 0
+
+  if (startIndex.value >= 1) {
+    const size =
+      positions[startIndex.value].top -
+      (positions[startIndex.value - aboveCount.value]?.top || 0)
+    startOffset = positions[startIndex.value - 1].bottom - size
+  }
+
+  contentRef.value.style.transform = `translate3d(0, ${startOffset}px, 0)`
+}
+```
+
+## scroll 事件性能问题
+
+scroll 事件触发频率极高，每次滚动都会执行回调。
+
+## 优化方案 1：节流
+
+```js
+import { throttle } from 'lodash-es'
+
+const onScroll = throttle((e) => {
+  scrollTop.value = e.target.scrollTop
+}, 16) // 约 60fps
+```
+
+## 优化方案 2：IntersectionObserver
+
+用 IntersectionObserver 替代 scroll 监听：
+
+```js
+const observer = new IntersectionObserver(
+  (entries) => {
+    entries.forEach((entry) => {
+      if (entry.isIntersecting) {
+        // 元素进入视口，更新渲染
+        updateVisibleItems()
+      }
+    })
+  },
+  {
+    root: containerRef.value,
+    threshold: [0, 0.25, 0.5, 0.75, 1],
+  }
+)
+
+// 观察首尾元素
+onMounted(() => {
+  observer.observe(firstItemRef.value)
+  observer.observe(lastItemRef.value)
+})
+```
+
+**优势**：
+
+- 异步触发，不阻塞主线程
+- 可设置阈值，减少触发次数
+- 浏览器原生优化
+
+## 总结
+
+| 问题        | 解决方案                    |
+| ----------- | --------------------------- |
+| 白屏闪烁    | 增加上下缓冲区              |
+| scroll 性能 | 节流 / IntersectionObserver |
+| 动态高度    | 预估 + 缓存 + 动态更新      |

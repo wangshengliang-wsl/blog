@@ -1,0 +1,210 @@
+---
+title: 'Vue3 条件渲染与列表渲染'
+pubDate: 2024-01-15
+category: 'Vue'
+tags: ['Vue3', 'v-if', 'v-for', '列表渲染']
+description: '掌握 v-if/v-show 的区别、v-for 的用法以及 key 的作用'
+---
+
+## 条件渲染：v-if vs v-show
+
+### v-if 家族
+
+```vue
+<script setup>
+import { ref } from 'vue'
+const status = ref('loading')
+</script>
+
+<template>
+  <div v-if="status === 'loading'">加载中...</div>
+  <div v-else-if="status === 'error'">加载失败</div>
+  <div v-else>加载成功</div>
+</template>
+```
+
+**切换多个元素**：用 `<template>` 包裹（不会渲染到 DOM）
+
+```vue
+<template v-if="isLoggedIn">
+  <h1>欢迎回来</h1>
+  <p>您有 3 条新消息</p>
+  <button>查看详情</button>
+</template>
+```
+
+### v-show
+
+```vue
+<div v-show="isVisible">我可能被隐藏</div>
+```
+
+### 区别对比
+
+| 特性     | v-if                            | v-show                    |
+| -------- | ------------------------------- | ------------------------- |
+| 原理     | 真正的条件渲染，会销毁/重建 DOM | 只切换 CSS `display` 属性 |
+| 初始开销 | 低（false 时不渲染）            | 高（始终渲染）            |
+| 切换开销 | 高（重建 DOM）                  | 低（只改 CSS）            |
+| 适用场景 | 条件很少变化                    | 需要频繁切换              |
+
+🎯 **选择建议**：
+
+- Tab 切换、弹窗显示隐藏 → `v-show`
+- 权限控制、一次性判断 → `v-if`
+
+## 列表渲染：v-for
+
+### 基本用法
+
+```vue
+<script setup>
+import { ref } from 'vue'
+
+const items = ref([
+  { id: 1, name: '苹果', price: 5 },
+  { id: 2, name: '香蕉', price: 3 },
+  { id: 3, name: '橙子', price: 4 },
+])
+</script>
+
+<template>
+  <ul>
+    <li v-for="item in items" :key="item.id">
+      {{ item.name }} - ¥{{ item.price }}
+    </li>
+  </ul>
+</template>
+```
+
+### 获取索引
+
+```vue
+<li v-for="(item, index) in items" :key="item.id">
+  {{ index + 1 }}. {{ item.name }}
+</li>
+```
+
+### 遍历对象
+
+```vue
+<script setup>
+const user = { name: '张三', age: 25, city: '北京' }
+</script>
+
+<template>
+  <!-- value, key, index -->
+  <div v-for="(value, key, index) in user" :key="key">
+    {{ index }}. {{ key }}: {{ value }}
+  </div>
+</template>
+```
+
+### 遍历数字范围
+
+```vue
+<!-- 输出 1, 2, 3, 4, 5 -->
+<span v-for="n in 5" :key="n">{{ n }}</span>
+```
+
+## key 的作用
+
+🙋 为什么需要 `key`？
+
+Vue 使用**就地更新**策略。没有 key 时，Vue 会尽量复用 DOM 元素，这可能导致问题：
+
+```vue
+<script setup>
+import { ref } from 'vue'
+
+const items = ref(['A', 'B', 'C'])
+
+const addFirst = () => {
+  items.value.unshift('New')
+}
+</script>
+
+<template>
+  <!-- ❌ 不用 key：input 状态会错乱 -->
+  <div v-for="(item, index) in items">{{ item }} <input /></div>
+
+  <!-- ✅ 用 key：状态正确跟随数据 -->
+  <div v-for="item in items" :key="item">{{ item }} <input /></div>
+</template>
+```
+
+🔶 **key 的规则**：
+
+- 必须是**唯一**的基础类型值（string/number）
+- 不要用 index 做 key（除非列表不会变）
+- 不要用对象做 key
+
+## 实战技巧
+
+### 1. v-for 与 template
+
+```vue
+<template v-for="item in items" :key="item.id">
+  <dt>{{ item.title }}</dt>
+  <dd>{{ item.content }}</dd>
+</template>
+```
+
+### 2. 不要同时用 v-if 和 v-for
+
+```vue
+<!-- ❌ 错误：v-if 优先级更高，拿不到 item -->
+<li v-for="item in items" v-if="item.isActive" :key="item.id">
+
+<!-- ✅ 正确：用 template 包裹 -->
+<template v-for="item in items" :key="item.id">
+  <li v-if="item.isActive">{{ item.name }}</li>
+
+<!-- ✅ 更好：用计算属性过滤 -->
+<li v-for="item in activeItems" :key="item.id"></li>
+```
+
+```ts
+const activeItems = computed(() => items.value.filter((item) => item.isActive))
+```
+
+### 3. 数组更新检测
+
+**会触发更新的方法**（变更方法）：
+
+- `push()`, `pop()`, `shift()`, `unshift()`
+- `splice()`, `sort()`, `reverse()`
+
+**不会触发更新的方法**：
+
+- `filter()`, `concat()`, `slice()`, `map()`
+
+需要用返回值替换原数组：
+
+```ts
+// ✅ 替换数组
+items.value = items.value.filter((item) => item.isActive)
+```
+
+## 语法速查
+
+```vue
+<!-- 条件渲染 -->
+<div v-if="条件">...</div>
+<div v-else-if="条件">...</div>
+<div v-else>...</div>
+<div v-show="条件">...</div>
+
+<!-- 列表渲染 -->
+<div v-for="item in items" :key="item.id"></div>
+```
+
+## 小结
+
+| 指令     | 用途     | 注意事项                 |
+| -------- | -------- | ------------------------ |
+| `v-if`   | 条件渲染 | 惰性，适合不常变         |
+| `v-show` | 条件显示 | 始终渲染，适合频繁切换   |
+| `v-for`  | 列表渲染 | 必须加 key，避免用 index |
+
+下一篇我们来看事件处理。

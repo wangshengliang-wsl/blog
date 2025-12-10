@@ -1,0 +1,116 @@
+---
+title: '图片懒加载实现'
+pubDate: 2024-01-15
+category: 'Vue'
+tags: ['Vue3', '性能优化']
+description: '使用 IntersectionObserver 实现图片懒加载，减少首屏加载时间'
+---
+
+## 核心原理
+
+1. 图片先使用占位图
+2. 真实地址存在 `data-src`
+3. 进入可视区域时，将 `data-src` 赋值给 `src`
+
+```html
+<img src="placeholder.png" data-src="real-image.jpg" />
+```
+
+## IntersectionObserver API
+
+用于检测元素与视口的交叉状态：
+
+```js
+const observer = new IntersectionObserver(
+  (entries) => {
+    entries.forEach((entry) => {
+      if (entry.isIntersecting) {
+        // 元素进入可视区域
+        const img = entry.target
+        img.src = img.dataset.src
+        observer.unobserve(img) // 停止观察
+      }
+    })
+  },
+  {
+    root: null, // 视口
+    rootMargin: '0px', // 边距
+    threshold: 0.1, // 触发阈值
+  }
+)
+
+// 观察所有图片
+document.querySelectorAll('img[data-src]').forEach((img) => {
+  observer.observe(img)
+})
+```
+
+## Vue 指令实现
+
+```js
+// directives/lazy.js
+export const vLazy = {
+  mounted(el) {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          el.src = el.dataset.src
+          observer.unobserve(el)
+        }
+      },
+      { threshold: 0.1 }
+    )
+    observer.observe(el)
+  },
+}
+```
+
+```vue
+<template>
+  <img v-lazy src="placeholder.png" data-src="real.jpg" />
+</template>
+```
+
+## 使用第三方库
+
+### vue3-lazyload
+
+```bash
+npm install vue3-lazyload
+```
+
+```js
+// main.js
+import VueLazyload from 'vue3-lazyload'
+
+app.use(VueLazyload, {
+  loading: '/placeholder.png',
+  error: '/error.png',
+})
+```
+
+```vue
+<img v-lazy="imageSrc" />
+```
+
+## 旧方案（scroll 事件）
+
+```js
+window.addEventListener('scroll', () => {
+  document.querySelectorAll('img[data-src]').forEach((img) => {
+    const rect = img.getBoundingClientRect()
+    if (rect.top < window.innerHeight) {
+      img.src = img.dataset.src
+    }
+  })
+})
+```
+
+**缺点**：scroll 事件频繁触发，需要节流处理。
+
+## 方案对比
+
+| 方案                 | 优点             | 缺点             |
+| -------------------- | ---------------- | ---------------- |
+| IntersectionObserver | 性能好，API 简洁 | 需要 polyfill    |
+| scroll 事件          | 兼容性好         | 需要节流，性能差 |

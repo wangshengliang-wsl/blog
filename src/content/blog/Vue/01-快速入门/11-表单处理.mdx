@@ -1,0 +1,249 @@
+---
+title: 'Vue3 表单双向绑定 v-model'
+pubDate: 2024-01-15
+category: 'Vue'
+tags: ['Vue3', 'v-model', '表单']
+description: '掌握 v-model 在各种表单元素上的用法和修饰符'
+---
+
+🙋 什么是双向绑定？
+
+数据变 → 视图变，视图变 → 数据变。
+
+手动实现：
+
+```vue
+<input :value="text" @input="text = $event.target.value" />
+```
+
+用 `v-model` 一行搞定：
+
+```vue
+<input v-model="text" />
+```
+
+## 各种表单元素的用法
+
+### 文本输入
+
+```vue
+<script setup>
+import { ref } from 'vue'
+const message = ref('')
+</script>
+
+<template>
+  <input v-model="message" placeholder="输入内容" />
+  <p>你输入了：{{ message }}</p>
+</template>
+```
+
+### 多行文本
+
+```vue
+<textarea v-model="content" rows="4"></textarea>
+```
+
+🔶 注意：`<textarea>{{ content }}</textarea>` 不行，必须用 v-model。
+
+### 复选框
+
+**单个复选框**：绑定布尔值
+
+```vue
+<script setup>
+import { ref } from 'vue'
+const agreed = ref(false)
+</script>
+
+<template>
+  <label>
+    <input type="checkbox" v-model="agreed" />
+    我同意协议
+  </label>
+  <p>{{ agreed ? '已同意' : '未同意' }}</p>
+</template>
+```
+
+**自定义 true/false 值**：
+
+```vue
+<input
+  type="checkbox"
+  v-model="status"
+  true-value="active"
+  false-value="inactive"
+/>
+```
+
+**多个复选框**：绑定数组
+
+```vue
+<script setup>
+import { ref } from 'vue'
+const hobbies = ref([])
+</script>
+
+<template>
+  <label><input type="checkbox" value="游泳" v-model="hobbies" /> 游泳</label>
+  <label><input type="checkbox" value="跑步" v-model="hobbies" /> 跑步</label>
+  <label><input type="checkbox" value="游戏" v-model="hobbies" /> 游戏</label>
+  <p>选中：{{ hobbies.join(', ') }}</p>
+</template>
+```
+
+### 单选框
+
+```vue
+<script setup>
+import { ref } from 'vue'
+const gender = ref('保密')
+</script>
+
+<template>
+  <label><input type="radio" value="男" v-model="gender" /> 男</label>
+  <label><input type="radio" value="女" v-model="gender" /> 女</label>
+  <label><input type="radio" value="保密" v-model="gender" /> 保密</label>
+</template>
+```
+
+### 下拉列表
+
+**单选**：绑定字符串
+
+```vue
+<script setup>
+import { ref } from 'vue'
+const city = ref('')
+</script>
+
+<template>
+  <select v-model="city">
+    <option value="" disabled>请选择城市</option>
+    <option value="beijing">北京</option>
+    <option value="shanghai">上海</option>
+    <option value="shenzhen">深圳</option>
+  </select>
+</template>
+```
+
+**多选**：绑定数组
+
+```vue
+<script setup>
+import { ref } from 'vue'
+const cities = ref([])
+</script>
+
+<template>
+  <select v-model="cities" multiple>
+    <option value="beijing">北京</option>
+    <option value="shanghai">上海</option>
+    <option value="shenzhen">深圳</option>
+  </select>
+</template>
+```
+
+## v-model 修饰符
+
+| 修饰符    | 作用                              | 场景           |
+| --------- | --------------------------------- | -------------- |
+| `.lazy`   | change 事件时才更新（而非 input） | 减少更新频率   |
+| `.number` | 自动转为数字                      | 数字输入       |
+| `.trim`   | 自动去除首尾空格                  | 用户名、搜索框 |
+
+```vue
+<template>
+  <!-- 失焦时才更新 -->
+  <input v-model.lazy="message" />
+
+  <!-- 转为数字 -->
+  <input v-model.number="age" type="number" />
+
+  <!-- 去除空格 -->
+  <input v-model.trim="username" />
+
+  <!-- 可组合使用 -->
+  <input v-model.lazy.trim="content" />
+</template>
+```
+
+## 实战：登录表单
+
+```vue
+<script setup>
+import { reactive, computed } from 'vue'
+
+const form = reactive({
+  username: '',
+  password: '',
+  remember: false,
+})
+
+const canSubmit = computed(
+  () => form.username.length >= 3 && form.password.length >= 6
+)
+
+const submit = () => {
+  if (!canSubmit.value) return
+  console.log('提交', form)
+}
+</script>
+
+<template>
+  <form @submit.prevent="submit">
+    <div>
+      <input v-model.trim="form.username" placeholder="用户名（至少3位）" />
+    </div>
+    <div>
+      <input
+        v-model="form.password"
+        type="password"
+        placeholder="密码（至少6位）"
+      />
+    </div>
+    <div>
+      <label>
+        <input type="checkbox" v-model="form.remember" />
+        记住我
+      </label>
+    </div>
+    <button :disabled="!canSubmit">登录</button>
+  </form>
+</template>
+```
+
+## v-model 背后的原理
+
+v-model 是语法糖，等价于：
+
+```vue
+<!-- 文本框 -->
+<input :value="text" @input="text = $event.target.value" />
+
+<!-- 复选框 -->
+<input
+  type="checkbox"
+  :checked="checked"
+  @change="checked = $event.target.checked"
+/>
+
+<!-- 下拉框 -->
+<select :value="selected" @change="selected = $event.target.value"></select>
+```
+
+Vue 会根据元素类型自动选择正确的属性和事件。
+
+## 小结
+
+| 元素                           | 绑定值类型 | 事件   |
+| ------------------------------ | ---------- | ------ |
+| `<input type="text">`          | string     | input  |
+| `<textarea>`                   | string     | input  |
+| `<input type="checkbox">` 单个 | boolean    | change |
+| `<input type="checkbox">` 多个 | array      | change |
+| `<input type="radio">`         | string     | change |
+| `<select>` 单选                | string     | change |
+| `<select multiple>`            | array      | change |
+
+下一篇我们来看 Vue 的生命周期。

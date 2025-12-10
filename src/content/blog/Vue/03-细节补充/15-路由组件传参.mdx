@@ -1,0 +1,140 @@
+---
+title: '路由组件传参（props）'
+pubDate: 2024-01-15
+category: 'Vue'
+tags: ['Vue3', 'Vue Router']
+description: '将路由参数解耦为组件 props，提高组件复用性'
+---
+
+## 问题：组件与路由耦合
+
+```vue
+<script setup>
+import { useRoute } from 'vue-router'
+
+const route = useRoute()
+const userId = route.params.userId // 依赖 $route
+</script>
+```
+
+组件只能用于特定路由，无法复用。
+
+## 解决方案：props 传参
+
+```js
+// 路由配置
+{
+  path: '/users/:userId',
+  component: User,
+  props: true  // 开启 props 传参
+}
+```
+
+```vue
+<!-- User.vue -->
+<script setup>
+// 路由参数变成了 props
+const props = defineProps({
+  userId: String,
+})
+</script>
+```
+
+## 三种模式
+
+### 1. 布尔模式
+
+`route.params` 自动转为 props：
+
+```js
+{ path: '/users/:id', component: User, props: true }
+```
+
+命名视图需要单独配置：
+
+```js
+{
+  path: '/users/:id',
+  components: { default: User, sidebar: Sidebar },
+  props: { default: true, sidebar: false }
+}
+```
+
+### 2. 对象模式
+
+传递静态 props：
+
+```js
+{
+  path: '/about',
+  component: About,
+  props: { title: '关于我们', version: '2.0' }
+}
+```
+
+### 3. 函数模式
+
+动态生成 props：
+
+```js
+{
+  path: '/search',
+  component: Search,
+  props: (route) => ({
+    query: route.query.q,
+    page: parseInt(route.query.page) || 1
+  })
+}
+```
+
+## RouterView 插槽传参
+
+给所有路由组件传递相同的 props：
+
+```vue
+<router-view v-slot="{ Component }">
+  <component :is="Component" :global-prop="value" />
+</router-view>
+```
+
+**注意**：这会给所有路由组件传递该 prop。
+
+## 对比
+
+| 方式        | 优点         | 缺点           |
+| ----------- | ------------ | -------------- |
+| useRoute()  | 简单直接     | 组件与路由耦合 |
+| props: true | 解耦，可复用 | 需要配置       |
+| props 函数  | 灵活，可转换 | 配置稍复杂     |
+
+## 最佳实践
+
+```js
+// 路由配置
+{
+  path: '/user/:id',
+  component: () => import('./User.vue'),
+  props: true
+}
+
+// 或者需要类型转换时
+{
+  path: '/user/:id',
+  component: () => import('./User.vue'),
+  props: (route) => ({
+    id: parseInt(route.params.id)
+  })
+}
+```
+
+```vue
+<!-- User.vue - 可复用的组件 -->
+<script setup>
+const props = defineProps({
+  id: {
+    type: Number,
+    required: true,
+  },
+})
+</script>
+```

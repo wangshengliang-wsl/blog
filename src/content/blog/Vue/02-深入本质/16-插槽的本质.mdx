@@ -1,0 +1,172 @@
+---
+title: '插槽的本质：函数调用'
+pubDate: 2024-01-15
+category: 'Vue'
+tags: ['Vue3', '原理', '插槽']
+description: '从编译角度理解插槽的本质：父组件传递函数，子组件调用获取虚拟 DOM'
+---
+
+🙋 插槽的本质是什么？
+
+**父组件传递的是函数，子组件调用函数获取虚拟 DOM。**
+
+## 使用层面理解
+
+- 父组件：向子组件传递模板内容
+- 子组件：用 `<slot>` 指定内容渲染位置
+
+```vue
+<!-- 父组件 -->
+<Card>
+  <template #header>标题</template>
+  <p>内容</p>
+</Card>
+
+<!-- 子组件 Card.vue -->
+<div class="card">
+  <div class="header"><slot name="header" /></div>
+  <div class="body"><slot /></div>
+</div>
+```
+
+## 父组件传递了什么
+
+父组件实际上传递了一个**对象**，对象的每个属性是一个**函数**：
+
+```js
+// 父组件传递给子组件的 slots 对象
+{
+  header: () => h('span', '标题'),
+  default: () => h('p', '内容')
+}
+```
+
+**调用函数 = 获取虚拟 DOM**
+
+## 子组件如何渲染
+
+子组件收到 slots 对象后，调用对应的函数：
+
+```js
+// 子组件的渲染逻辑
+const slots = {
+  header: () => h('span', '标题'),
+  default: () => h('p', '内容'),
+}
+
+// <slot name="header" /> 相当于
+slots.header() // 返回 VNode
+
+// <slot /> 相当于
+slots.default() // 返回 VNode
+```
+
+## 作用域插槽
+
+作用域插槽：子组件向父组件传递数据。
+
+```vue
+<!-- 子组件 -->
+<slot name="item" :data="item" />
+
+<!-- 父组件 -->
+<template #item="{ data }">
+  {{ data.name }}
+</template>
+```
+
+本质：子组件调用函数时**传入参数**：
+
+```js
+// 子组件
+slots.item({ data: item })
+
+// 父组件传递的函数
+{
+  item: ({ data }) => h('span', data.name)
+}
+```
+
+## 验证：用渲染函数写组件
+
+```js
+// Card.js
+import { defineComponent, h } from 'vue'
+
+export default defineComponent({
+  name: 'Card',
+  setup(_, { slots }) {
+    return () =>
+      h('div', { class: 'card' }, [
+        // 调用 header 插槽函数
+        h('div', { class: 'header' }, slots.header?.() || '默认标题'),
+        // 调用 default 插槽函数
+        h('div', { class: 'body' }, slots.default?.()),
+      ])
+  },
+})
+```
+
+```js
+// 带作用域插槽
+export default defineComponent({
+  setup(_, { slots }) {
+    const items = [
+      { id: 1, name: 'Vue' },
+      { id: 2, name: 'React' },
+    ]
+
+    return () =>
+      h(
+        'ul',
+        items.map((item) => h('li', slots.item?.({ item }) || item.name))
+      )
+  },
+})
+```
+
+## 编译结果分析
+
+```vue
+<Card>
+  <template #header>标题</template>
+  内容
+</Card>
+```
+
+编译后：
+
+```js
+h(Card, null, {
+  header: () => '标题',
+  default: () => '内容',
+})
+```
+
+子组件 `<slot name="header" />` 编译后：
+
+```js
+renderSlot($slots, 'header')
+// 本质就是调用 $slots.header()
+```
+
+## 小结
+
+| 概念           | 本质                     |
+| -------------- | ------------------------ |
+| 父组件传递插槽 | 传递一个包含函数的对象   |
+| 子组件渲染插槽 | 调用对应的函数获取 VNode |
+| 作用域插槽     | 调用函数时传入参数       |
+| 默认内容       | 函数不存在时的降级处理   |
+
+```
+父组件                          子组件
+  │                              │
+  │  { header: () => VNode }     │
+  ├─────────────────────────────→│
+  │                              │ slots.header()
+  │                              │     ↓
+  │                              │  得到 VNode
+```
+
+下一篇我们来看 v-model 的本质。

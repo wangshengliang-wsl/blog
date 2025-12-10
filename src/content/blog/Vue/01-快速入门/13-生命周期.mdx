@@ -1,0 +1,209 @@
+---
+title: 'Vue3 生命周期钩子'
+pubDate: 2024-01-15
+category: 'Vue'
+tags: ['Vue3', '生命周期', 'onMounted']
+description: '理解 Vue3 组件生命周期，掌握 onMounted 等钩子函数的使用场景'
+---
+
+🙋 什么是生命周期？
+
+组件从**创建**到**销毁**所经历的一系列过程。Vue 在这些过程中设置了一些"时间点"，让你有机会在特定阶段执行自己的代码。
+
+## 生命周期图示
+
+```
+创建阶段
+  ↓
+setup() ← 组合式 API 在这里执行
+  ↓
+挂载阶段
+  ↓
+onBeforeMount ← DOM 还没创建
+  ↓
+onMounted ← DOM 已创建，可以访问 ★最常用
+  ↓
+更新阶段（数据变化时）
+  ↓
+onBeforeUpdate ← DOM 更新前
+  ↓
+onUpdated ← DOM 更新后
+  ↓
+卸载阶段
+  ↓
+onBeforeUnmount ← 组件卸载前
+  ↓
+onUnmounted ← 组件已卸载
+```
+
+## 最常用：onMounted
+
+`onMounted` 在组件挂载完成后执行，此时：
+
+- DOM 已经创建好了
+- 可以进行 DOM 操作
+- 适合发起数据请求
+
+```vue
+<script setup>
+import { ref, onMounted } from 'vue'
+
+const users = ref([])
+const loading = ref(true)
+const error = ref(null)
+
+onMounted(async () => {
+  try {
+    const res = await fetch('https://jsonplaceholder.typicode.com/users')
+    users.value = await res.json()
+  } catch (e) {
+    error.value = e.message
+  } finally {
+    loading.value = false
+  }
+})
+</script>
+
+<template>
+  <div v-if="loading">加载中...</div>
+  <div v-else-if="error">{{ error }}</div>
+  <ul v-else>
+    <li v-for="user in users" :key="user.id">
+      {{ user.name }}
+    </li>
+  </ul>
+</template>
+```
+
+## 常用钩子一览
+
+| 钩子              | 触发时机     | 常见用途                 |
+| ----------------- | ------------ | ------------------------ |
+| `onMounted`       | DOM 挂载完成 | 请求数据、初始化第三方库 |
+| `onUpdated`       | DOM 更新后   | 操作更新后的 DOM         |
+| `onUnmounted`     | 组件卸载后   | 清理定时器、取消订阅     |
+| `onBeforeMount`   | DOM 挂载前   | 很少用                   |
+| `onBeforeUpdate`  | DOM 更新前   | 获取更新前的 DOM 状态    |
+| `onBeforeUnmount` | 组件卸载前   | 清理工作                 |
+
+## 实战场景
+
+### 场景 1：初始化第三方库
+
+```vue
+<script setup>
+import { ref, onMounted, onUnmounted } from 'vue'
+
+const chartRef = ref(null)
+let chartInstance = null
+
+onMounted(() => {
+  // DOM 已存在，可以初始化图表
+  chartInstance = new Chart(chartRef.value, {
+    // 配置...
+  })
+})
+
+onUnmounted(() => {
+  // 组件卸载时销毁图表实例
+  chartInstance?.destroy()
+})
+</script>
+
+<template>
+  <canvas ref="chartRef"></canvas>
+</template>
+```
+
+### 场景 2：定时器清理
+
+```vue
+<script setup>
+import { ref, onMounted, onUnmounted } from 'vue'
+
+const count = ref(0)
+let timer = null
+
+onMounted(() => {
+  timer = setInterval(() => {
+    count.value++
+  }, 1000)
+})
+
+onUnmounted(() => {
+  // 必须清理，否则内存泄漏
+  clearInterval(timer)
+})
+</script>
+```
+
+### 场景 3：事件监听
+
+```vue
+<script setup>
+import { onMounted, onUnmounted } from 'vue'
+
+const handleResize = () => {
+  console.log(window.innerWidth)
+}
+
+onMounted(() => {
+  window.addEventListener('resize', handleResize)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', handleResize)
+})
+</script>
+```
+
+## 执行顺序
+
+同一个组件中，钩子执行顺序：
+
+```
+setup() 执行
+  ↓
+onBeforeMount
+  ↓
+onMounted
+  ↓
+（数据变化）
+  ↓
+onBeforeUpdate
+  ↓
+onUpdated
+  ↓
+（组件销毁）
+  ↓
+onBeforeUnmount
+  ↓
+onUnmounted
+```
+
+父子组件的执行顺序：
+
+```
+父 setup
+父 onBeforeMount
+  子 setup
+  子 onBeforeMount
+  子 onMounted
+父 onMounted
+```
+
+## 小结
+
+| 需求              | 用哪个钩子    |
+| ----------------- | ------------- |
+| 请求初始数据      | `onMounted`   |
+| 初始化 DOM 相关库 | `onMounted`   |
+| 清理定时器/事件   | `onUnmounted` |
+| 获取更新后的 DOM  | `onUpdated`   |
+
+🎯 **最佳实践**：
+
+- 90% 的情况只需要 `onMounted` 和 `onUnmounted`
+- 有 `onMounted` 中创建的资源，就要在 `onUnmounted` 中清理
+
+下一篇我们来看侦听器 watch。

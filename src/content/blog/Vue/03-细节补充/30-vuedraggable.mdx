@@ -1,0 +1,118 @@
+---
+title: 'vuedraggable 拖拽排序'
+pubDate: 2024-01-15
+category: 'Vue'
+tags: ['Vue3', '第三方库']
+description: '使用 vuedraggable 实现列表拖拽排序和跨列表拖拽'
+---
+
+## 简介
+
+vuedraggable 是基于 Sortable.js 的 Vue 组件，用于实现拖拽排序。
+
+## 安装
+
+```bash
+npm install vuedraggable@4.0.0
+```
+
+## 基本用法
+
+```vue
+<template>
+  <draggable v-model="list" item-key="id" @start="onStart" @end="onEnd">
+    <template #item="{ element }">
+      <div class="item">{{ element.name }}</div>
+    </template>
+  </draggable>
+</template>
+
+<script setup>
+import { ref } from 'vue'
+import draggable from 'vuedraggable'
+
+const list = ref([
+  { id: 1, name: '任务 1' },
+  { id: 2, name: '任务 2' },
+  { id: 3, name: '任务 3' },
+])
+
+const onStart = () => console.log('拖拽开始')
+const onEnd = () => console.log('拖拽结束')
+</script>
+```
+
+## 跨列表拖拽
+
+使用相同的 `group` 名称：
+
+```vue
+<template>
+  <div class="boards">
+    <div class="board">
+      <h3>待办</h3>
+      <draggable v-model="todo" group="tasks" item-key="id">
+        <template #item="{ element }">
+          <div class="task">{{ element.name }}</div>
+        </template>
+      </draggable>
+    </div>
+
+    <div class="board">
+      <h3>已完成</h3>
+      <draggable v-model="done" group="tasks" item-key="id">
+        <template #item="{ element }">
+          <div class="task">{{ element.name }}</div>
+        </template>
+      </draggable>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref } from 'vue'
+import draggable from 'vuedraggable'
+
+const todo = ref([
+  { id: 1, name: '任务 1' },
+  { id: 2, name: '任务 2' },
+])
+
+const done = ref([{ id: 3, name: '任务 3' }])
+</script>
+```
+
+## 常用属性
+
+| 属性        | 说明                         |
+| ----------- | ---------------------------- |
+| v-model     | 绑定的数组                   |
+| item-key    | 唯一标识字段                 |
+| group       | 分组名称（相同组可互相拖拽） |
+| animation   | 动画时长（毫秒）             |
+| disabled    | 是否禁用                     |
+| handle      | 拖拽手柄选择器               |
+| ghost-class | 拖拽时占位元素的类名         |
+
+## 常用事件
+
+| 事件    | 说明       |
+| ------- | ---------- |
+| @start  | 开始拖拽   |
+| @end    | 结束拖拽   |
+| @change | 列表变化   |
+| @add    | 元素被添加 |
+| @remove | 元素被移除 |
+
+## 拖拽手柄
+
+```vue
+<draggable v-model="list" handle=".handle" item-key="id">
+  <template #item="{ element }">
+    <div class="item">
+      <span class="handle">☰</span>
+      {{ element.name }}
+    </div>
+  </template>
+</draggable>
+```

@@ -1,0 +1,119 @@
+---
+title: '属性透传（Fallthrough Attributes）'
+pubDate: 2024-01-15
+category: 'Vue'
+tags: ['Vue3', '进阶']
+description: '理解 Vue3 中未声明的属性如何自动透传到子组件根元素'
+---
+
+## 什么是属性透传
+
+传递给组件的属性，如果没有被声明为 `props` 或 `emits`，会自动透传到子组件的**根元素**上。
+
+常见的透传属性：`class`、`style`、`id`、`data-*` 等。
+
+```vue
+<!-- 父组件 -->
+<MyButton class="btn-large" id="submit" data-test="button" />
+
+<!-- MyButton.vue -->
+<template>
+  <button>Click</button>
+</template>
+
+<!-- 渲染结果 -->
+<button class="btn-large" id="submit" data-test="button">Click</button>
+```
+
+## class 和 style 的合并
+
+如果子组件根元素已有 class/style，会与透传的**合并**：
+
+```vue
+<!-- 父组件 -->
+<MyButton class="large" />
+
+<!-- MyButton.vue -->
+<template>
+  <button class="btn">Click</button>
+</template>
+
+<!-- 渲染结果：合并了两个 class -->
+<button class="btn large">Click</button>
+```
+
+## 深层组件透传
+
+如果子组件的根元素是另一个组件，属性会继续透传：
+
+```vue
+<!-- A.vue 的根元素是 B 组件 -->
+<template>
+  <B />
+</template>
+
+<!-- 父组件 -->
+<A class="test" />
+<!-- class="test" 会透传到 B 的根元素 -->
+```
+
+**注意**：被消费的 props 和 emits 不会继续透传。
+
+## 禁用自动透传
+
+有时需要手动控制透传属性的位置：
+
+```vue
+<script setup>
+defineOptions({
+  inheritAttrs: false, // 禁用自动透传
+})
+</script>
+
+<template>
+  <div class="wrapper">
+    <!-- 手动指定透传位置 -->
+    <button v-bind="$attrs">Click</button>
+  </div>
+</template>
+```
+
+## 多根节点组件
+
+多根节点组件没有自动透传行为，必须显式绑定 `$attrs`：
+
+```vue
+<template>
+  <header>...</header>
+  <main v-bind="$attrs">...</main>
+  <!-- 显式绑定 -->
+  <footer>...</footer>
+</template>
+```
+
+## 在 JS 中访问透传属性
+
+```vue
+<script setup>
+import { useAttrs } from 'vue'
+
+const attrs = useAttrs()
+console.log(attrs.class) // 透传的 class
+console.log(attrs.onClick) // 透传的事件（函数形式）
+</script>
+```
+
+## 透传属性的特点
+
+| 特点       | 说明                                    |
+| ---------- | --------------------------------------- |
+| 保留大小写 | `foo-bar` 需用 `$attrs['foo-bar']` 访问 |
+| 事件监听器 | `@click` 暴露为 `$attrs.onClick`        |
+| 自动合并   | class 和 style 会合并                   |
+| 其他属性   | 同名属性使用父组件的值                  |
+
+## 常见用途
+
+1. **封装原生元素**：透传原生属性到内部元素
+2. **组件库开发**：允许用户自定义样式和行为
+3. **高阶组件**：包装组件时保留原有属性

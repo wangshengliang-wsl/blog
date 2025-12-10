@@ -1,0 +1,163 @@
+---
+title: 'Vue Router 路由匹配语法'
+pubDate: 2024-01-15
+category: 'Vue'
+tags: ['Vue3', 'Vue Router']
+description: '掌握动态路由参数的正则约束、重复参数、可选参数等高级匹配语法'
+---
+
+## 基础匹配
+
+```js
+// 静态路由
+{
+  path: '/about'
+} // 匹配 /about
+
+// 动态路由
+{
+  path: '/users/:id'
+} // 匹配 /users/1, /users/abc
+```
+
+## 参数正则约束
+
+限制参数必须是数字：
+
+```js
+// \d+ 表示一个或多个数字
+{
+  path: '/users/:id(\\d+)'
+}
+```
+
+| URL        | 是否匹配 |
+| ---------- | -------- |
+| /users/123 | ✅       |
+| /users/abc | ❌       |
+
+## 重复参数
+
+### + 表示 1 个或多个
+
+```js
+{
+  path: '/files/:path+'
+}
+```
+
+| URL          | 匹配结果                  |
+| ------------ | ------------------------- |
+| /files       | ❌                        |
+| /files/a     | ✅ path = ['a']           |
+| /files/a/b/c | ✅ path = ['a', 'b', 'c'] |
+
+### \* 表示 0 个或多个
+
+```js
+{
+  path: '/files/:path*'
+}
+```
+
+| URL          | 匹配结果                  |
+| ------------ | ------------------------- |
+| /files       | ✅ path = []              |
+| /files/a     | ✅ path = ['a']           |
+| /files/a/b/c | ✅ path = ['a', 'b', 'c'] |
+
+### 结合正则
+
+```js
+// 数字参数，可重复
+{
+  path: '/coords/:id(\\d+)+'
+}
+```
+
+| URL           | 是否匹配 |
+| ------------- | -------- |
+| /coords/1     | ✅       |
+| /coords/1/2/3 | ✅       |
+| /coords/abc   | ❌       |
+
+## 可选参数
+
+`?` 表示 0 个或 1 个：
+
+```js
+{
+  path: '/users/:id?'
+}
+```
+
+| URL        | 匹配结果          |
+| ---------- | ----------------- |
+| /users     | ✅ id = undefined |
+| /users/123 | ✅ id = '123'     |
+
+结合正则：
+
+```js
+// 可选的数字参数
+{
+  path: '/users/:id(\\d+)?'
+}
+```
+
+| URL        | 是否匹配 |
+| ---------- | -------- |
+| /users     | ✅       |
+| /users/123 | ✅       |
+| /users/abc | ❌       |
+
+## 大小写敏感
+
+默认不区分大小写：
+
+```js
+const router = createRouter({
+  routes: [
+    {
+      path: '/users/:id',
+      sensitive: true, // 局部设置
+    },
+  ],
+  sensitive: true, // 全局设置
+})
+```
+
+| 设置                     | /Users/123 |
+| ------------------------ | ---------- |
+| sensitive: false（默认） | ✅ 匹配    |
+| sensitive: true          | ❌ 不匹配  |
+
+## 尾部斜杠
+
+默认允许尾部斜杠：
+
+```js
+const router = createRouter({
+  routes: [...],
+  strict: true  // 严格模式
+})
+```
+
+| 设置                  | /users/123/ |
+| --------------------- | ----------- |
+| strict: false（默认） | ✅ 匹配     |
+| strict: true          | ❌ 不匹配   |
+
+## 语法速查
+
+| 语法     | 说明      | 示例               |
+| -------- | --------- | ------------------ |
+| `:param` | 动态参数  | `/users/:id`       |
+| `(\\d+)` | 正则约束  | `/users/:id(\\d+)` |
+| `+`      | 1个或多个 | `/:path+`          |
+| `*`      | 0个或多个 | `/:path*`          |
+| `?`      | 可选      | `/:id?`            |
+
+## 调试工具
+
+[路径排名调试工具](https://paths.esm.dev/) 可以帮助理解路由匹配规则。

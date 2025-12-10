@@ -1,0 +1,229 @@
+---
+title: 'Vue3 动态绑定 class 和 style'
+pubDate: 2024-01-15
+category: 'Vue'
+tags: ['Vue3', 'class', 'style', '样式绑定']
+description: '掌握 Vue3 中动态绑定 class 和 style 的对象语法与数组语法'
+---
+
+🙋 为什么 `class` 和 `style` 需要特殊处理？
+
+因为它们太常用了，而且值经常需要动态计算。如果用字符串拼接：
+
+```vue
+<!-- 😵 拼接字符串容易出错 -->
+<div
+  :class="'btn ' + (isActive ? 'active' : '') + ' ' + (hasError ? 'error' : '')"
+></div>
+```
+
+Vue 对这两个属性做了增强，支持**对象语法**和**数组语法**。
+
+## 绑定 class
+
+### 对象语法
+
+对象的 key 是类名，value 是布尔值（true 挂上，false 不挂）：
+
+```vue
+<script setup>
+import { ref } from 'vue'
+
+const isActive = ref(true)
+const hasError = ref(false)
+</script>
+
+<template>
+  <div class="btn" :class="{ 'active': isActive, 'text-danger': hasError }">
+    按钮
+  </div>
+</template>
+```
+
+渲染结果：`<div class="btn active">`
+
+🎯 **推荐**：如果类比较多，把对象抽到 script 里：
+
+```vue
+<script setup>
+import { reactive, computed } from 'vue'
+
+// 方式 1：reactive 对象
+const classObj = reactive({
+  'active': true,
+  'disabled': false,
+  'is-loading': true,
+})
+
+// 方式 2：计算属性（推荐，逻辑清晰）
+const isActive = ref(true)
+const isLoading = ref(false)
+
+const buttonClass = computed(() => ({
+  'active': isActive.value,
+  'is-loading': isLoading.value,
+  'disabled': isLoading.value, // loading 时禁用
+}))
+</script>
+
+<template>
+  <button :class="buttonClass">提交</button>
+</template>
+```
+
+### 数组语法
+
+数组中每项是要挂的类名：
+
+```vue
+<script setup>
+import { ref } from 'vue'
+
+const activeClass = ref('active')
+const errorClass = ref('text-danger')
+</script>
+
+<template>
+  <div :class="[activeClass, errorClass]">按钮</div>
+</template>
+```
+
+渲染结果：`<div class="active text-danger">`
+
+**数组 + 三元表达式**：
+
+```vue
+<div :class="[isActive ? 'active' : '', errorClass]"></div>
+```
+
+**数组 + 对象混用**（更清晰）：
+
+```vue
+<div :class="[{ active: isActive }, errorClass]"></div>
+```
+
+## 绑定 style
+
+### 对象语法
+
+对象的 key 是 CSS 属性名（驼峰或短横线），value 是属性值：
+
+```vue
+<script setup>
+import { ref } from 'vue'
+
+const textColor = ref('red')
+const fontSize = ref(16)
+</script>
+
+<template>
+  <div :style="{ color: textColor, fontSize: fontSize + 'px' }">动态样式</div>
+</template>
+```
+
+同样推荐把样式对象抽出来：
+
+```vue
+<script setup>
+import { reactive } from 'vue'
+
+const styleObj = reactive({
+  color: 'red',
+  fontSize: '16px',
+  fontWeight: 'bold',
+})
+</script>
+
+<template>
+  <div :style="styleObj">动态样式</div>
+</template>
+```
+
+### 数组语法
+
+合并多个样式对象：
+
+```vue
+<script setup>
+import { reactive } from 'vue'
+
+const baseStyle = reactive({
+  color: 'blue',
+  fontSize: '14px',
+})
+
+const activeStyle = reactive({
+  fontWeight: 'bold',
+  textDecoration: 'underline',
+})
+</script>
+
+<template>
+  <div :style="[baseStyle, activeStyle]">合并样式</div>
+</template>
+```
+
+后面的对象会覆盖前面的同名属性。
+
+## 实战场景
+
+### 场景 1：按钮状态
+
+```vue
+<script setup>
+import { ref, computed } from 'vue'
+
+const isLoading = ref(false)
+const isDisabled = ref(false)
+
+const btnClass = computed(() => ({
+  'btn': true,
+  'btn--loading': isLoading.value,
+  'btn--disabled': isDisabled.value || isLoading.value,
+}))
+</script>
+
+<template>
+  <button :class="btnClass" :disabled="isDisabled || isLoading">
+    {{ isLoading ? '提交中...' : '提交' }}
+  </button>
+</template>
+```
+
+### 场景 2：主题切换
+
+```vue
+<script setup>
+import { ref, computed } from 'vue'
+
+const isDark = ref(false)
+
+const themeStyle = computed(() => ({
+  backgroundColor: isDark.value ? '#1a1a1a' : '#ffffff',
+  color: isDark.value ? '#ffffff' : '#1a1a1a',
+}))
+</script>
+
+<template>
+  <div :style="themeStyle">
+    <button @click="isDark = !isDark">切换主题</button>
+  </div>
+</template>
+```
+
+## 语法速查
+
+| 绑定方式   | 语法                        | 示例                                 |
+| ---------- | --------------------------- | ------------------------------------ |
+| class 对象 | `:class="{ 类名: 布尔值 }"` | `:class="{ active: isActive }"`      |
+| class 数组 | `:class="[类名变量, ...]"`  | `:class="[activeClass, errorClass]"` |
+| style 对象 | `:style="{ 属性: 值 }"`     | `:style="{ color: textColor }"`      |
+| style 数组 | `:style="[样式对象, ...]"`  | `:style="[base, active]"`            |
+
+## 小结
+
+- **class 绑定**：对象语法控制开关，数组语法合并多个类
+- **style 绑定**：对象语法设置属性，数组语法合并多个样式对象
+- **最佳实践**：复杂逻辑用计算属性，保持模板清爽
+
+下一篇我们来看条件渲染和列表渲染。

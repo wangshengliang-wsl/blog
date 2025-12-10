@@ -1,0 +1,195 @@
+---
+title: '数据拦截：defineProperty vs Proxy'
+pubDate: 2024-01-15
+category: 'Vue'
+tags: ['Vue3', '原理', 'Proxy']
+description: '对比 Object.defineProperty 和 Proxy 两种数据拦截方式的差异'
+---
+
+🙋 什么是数据拦截？
+
+就是在读写数据时"打断"，让我们有机会做额外的事情（比如通知视图更新）。
+
+## 两种拦截方式
+
+### 1. Object.defineProperty
+
+给对象的**特定属性**添加 getter/setter：
+
+```js
+const obj = {}
+let _value = '初始值'
+
+Object.defineProperty(obj, 'data', {
+  get() {
+    console.log('读取 data')
+    return _value
+  },
+  set(newVal) {
+    console.log('设置 data')
+    _value = newVal
+  },
+})
+
+obj.data // 读取 data
+obj.data = 'x' // 设置 data
+```
+
+### 2. Proxy
+
+给**整个对象**创建代理：
+
+```js
+const obj = { data: '初始值', name: '张三' }
+
+const proxy = new Proxy(obj, {
+  get(target, key) {
+    console.log(`读取 ${key}`)
+    return target[key]
+  },
+  set(target, key, value) {
+    console.log(`设置 ${key}`)
+    target[key] = value
+    return true
+  },
+})
+
+proxy.data // 读取 data
+proxy.data = 'x' // 设置 data
+proxy.name // 读取 name（也能拦截！）
+```
+
+## 核心差异
+
+| 特性     | defineProperty | Proxy       |
+| -------- | -------------- | ----------- |
+| 拦截目标 | 特定属性       | 整个对象    |
+| 新增属性 | ❌ 无法拦截    | ✅ 能拦截   |
+| 删除属性 | ❌ 无法拦截    | ✅ 能拦截   |
+| 数组操作 | ❌ 需要 hack   | ✅ 原生支持 |
+
+### 新增属性问题
+
+```js
+// defineProperty：新增属性无法拦截
+const obj = {}
+Object.defineProperty(obj, 'a', {
+  /* ... */
+})
+obj.b = 2 // ❌ 新增的 b 没有拦截
+
+// Proxy：新增属性也能拦截
+const proxy = new Proxy(
+  {},
+  {
+    set(target, key, value) {
+      console.log(`设置 ${key}`) // 新增 b 也会触发
+      target[key] = value
+      return true
+    },
+  }
+)
+proxy.b = 2 // ✅ 设置 b
+```
+
+这就是 Vue2 需要 `Vue.set()` 的原因！
+
+### Proxy 能拦截更多操作
+
+```js
+const proxy = new Proxy(obj, {
+  get(target, key) {
+    /* 读取 */
+  },
+  set(target, key, value) {
+    /* 设置 */
+  },
+  deleteProperty(target, key) {
+    /* 删除 */
+  },
+  has(target, key) {
+    /* in 操作符 */
+  },
+  ownKeys(target) {
+    /* Object.keys 等 */
+  },
+})
+```
+
+## 深度拦截
+
+两者都需要**递归**实现深度拦截：
+
+```js
+// Proxy 深度拦截
+function deepProxy(obj) {
+  return new Proxy(obj, {
+    get(target, key) {
+      const value = target[key]
+      // 如果是对象，递归代理
+      if (typeof value === 'object' && value !== null) {
+        return deepProxy(value)
+      }
+      return value
+    },
+    set(target, key, value) {
+      target[key] = value
+      return true
+    },
+  })
+}
+```
+
+## Vue2 的响应式缺陷
+
+因为用的是 `Object.defineProperty`：
+
+```js
+// ❌ 无法检测
+obj.newKey = value // 新增属性
+delete obj.key // 删除属性
+arr[index] = value // 通过索引设置数组元素
+arr.length = 0 // 修改数组长度
+```
+
+Vue2 的解决方案：
+
+- `Vue.set(obj, key, value)` - 新增属性
+- `Vue.delete(obj, key)` - 删除属性
+- 重写数组的 7 个方法（push、pop、shift、unshift、splice、sort、reverse）
+
+## Vue3 用 Proxy 的好处
+
+```js
+const state = reactive({ list: [1, 2, 3] })
+
+// 以下操作都能触发响应式更新
+state.newKey = 'value' // ✅ 新增属性
+delete state.key // ✅ 删除属性
+state.list[0] = 10 // ✅ 数组索引
+state.list.length = 0 // ✅ 数组长度
+```
+
+不需要任何 hack，原生支持！
+
+## 性能对比
+
+| 场景     | defineProperty   | Proxy                |
+| -------- | ---------------- | -------------------- |
+| 少量属性 | 更快（直接绑定） | 略慢（代理层）       |
+| 大量属性 | 慢（逐个定义）   | 快（一次代理）       |
+| 深层对象 | 初始化时递归     | 访问时递归（懒代理） |
+
+Vue3 的 Proxy 采用**懒代理**：只有访问到的嵌套对象才会被代理。
+
+## 小结
+
+| 方面       | Vue2 (defineProperty) | Vue3 (Proxy) |
+| ---------- | --------------------- | ------------ |
+| 新增属性   | 需要 Vue.set          | 原生支持     |
+| 删除属性   | 需要 Vue.delete       | 原生支持     |
+| 数组操作   | 重写 7 个方法         | 原生支持     |
+| 代理方式   | 逐个属性              | 整个对象     |
+| 浏览器支持 | IE9+                  | 不支持 IE    |
+
+下一篇我们来看响应式数据的本质。

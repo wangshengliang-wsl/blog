@@ -5,7 +5,12 @@ import Categorizer from '~/components/base/Categorizer.astro'
 import ListItem from '~/components/views/ListItem.astro'
 import Warning from '~/components/base/Warning.astro'
 
-import { getFilteredPosts, getPostsByCategory } from '~/utils/data'
+import {
+  getFilteredPosts,
+  buildNestedCategoryTree,
+  flattenCategoryTree,
+  type CategoryTreeNode,
+} from '~/utils/data'
 
 import type { CollectionEntry } from 'astro:content'
 
@@ -13,27 +18,58 @@ const WARNING = `No content available for display.`
 
 /* Posts */
 const blogItems = await getFilteredPosts('blog')
-const categorizedBlogItems = getPostsByCategory(blogItems)
-const sortedBlogItems = categorizedBlogItems.flatMap(([_, p]) => p)
+const categoryTree = buildNestedCategoryTree(blogItems)
+const flattenedCategories = flattenCategoryTree(categoryTree)
 
-const categories = categorizedBlogItems.map(([category]) => category)
+// 收集所有分类路径用于 JS
+const allCategoryPaths = flattenedCategories.map((fc) => fc.node.path)
+
+// 收集所有文章并按树形顺序排列
+function collectAllPosts(
+  nodes: CategoryTreeNode[]
+): CollectionEntry<'blog' | 'changelog'>[] {
+  const posts: CollectionEntry<'blog' | 'changelog'>[] = []
+  const collectFromNode = (node: CategoryTreeNode) => {
+    posts.push(...node.posts)
+    node.children.forEach(collectFromNode)
+  }
+  nodes.forEach(collectFromNode)
+  return posts
+}
+
+const sortedBlogItems = collectAllPosts(categoryTree)
 const isEmpty = sortedBlogItems.length === 0
 
 // 预处理文章数据，添加阅读时间
 interface PostWithReadTime {
   post: CollectionEntry<'blog' | 'changelog'>
   minutesRead: number
-  category: string
+  categoryPath: string
   globalIdx: number
 }
 
-// 并行渲染以避免逐篇渲染导致的超时
-const postsInDisplayOrder = categorizedBlogItems.flatMap(([category, posts]) =>
-  posts.map((post) => ({ post, category }))
-)
+// 收集文章及其分类路径
+function collectPostsWithCategory(
+  nodes: CategoryTreeNode[]
+): { post: CollectionEntry<'blog' | 'changelog'>; categoryPath: string }[] {
+  const result: {
+    post: CollectionEntry<'blog' | 'changelog'>
+    categoryPath: string
+  }[] = []
+  const collectFromNode = (node: CategoryTreeNode) => {
+    node.posts.forEach((post) => {
+      result.push({ post, categoryPath: node.path })
+    })
+    node.children.forEach(collectFromNode)
+  }
+  nodes.forEach(collectFromNode)
+  return result
+}
+
+const postsInDisplayOrder = collectPostsWithCategory(categoryTree)
 
 const postsWithReadTime: PostWithReadTime[] = await Promise.all(
-  postsInDisplayOrder.map(async ({ post, category }, globalIdx) => {
+  postsInDisplayOrder.map(async ({ post, categoryPath }, globalIdx) => {
     const { remarkPluginFrontmatter } = await render(post)
     const minutesRead =
       post.data.minutesRead || remarkPluginFrontmatter.minutesRead || 0
@@ -41,10 +77,21 @@ const postsWithReadTime: PostWithReadTime[] = await Promise.all(
     return {
       post,
       minutesRead,
-      category,
+      categoryPath,
       globalIdx,
     }
   })
+)
+
+// 生成树形结构的 JSON 供 JS 使用
+const treeDataForJS = JSON.stringify(
+  flattenedCategories.map((fc) => ({
+    path: fc.node.path,
+    depth: fc.depth,
+    hasChildren: fc.hasChildren,
+    totalPosts: fc.totalPosts,
+    postIds: fc.node.posts.map((p) => p.id),
+  }))
 )
 ---
 
@@ -52,7 +99,10 @@ const postsWithReadTime: PostWithReadTime[] = await Promise.all(
   isEmpty ? (
     <Warning html={WARNING} />
   ) : (
-    <blog-filter-view data-categories={JSON.stringify(categories)}>
+    <blog-filter-view
+      data-categories={JSON.stringify(allCategoryPaths)}
+      data-tree={treeDataForJS}
+    >
       {/* 左侧分类导航 - 桌面端 */}
       <aside class="category-sidebar lt-lgp:hidden">
         <nav class="toc-desktop toc-desktop-content" id="blog-filter-toc">
@@ -83,7 +133,7 @@ const postsWithReadTime: PostWithReadTime[] = await Promise.all(
           </div>
           <ul id="blog-filter-toc-list" class="category-nav">
             {/* 全部分类选项 */}
-            <li class="category-group">
+            <li class="category-group" data-depth="0">
               <button
                 type="button"
                 class="category-header active"
@@ -93,33 +143,49 @@ const postsWithReadTime: PostWithReadTime[] = await Promise.all(
                 <span class="category-count">({sortedBlogItems.length})</span>
               </button>
             </li>
-            {/* 各分类及其文章 */}
-            {categorizedBlogItems.map(([category, posts]) => (
-              <li class="category-group">
-                <button
-                  type="button"
-                  class="category-header"
-                  data-category={category}
+            {/* 树形分类导航 */}
+            {flattenedCategories.map(
+              ({ node, depth, hasChildren, totalPosts }) => (
+                <li
+                  class="category-group"
+                  data-depth={depth}
+                  data-path={node.path}
                 >
-                  <span class="expand-icon i-ri-arrow-right-s-line" />
-                  <span class="category-name">{category}</span>
-                  <span class="category-count">({posts.length})</span>
-                </button>
-                <ul class="category-posts">
-                  {posts.map((post) => (
-                    <li>
-                      <a
-                        href={`/blog/${post.id}/`}
-                        class="post-link"
-                        title={post.data.title}
-                      >
-                        {post.data.title}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </li>
-            ))}
+                  <button
+                    type="button"
+                    class="category-header"
+                    data-category={node.path}
+                    data-has-children={hasChildren || node.posts.length > 0}
+                    style={`padding-left: ${depth * 0.75}rem`}
+                  >
+                    {(hasChildren || node.posts.length > 0) && (
+                      <span class="expand-icon i-ri-arrow-right-s-line" />
+                    )}
+                    <span class="category-name">{node.name}</span>
+                    <span class="category-count">({totalPosts})</span>
+                  </button>
+                  {/* 当前分类的文章列表 */}
+                  {node.posts.length > 0 && (
+                    <ul
+                      class="category-posts"
+                      style={`padding-left: ${depth * 0.75 + 1.25}rem`}
+                    >
+                      {node.posts.map((post) => (
+                        <li>
+                          <a
+                            href={`/blog/${post.id}/`}
+                            class="post-link"
+                            title={post.data.title}
+                          >
+                            {post.data.title}
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </li>
+              )
+            )}
           </ul>
         </nav>
       </aside>
@@ -175,7 +241,7 @@ const postsWithReadTime: PostWithReadTime[] = await Promise.all(
           </div>
           <ul class="category-nav mobile-nav">
             {/* 全部分类选项 */}
-            <li class="category-group">
+            <li class="category-group" data-depth="0">
               <button
                 type="button"
                 class="category-header active"
@@ -185,33 +251,48 @@ const postsWithReadTime: PostWithReadTime[] = await Promise.all(
                 <span class="category-count">({sortedBlogItems.length})</span>
               </button>
             </li>
-            {/* 各分类及其文章 */}
-            {categorizedBlogItems.map(([category, posts]) => (
-              <li class="category-group">
-                <button
-                  type="button"
-                  class="category-header"
-                  data-category={category}
+            {/* 树形分类导航 - 移动端 */}
+            {flattenedCategories.map(
+              ({ node, depth, hasChildren, totalPosts }) => (
+                <li
+                  class="category-group"
+                  data-depth={depth}
+                  data-path={node.path}
                 >
-                  <span class="expand-icon i-ri-arrow-right-s-line" />
-                  <span class="category-name">{category}</span>
-                  <span class="category-count">({posts.length})</span>
-                </button>
-                <ul class="category-posts">
-                  {posts.map((post) => (
-                    <li>
-                      <a
-                        href={`/blog/${post.id}/`}
-                        class="post-link"
-                        title={post.data.title}
-                      >
-                        {post.data.title}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </li>
-            ))}
+                  <button
+                    type="button"
+                    class="category-header"
+                    data-category={node.path}
+                    data-has-children={hasChildren || node.posts.length > 0}
+                    style={`padding-left: ${depth * 0.75}rem`}
+                  >
+                    {(hasChildren || node.posts.length > 0) && (
+                      <span class="expand-icon i-ri-arrow-right-s-line" />
+                    )}
+                    <span class="category-name">{node.name}</span>
+                    <span class="category-count">({totalPosts})</span>
+                  </button>
+                  {node.posts.length > 0 && (
+                    <ul
+                      class="category-posts"
+                      style={`padding-left: ${depth * 0.75 + 1.25}rem`}
+                    >
+                      {node.posts.map((post) => (
+                        <li>
+                          <a
+                            href={`/blog/${post.id}/`}
+                            class="post-link"
+                            title={post.data.title}
+                          >
+                            {post.data.title}
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </li>
+              )
+            )}
           </ul>
         </div>
       </div>
@@ -219,15 +300,26 @@ const postsWithReadTime: PostWithReadTime[] = await Promise.all(
       {/* 文章列表 */}
       <div aria-label="Post list" id="blog-post-list" class="mt-10">
         {postsWithReadTime.map(
-          ({ post, minutesRead, category, globalIdx }, idx) => {
+          ({ post, minutesRead, categoryPath, globalIdx }, idx) => {
             const { data, id } = post
             const isFirstInCategory =
-              idx === 0 || postsWithReadTime[idx - 1]?.category !== category
+              idx === 0 ||
+              postsWithReadTime[idx - 1]?.categoryPath !== categoryPath
+
+            // 获取显示名称：去掉数字前缀
+            const displayCategory = categoryPath
+              .split('/')
+              .map((s) => s.replace(/^\d+-/, ''))
+              .join(' / ')
 
             return (
-              <div class="post-item" data-category={category}>
+              <div class="post-item" data-category={categoryPath}>
                 {isFirstInCategory && (
-                  <Categorizer idx={globalIdx} needId={true} text={category} />
+                  <Categorizer
+                    idx={globalIdx}
+                    needId={true}
+                    text={displayCategory}
+                  />
                 )}
                 <ListItem
                   idx={globalIdx}
@@ -1003,7 +1095,7 @@ const postsWithReadTime: PostWithReadTime[] = await Promise.all(
       const categoryFirstPost = new Map<string, boolean>()
 
       postItems.forEach((item) => {
-        const itemCategory = (item as HTMLElement).dataset.category
+        const itemCategory = (item as HTMLElement).dataset.category || ''
         const categorizer = item.querySelector('.toc-heading')
 
         if (category === 'all') {
@@ -1011,19 +1103,22 @@ const postsWithReadTime: PostWithReadTime[] = await Promise.all(
           item.classList.remove('hidden')
           // 显示分类标题（如果是该分类的第一篇）
           if (categorizer) {
-            if (!categoryFirstPost.has(itemCategory!)) {
-              categoryFirstPost.set(itemCategory!, true)
+            if (!categoryFirstPost.has(itemCategory)) {
+              categoryFirstPost.set(itemCategory, true)
               ;(categorizer as HTMLElement).style.display = ''
             }
           }
         } else {
-          // 筛选特定分类
-          if (itemCategory === category) {
+          // 支持路径前缀匹配：选择 'vue' 应显示 'vue/01-xxx' 下的所有文章
+          const isMatch =
+            itemCategory === category || itemCategory.startsWith(category + '/')
+
+          if (isMatch) {
             item.classList.remove('hidden')
             // 显示分类标题（如果是该分类的第一篇）
             if (categorizer) {
-              if (!categoryFirstPost.has(itemCategory!)) {
-                categoryFirstPost.set(itemCategory!, true)
+              if (!categoryFirstPost.has(itemCategory)) {
+                categoryFirstPost.set(itemCategory, true)
                 ;(categorizer as HTMLElement).style.display = ''
               }
             }

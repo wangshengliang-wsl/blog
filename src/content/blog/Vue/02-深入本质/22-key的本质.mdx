@@ -1,0 +1,241 @@
+---
+title: 'key 的本质：VNode 唯一标识'
+pubDate: 2024-01-15
+category: 'Vue'
+tags: ['Vue3', '原理', 'key']
+description: '理解 key 在 diff 算法中的作用，以及为什么不能用 index 作为 key'
+---
+
+🙋 key 是什么？
+
+**key 是 VNode 的唯一标识**，用于在 diff 算法中精确匹配新旧节点。
+
+类似数据库的主键（Primary Key），用于唯一标识一条记录。
+
+## 不使用复用策略
+
+假设列表从 `[1, 2, 3]` 变成 `[4, 5, 6]`：
+
+```
+旧 DOM：p(1) p(2) p(3)
+新 DOM：p(4) p(5) p(6)
+
+不复用：删除 3 个 + 创建 3 个 = 6 次 DOM 操作
+```
+
+**观察**：只是文本变了，p 元素本身可以复用！
+
+## 简单复用策略
+
+按位置一一对应，只更新文本：
+
+```ts
+for (let i = 0; i < Math.min(oldLen, newLen); i++) {
+  patch(oldChildren[i], newChildren[i]) // 更新文本
+}
+
+// 处理长度差异
+if (newLen > oldLen) {
+  // 挂载新增的
+} else if (oldLen > newLen) {
+  // 卸载多余的
+}
+```
+
+**结果**：只需要 3 次 DOM 操作（更新文本）。
+
+## 问题：类型不同、顺序变化
+
+```js
+// 旧
+;[
+  { type: 'p', text: '1' },
+  { type: 'div', text: '2' },
+][
+  // 新（顺序变了）
+  ({ type: 'div', text: '2' }, { type: 'p', text: '1' })
+]
+```
+
+按位置对应：p ↔ div，类型不同，无法复用。
+
+但实际上，只是**顺序变了**，应该移动 DOM 而不是重建。
+
+## 问题：相同类型多个节点
+
+```js
+// 旧
+;[
+  { type: 'p', text: 'A' },
+  { type: 'p', text: 'B' },
+  { type: 'p', text: 'C' },
+][
+  // 新
+  ({ type: 'p', text: 'C' }, { type: 'p', text: 'A' }, { type: 'p', text: 'B' })
+]
+```
+
+都是 p 元素，如何知道哪个对应哪个？
+
+## key 的作用
+
+给每个 VNode 一个唯一标识：
+
+```js
+// 旧
+;[
+  { type: 'p', text: 'A', key: 1 },
+  { type: 'p', text: 'B', key: 2 },
+  { type: 'p', text: 'C', key: 3 },
+][
+  // 新
+  ({ type: 'p', text: 'C', key: 3 },
+  { type: 'p', text: 'A', key: 1 },
+  { type: 'p', text: 'B', key: 2 })
+]
+```
+
+通过 key 精确匹配：
+
+```
+旧 key=1 ↔ 新 key=1（移动）
+旧 key=2 ↔ 新 key=2（移动）
+旧 key=3 ↔ 新 key=3（移动）
+```
+
+**结果**：只需要移动 DOM，不需要重建。
+
+## 就地更新策略
+
+没有 key 时，Vue 采用"就地更新"策略：
+
+```
+旧：p(A) p(B) p(C)
+新：p(C) p(A) p(B)
+
+就地更新：
+  位置0：p 的文本 A → C
+  位置1：p 的文本 B → A
+  位置2：p 的文本 C → B
+```
+
+看起来也能工作，但有问题...
+
+## 就地更新的问题
+
+当元素有**状态**时：
+
+```vue
+<template>
+  <div v-for="item in list">
+    <input v-model="item.value" />
+    <span>{{ item.name }}</span>
+  </div>
+</template>
+```
+
+假设用户在第一个 input 中输入了内容，然后列表顺序变化：
+
+```
+就地更新：
+  - span 的文本更新了 ✓
+  - input 的 DOM 被复用，但用户输入的内容还在原位置！✗
+```
+
+**问题**：DOM 状态（如 input 的值、focus 状态）没有跟着数据移动。
+
+用 key 后：
+
+```
+key 匹配：
+  - 整个 div（包括 input）跟着数据移动
+  - 用户输入的内容也跟着移动 ✓
+```
+
+## 为什么不能用 index 作为 key
+
+```js
+// 初始
+;[
+  { id: 1, name: 'A' },
+  { id: 2, name: 'B' },
+  { id: 3, name: 'C' },
+][
+  // key: 0, 1, 2
+
+  // 删除 B 后
+  ({ id: 1, name: 'A' }, { id: 3, name: 'C' })
+]
+// key: 0, 1
+```
+
+问题：
+
+- 旧 key=1 是 B
+- 新 key=1 是 C
+- Vue 认为它们是同一个节点，**但实际上不是**！
+
+```
+错误的复用：
+  旧 key=1 (B) ↔ 新 key=1 (C)
+  把 B 的 DOM 复用给 C，但 DOM 状态（input 值等）还是 B 的
+```
+
+**正确做法**：用数据的唯一标识（如 id）作为 key。
+
+```vue
+<div v-for="item in list" :key="item.id"></div>
+```
+
+## diff 中 key 的使用
+
+```ts
+function patchChildren(n1, n2, container) {
+  const oldChildren = n1.children
+  const newChildren = n2.children
+
+  // 建立 key → index 的映射
+  const keyToOldIdx = {}
+  oldChildren.forEach((child, i) => {
+    if (child.key != null) {
+      keyToOldIdx[child.key] = i
+    }
+  })
+
+  // 遍历新节点
+  for (let i = 0; i < newChildren.length; i++) {
+    const newChild = newChildren[i]
+
+    // 用 key 找到对应的旧节点
+    const oldIdx = keyToOldIdx[newChild.key]
+
+    if (oldIdx !== undefined) {
+      // 找到了，复用并更新
+      patch(oldChildren[oldIdx], newChild)
+      // 可能需要移动位置
+    } else {
+      // 没找到，新建
+      patch(null, newChild, container)
+    }
+  }
+
+  // 删除多余的旧节点
+  // ...
+}
+```
+
+## 小结
+
+| 场景        | 没有 key     | 有 key   |
+| ----------- | ------------ | -------- |
+| 顺序变化    | 更新内容     | 移动 DOM |
+| 有 DOM 状态 | 状态错乱     | 状态正确 |
+| 插入/删除   | 可能复用错误 | 精确匹配 |
+
+| key 选择 | 效果                     |
+| -------- | ------------------------ |
+| 唯一 id  | ✓ 正确匹配               |
+| index    | ✗ 可能匹配错误           |
+| 无 key   | 就地更新，某些场景有问题 |
+
+**核心理解**：key 让 Vue 知道"这个新节点对应哪个旧节点"，从而正确复用 DOM。

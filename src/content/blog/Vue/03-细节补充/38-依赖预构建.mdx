@@ -1,0 +1,113 @@
+---
+title: 'Vite 依赖预构建'
+pubDate: 2024-01-15
+category: 'Vue'
+tags: ['Vue3', 'Vite']
+description: '理解 Vite 依赖预构建的原理和配置方式'
+---
+
+## 为什么需要预构建
+
+Vite 开发时不打包源码，但需要对**依赖**进行预构建：
+
+1. **减少请求数**：如 lodash-es 有 600+ 模块，预构建后合并为一个
+2. **兼容 CommonJS**：将 CJS/UMD 转换为 ESM 格式
+
+## 预构建工具
+
+Vite 使用 **esbuild** 进行预构建（Go 语言编写，速度极快）。
+
+## 缓存机制
+
+预构建产物缓存在 `node_modules/.vite`。
+
+**触发重新预构建的条件**：
+
+- lockfile 变化（package-lock.json 等）
+- vite.config.js 相关配置变化
+- NODE_ENV 变化
+
+**浏览器缓存**：使用强缓存，版本号变化时自动失效。
+
+## 配置选项
+
+```js
+export default defineConfig({
+  optimizeDeps: {
+    // 配置项
+  },
+})
+```
+
+### include：强制预构建
+
+```js
+optimizeDeps: {
+  include: ['lodash-es', 'axios']
+}
+```
+
+### exclude：排除预构建
+
+```js
+optimizeDeps: {
+  exclude: ['my-linked-package']
+}
+```
+
+### entries：自定义入口
+
+```js
+optimizeDeps: {
+  entries: ['src/main.js', 'src/admin.js']
+}
+```
+
+### force：强制重新预构建
+
+```js
+optimizeDeps: {
+  force: true // 忽略缓存
+}
+```
+
+### esbuildOptions：esbuild 配置
+
+```js
+optimizeDeps: {
+  esbuildOptions: {
+    target: 'es2015',
+    define: {
+      'process.env.NODE_ENV': '"production"'
+    }
+  }
+}
+```
+
+## 常见问题
+
+### 依赖没有被预构建
+
+```js
+// 手动添加到 include
+optimizeDeps: {
+  include: ['problem-package']
+}
+```
+
+### 清除缓存重新预构建
+
+```bash
+# 删除缓存目录
+rm -rf node_modules/.vite
+
+# 或使用 force 选项
+vite --force
+```
+
+## 预构建 vs 源码
+
+| 内容              | 处理方式         |
+| ----------------- | ---------------- |
+| node_modules 依赖 | esbuild 预构建   |
+| 项目源码          | 按需编译，不打包 |

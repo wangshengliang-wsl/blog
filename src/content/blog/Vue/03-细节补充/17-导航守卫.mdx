@@ -1,0 +1,193 @@
+---
+title: '导航守卫'
+pubDate: 2024-01-15
+category: 'Vue'
+tags: ['Vue3', 'Vue Router']
+description: '掌握全局守卫、路由守卫、组件守卫的使用场景和执行顺序'
+---
+
+## 什么是导航守卫
+
+在路由跳转时拦截导航，执行检查或其他操作。
+
+```js
+router.beforeEach((to, from) => {
+  console.log('从', from.path, '到', to.path)
+  // 返回 false 取消导航
+  // 返回路由地址重定向
+  // 不返回或返回 true 放行
+})
+```
+
+## 三类守卫
+
+### 1. 全局守卫
+
+| 守卫          | 触发时机                 |
+| ------------- | ------------------------ |
+| beforeEach    | 导航触发时，最先执行     |
+| beforeResolve | 组件守卫和异步组件解析后 |
+| afterEach     | 导航确认后，DOM 更新前   |
+
+```js
+// 全局前置守卫
+router.beforeEach((to, from) => {
+  if (to.meta.requiresAuth && !isLoggedIn()) {
+    return '/login'
+  }
+})
+
+// 全局解析守卫
+router.beforeResolve((to) => {
+  // 异步数据已加载，可做最后检查
+})
+
+// 全局后置守卫
+router.afterEach((to) => {
+  document.title = to.meta.title || '默认标题'
+  // 关闭加载指示器
+  // 记录访问日志
+})
+```
+
+### 2. 路由守卫
+
+在路由配置中定义，只针对特定路由：
+
+```js
+const routes = [
+  {
+    path: '/admin',
+    component: Admin,
+    beforeEnter: (to, from) => {
+      if (!isAdmin()) {
+        return '/403'
+      }
+    },
+  },
+]
+```
+
+**注意**：
+
+- 只在**进入路由**时触发
+- params/query/hash 变化不触发
+- 可以是函数数组
+
+```js
+beforeEnter: [checkAuth, checkPermission, logAccess]
+```
+
+### 3. 组件守卫
+
+在组件内定义：
+
+```vue
+<script>
+export default {
+  beforeRouteEnter(to, from, next) {
+    // 组件实例还未创建，不能访问 this
+    next((vm) => {
+      // 通过 vm 访问组件实例
+    })
+  },
+
+  beforeRouteUpdate(to, from) {
+    // 路由参数变化时（组件复用）
+    // 可以访问 this
+  },
+
+  beforeRouteLeave(to, from) {
+    // 离开组件时
+    // 可用于保存草稿、确认离开
+    const answer = confirm('确定离开？')
+    if (!answer) return false
+  },
+}
+</script>
+```
+
+Composition API 写法：
+
+```vue
+<script setup>
+import { onBeforeRouteUpdate, onBeforeRouteLeave } from 'vue-router'
+
+onBeforeRouteUpdate((to, from) => {
+  // 路由参数变化
+})
+
+onBeforeRouteLeave((to, from) => {
+  // 离开组件
+})
+</script>
+```
+
+## 执行顺序
+
+**普通导航**：
+
+```
+1. beforeRouteLeave（离开组件）
+2. beforeEach（全局前置）
+3. beforeEnter（路由守卫）
+4. beforeRouteEnter（进入组件）
+5. beforeResolve（全局解析）
+6. afterEach（全局后置）
+```
+
+**组件复用（参数变化）**：
+
+```
+1. beforeEach
+2. beforeRouteUpdate
+3. beforeResolve
+4. afterEach
+```
+
+## 返回值控制
+
+```js
+router.beforeEach((to, from) => {
+  // 放行
+  return true // 或不返回
+
+  // 取消导航
+  return false
+
+  // 重定向
+  return '/login'
+  return { name: 'Login' }
+  return { path: '/login', query: { redirect: to.fullPath } }
+})
+```
+
+## 在守卫中使用 inject
+
+Vue 3.3+ 支持在守卫中使用 inject：
+
+```js
+router.beforeEach(() => {
+  const userStore = inject('userStore')
+  // 或使用 Pinia
+  const user = useUserStore()
+})
+```
+
+## 实战示例
+
+```js
+router.beforeEach((to, from) => {
+  const userStore = useUserStore()
+
+  // 需要登录
+  if (to.meta.requiresAuth && !userStore.isLoggedIn) {
+    return { path: '/login', query: { redirect: to.fullPath } }
+  }
+
+  // 需要特定角色
+  if (to.meta.roles && !to.meta.roles.includes(userStore.role)) {
+    return '/403'
+  }
+})
+```

@@ -1,0 +1,105 @@
+---
+title: 'computed 面试题'
+pubDate: 2024-01-15
+category: 'Vue'
+tags: ['Vue3', '面试']
+description: '面试题：谈谈 computed 的机制，缓存了什么？为什么不支持异步？'
+---
+
+## 面试题
+
+> 谈谈 computed 的机制，缓存了什么？为什么 computed 不支持异步？
+
+## computed 用法
+
+```js
+// 只读
+const sum = computed(() => state.a + state.b)
+
+// 可写
+const fullName = computed({
+  get() {
+    return firstName.value + ' ' + lastName.value
+  },
+  set(newValue) {
+    ;[firstName.value, lastName.value] = newValue.split(' ')
+  },
+})
+```
+
+## 实现原理
+
+```js
+function computed(getterOrOptions) {
+  const { getter, setter } = normalizeParameter(getterOrOptions)
+
+  let value
+  let dirty = true // 标记是否需要重新计算
+
+  const effectFn = effect(getter, {
+    lazy: true,
+    scheduler() {
+      dirty = true // 依赖变化时，标记需要重新计算
+      trigger(obj, 'SET', 'value')
+    },
+  })
+
+  const obj = {
+    get value() {
+      track(obj, 'GET', 'value')
+      if (dirty) {
+        value = effectFn() // 重新计算
+        dirty = false
+      }
+      return value // 返回缓存值
+    },
+    set value(newValue) {
+      setter(newValue)
+    },
+  }
+
+  return obj
+}
+```
+
+**核心逻辑**：
+
+1. `dirty` 控制是否从缓存取值
+2. 首次访问或依赖变化后，`dirty = true`，重新计算
+3. 计算后 `dirty = false`，后续访问直接返回缓存值
+
+## 缓存了什么？
+
+缓存的是 **getter 计算出来的值**。
+
+当依赖的响应式数据没有变化时，多次访问 computed 会直接返回缓存值，不会重新执行 getter。
+
+## 为什么不支持异步？
+
+1. **缓存机制冲突**：computed 的缓存基于同步计算，异步操作完成前无法提供有效返回值
+
+2. **数据一致性**：computed 用于模板绑定，渲染期间需要稳定的值，异步会导致数据不一致
+
+3. **依赖追踪困难**：异步操作完成时间不确定，难以追踪依赖关系
+
+## 需要异步？用 watch
+
+```js
+const data = ref(null)
+
+watch(source, async () => {
+  data.value = await fetchData()
+})
+```
+
+## 参考答案
+
+**缓存了什么**：缓存的是上一次 getter 计算出来的值。
+
+**为什么不支持异步**：
+
+1. computed 的核心是同步计算 + 缓存，异步与此相悖
+2. 模板渲染需要稳定的同步值
+3. 异步会使依赖追踪变得复杂
+
+如需异步操作，应使用 watch。

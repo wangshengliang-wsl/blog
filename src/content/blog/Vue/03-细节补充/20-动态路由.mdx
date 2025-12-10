@@ -1,0 +1,169 @@
+---
+title: '动态路由'
+pubDate: 2024-01-15
+category: 'Vue'
+tags: ['Vue3', 'Vue Router']
+description: '运行时动态添加和删除路由，实现基于权限的菜单管理'
+---
+
+## 概念区分
+
+| 术语         | 说明                                     |
+| ------------ | ---------------------------------------- |
+| 动态参数路由 | `/users/:id` 匹配 `/users/1`、`/users/2` |
+| 动态路由     | 运行时添加/删除路由表中的路由            |
+
+本文讨论的是**动态路由**。
+
+## 添加路由
+
+```js
+router.addRoute({
+  path: '/admin',
+  name: 'admin',
+  component: Admin,
+})
+
+// 添加后需要手动导航
+router.push('/admin')
+```
+
+## 添加嵌套路由
+
+```js
+// 先添加父路由
+router.addRoute({
+  path: '/user',
+  name: 'user',
+  component: User,
+})
+
+// 添加子路由，第一个参数是父路由名称
+router.addRoute('user', {
+  path: 'profile',
+  component: UserProfile,
+})
+```
+
+等价于：
+
+```js
+router.addRoute({
+  path: '/user',
+  name: 'user',
+  component: User,
+  children: [{ path: 'profile', component: UserProfile }],
+})
+```
+
+## 删除路由
+
+### 方法 1：removeRoute
+
+```js
+router.addRoute({ path: '/admin', name: 'admin', component: Admin })
+router.removeRoute('admin')
+```
+
+### 方法 2：名称冲突
+
+```js
+router.addRoute({ path: '/about', name: 'about', component: About })
+// 同名路由会替换旧的
+router.addRoute({ path: '/help', name: 'about', component: Help })
+```
+
+### 方法 3：addRoute 返回的函数
+
+```js
+const remove = router.addRoute({ path: '/temp', component: Temp })
+remove() // 删除刚添加的路由
+```
+
+## 其他 API
+
+```js
+// 检查路由是否存在
+router.hasRoute('admin') // true/false
+
+// 获取所有路由
+router.getRoutes() // RouteRecord[]
+```
+
+## 实战：权限路由
+
+```js
+// 基础路由（所有人可访问）
+const baseRoutes = [
+  { path: '/', component: Home },
+  { path: '/login', component: Login },
+]
+
+// 权限路由映射
+const permissionRoutes = {
+  admin: [
+    { path: '/admin', name: 'admin', component: Admin },
+    { path: '/users', name: 'users', component: Users },
+  ],
+  teacher: [
+    { path: '/courses', name: 'courses', component: Courses },
+    { path: '/students', name: 'students', component: Students },
+  ],
+  student: [{ path: '/my-courses', name: 'my-courses', component: MyCourses }],
+}
+
+// 登录后动态添加路由
+async function login(role) {
+  // 先清除旧的权限路由
+  clearPermissionRoutes()
+
+  // 添加对应角色的路由
+  const routes = permissionRoutes[role] || []
+  routes.forEach((route) => {
+    router.addRoute(route)
+  })
+
+  // 导航到首页
+  router.push('/')
+}
+
+// 登出时清除
+function logout() {
+  clearPermissionRoutes()
+  router.push('/login')
+}
+
+function clearPermissionRoutes() {
+  Object.values(permissionRoutes)
+    .flat()
+    .forEach((route) => {
+      if (route.name && router.hasRoute(route.name)) {
+        router.removeRoute(route.name)
+      }
+    })
+}
+```
+
+## 导航守卫中添加路由
+
+```js
+router.beforeEach(async (to) => {
+  const userStore = useUserStore()
+
+  if (userStore.isLoggedIn && !userStore.routesLoaded) {
+    // 根据用户角色获取路由
+    const routes = await fetchUserRoutes(userStore.role)
+    routes.forEach((route) => router.addRoute(route))
+    userStore.routesLoaded = true
+
+    // 重新导航到目标路由
+    return to.fullPath
+  }
+})
+```
+
+## 注意事项
+
+1. **addRoute 后需要手动导航**：添加路由后当前页面不会自动更新
+2. **刷新后路由丢失**：动态添加的路由在刷新后需要重新添加
+3. **404 路由放最后**：动态添加路由后，确保 404 路由在最后

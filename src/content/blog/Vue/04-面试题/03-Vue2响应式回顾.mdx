@@ -1,0 +1,120 @@
+---
+title: 'Vue2 响应式原理回顾'
+pubDate: 2024-01-15
+category: 'Vue'
+tags: ['Vue3', '面试']
+description: 'Vue2 响应式实现原理：Observer、Dep、Watcher'
+---
+
+## 观察者模式
+
+类比：顾客订阅商品到货通知。
+
+- 顾客（Watcher）：订阅感兴趣的商品
+- 商店（Dep）：记录订阅者，到货时通知
+
+## Vue2 响应式核心
+
+```
+数据变化 → 通知 Watcher → 组件重新渲染
+```
+
+### 1. Observer（数据劫持）
+
+将普通对象转换为响应式对象：
+
+```js
+// 遍历对象属性，添加 getter/setter
+Object.defineProperty(obj, key, {
+  get() {
+    // 收集依赖
+    return value
+  },
+  set(newVal) {
+    // 派发更新
+    value = newVal
+  },
+})
+```
+
+**特点**：
+
+- 递归遍历所有属性
+- 无法监测新增/删除属性（需要 $set/$delete）
+- 数组需要重写原型方法
+
+### 2. Dep（依赖管理器）
+
+每个响应式属性都有一个 Dep 实例：
+
+```js
+class Dep {
+  subs = [] // 订阅者列表
+
+  depend() {
+    // 收集当前 watcher
+    this.subs.push(Dep.target)
+  }
+
+  notify() {
+    // 通知所有 watcher 更新
+    this.subs.forEach((watcher) => watcher.update())
+  }
+}
+```
+
+### 3. Watcher（观察者）
+
+负责具体的更新操作：
+
+```js
+class Watcher {
+  update() {
+    // 执行更新
+    this.run()
+  }
+}
+```
+
+### 4. Scheduler（调度器）
+
+避免重复更新，使用微任务异步执行：
+
+```js
+state.a = 'new'
+state.b = 'new'
+state.c = 'new'
+// 只会触发一次更新，而不是三次
+```
+
+## 整体流程
+
+```
+┌─────────────────────────────────────────────┐
+│                  Observer                    │
+│         Object.defineProperty               │
+└──────────────┬────────────────┬─────────────┘
+               │                │
+           getter            setter
+               │                │
+               ▼                ▼
+         ┌─────────┐      ┌─────────┐
+         │   Dep   │      │   Dep   │
+         │ 收集依赖 │      │ 派发更新 │
+         └────┬────┘      └────┬────┘
+              │                │
+              ▼                ▼
+         ┌─────────┐      ┌───────────┐
+         │ Watcher │◄─────│ Scheduler │
+         └─────────┘      └───────────┘
+              │
+              ▼
+         组件重新渲染
+```
+
+## Vue2 响应式的局限性
+
+1. 无法监测属性的新增和删除
+2. 无法监测数组索引和长度变化
+3. 需要递归遍历，初始化性能开销大
+4. Object.defineProperty 只能劫持属性

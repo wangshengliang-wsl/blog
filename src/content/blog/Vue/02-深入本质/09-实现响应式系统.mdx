@@ -1,0 +1,199 @@
+---
+title: '手写响应式系统（上）'
+pubDate: 2024-01-15
+category: 'Vue'
+tags: ['Vue3', '原理', '响应式']
+description: '从零实现一个简易的响应式系统，理解核心原理'
+---
+
+实现响应式系统的两个核心要素：
+
+1. **拦截数据读写**
+2. **关联数据和函数**
+
+## 需要拦截的操作
+
+| 操作        | 类型 | 处理     |
+| ----------- | ---- | -------- |
+| 获取属性    | 读取 | 收集依赖 |
+| 设置属性    | 写入 | 触发更新 |
+| 新增属性    | 写入 | 触发更新 |
+| 删除属性    | 写入 | 触发更新 |
+| `in` 操作符 | 读取 | 收集依赖 |
+| 遍历属性    | 读取 | 收集依赖 |
+
+简单总结：**读取 → 收集依赖，写入 → 触发更新**
+
+## 第一步：创建代理
+
+```ts
+function reactive(target) {
+  return new Proxy(target, {
+    get(target, key, receiver) {
+      const result = Reflect.get(target, key, receiver)
+      track(target, key) // 收集依赖
+      return result
+    },
+    set(target, key, value, receiver) {
+      const result = Reflect.set(target, key, value, receiver)
+      trigger(target, key) // 触发更新
+      return result
+    },
+  })
+}
+```
+
+## 第二步：存储依赖关系
+
+用 WeakMap + Map + Set 存储：
+
+```
+targetMap (WeakMap)
+└── target (对象)
+    └── depsMap (Map)
+        └── key (属性名)
+            └── deps (Set)
+                └── [effect1, effect2, ...]
+```
+
+```ts
+const targetMap = new WeakMap()
+
+function track(target, key) {
+  if (!activeEffect) return // 没有正在运行的 effect，不收集
+
+  let depsMap = targetMap.get(target)
+  if (!depsMap) {
+    targetMap.set(target, (depsMap = new Map()))
+  }
+
+  let deps = depsMap.get(key)
+  if (!deps) {
+    depsMap.set(key, (deps = new Set()))
+  }
+
+  deps.add(activeEffect) // 把当前 effect 加入依赖集合
+}
+
+function trigger(target, key) {
+  const depsMap = targetMap.get(target)
+  if (!depsMap) return
+
+  const deps = depsMap.get(key)
+  deps?.forEach((effect) => effect()) // 执行所有依赖的 effect
+}
+```
+
+## 第三步：实现 effect
+
+effect 是被监控的函数的包装器：
+
+```ts
+let activeEffect = null // 当前正在运行的 effect
+
+function effect(fn) {
+  const effectFn = () => {
+    activeEffect = effectFn // 设置当前 effect
+    fn() // 执行函数，期间会触发 get，收集依赖
+    activeEffect = null // 清空
+  }
+  effectFn() // 立即执行一次
+  return effectFn
+}
+```
+
+## 完整代码
+
+```ts
+// 存储依赖关系
+const targetMap = new WeakMap()
+let activeEffect = null
+
+// 创建响应式对象
+function reactive(target) {
+  return new Proxy(target, {
+    get(target, key, receiver) {
+      const result = Reflect.get(target, key, receiver)
+      track(target, key)
+      return result
+    },
+    set(target, key, value, receiver) {
+      const result = Reflect.set(target, key, value, receiver)
+      trigger(target, key)
+      return result
+    },
+  })
+}
+
+// 收集依赖
+function track(target, key) {
+  if (!activeEffect) return
+
+  let depsMap = targetMap.get(target)
+  if (!depsMap) {
+    targetMap.set(target, (depsMap = new Map()))
+  }
+
+  let deps = depsMap.get(key)
+  if (!deps) {
+    depsMap.set(key, (deps = new Set()))
+  }
+
+  deps.add(activeEffect)
+}
+
+// 触发更新
+function trigger(target, key) {
+  const depsMap = targetMap.get(target)
+  if (!depsMap) return
+
+  const deps = depsMap.get(key)
+  deps?.forEach((effectFn) => effectFn())
+}
+
+// 创建 effect
+function effect(fn) {
+  const effectFn = () => {
+    activeEffect = effectFn
+    fn()
+    activeEffect = null
+  }
+  effectFn()
+  return effectFn
+}
+```
+
+## 测试
+
+```ts
+const state = reactive({ count: 0 })
+
+effect(() => {
+  console.log('count:', state.count)
+})
+// 输出：count: 0
+
+state.count = 1
+// 输出：count: 1
+
+state.count = 2
+// 输出：count: 2
+```
+
+工作流程：
+
+1. `effect` 执行，设置 `activeEffect`
+2. 执行 `fn`，读取 `state.count`
+3. 触发 `get`，调用 `track`
+4. `track` 把当前 effect 存入 `count` 的依赖集合
+5. 后续修改 `state.count`
+6. 触发 `set`，调用 `trigger`
+7. `trigger` 执行 `count` 的所有依赖 effect
+
+## 当前实现的问题
+
+1. **嵌套 effect** 会有问题
+2. **分支切换** 会有多余依赖
+3. **自增操作** 会无限循环
+
+下一篇我们来解决这些问题。

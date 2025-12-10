@@ -1,0 +1,181 @@
+---
+title: 'KeepAlive 的特殊生命周期'
+pubDate: 2024-01-15
+category: 'Vue'
+tags: ['Vue3', '原理', 'KeepAlive']
+description: '理解 activated 和 deactivated 钩子的作用和执行时机'
+---
+
+## KeepAlive 的作用
+
+类似 HTTP 的 Keep-Alive（持久连接），Vue 的 `<KeepAlive>` 用于**缓存组件实例**，避免频繁销毁/重建。
+
+```vue
+<KeepAlive>
+  <component :is="currentTab" />
+</KeepAlive>
+```
+
+切换组件时，被缓存的组件不会触发 unmounted，而是保持状态。
+
+## 问题：如何知道组件是否激活？
+
+被缓存的组件不会再触发 mounted/unmounted，那如何知道组件当前是显示还是隐藏状态？
+
+**解决方案**：KeepAlive 专属的生命周期钩子
+
+| 钩子          | 触发时机                            |
+| ------------- | ----------------------------------- |
+| onActivated   | 组件激活时（首次挂载 + 从缓存恢复） |
+| onDeactivated | 组件失活时（被缓存，但仍在内存中）  |
+
+## 使用示例
+
+```vue
+<script setup>
+import { onActivated, onDeactivated, onMounted, onUnmounted } from 'vue'
+
+onMounted(() => {
+  console.log('mounted - 只在首次挂载时触发')
+})
+
+onUnmounted(() => {
+  console.log('unmounted - 被 KeepAlive 缓存时不会触发')
+})
+
+onActivated(() => {
+  console.log('activated - 每次显示时触发')
+  // 适合做：恢复定时器、重新获取数据等
+})
+
+onDeactivated(() => {
+  console.log('deactivated - 每次隐藏时触发')
+  // 适合做：暂停定时器、保存临时状态等
+})
+</script>
+```
+
+## 执行顺序对比
+
+### 不使用 KeepAlive
+
+```
+组件 A → 组件 B：
+  A: beforeUnmount
+  B: created
+  B: beforeMount
+  A: unmounted
+  B: mounted
+
+组件 B → 组件 A：
+  B: beforeUnmount
+  A: created（重新创建！）
+  A: beforeMount
+  B: unmounted
+  A: mounted
+```
+
+### 使用 KeepAlive
+
+```
+组件 A → 组件 B（首次）：
+  A: deactivated
+  B: created
+  B: beforeMount
+  B: mounted
+  B: activated
+
+组件 B → 组件 A（从缓存恢复）：
+  B: deactivated
+  A: activated（不会重新 created/mounted）
+```
+
+## 常见应用场景
+
+### 1. 定时器管理
+
+```vue
+<script setup>
+import { ref, onActivated, onDeactivated } from 'vue'
+
+const count = ref(0)
+let timer = null
+
+onActivated(() => {
+  // 激活时启动定时器
+  timer = setInterval(() => count.value++, 1000)
+})
+
+onDeactivated(() => {
+  // 失活时清除定时器，避免后台运行
+  clearInterval(timer)
+})
+</script>
+```
+
+### 2. 滚动位置恢复
+
+```vue
+<script setup>
+import { ref, onActivated, onDeactivated } from 'vue'
+
+const scrollTop = ref(0)
+
+onDeactivated(() => {
+  // 保存滚动位置
+  scrollTop.value = document.documentElement.scrollTop
+})
+
+onActivated(() => {
+  // 恢复滚动位置
+  document.documentElement.scrollTop = scrollTop.value
+})
+</script>
+```
+
+### 3. 数据刷新
+
+```vue
+<script setup>
+import { onActivated } from 'vue'
+
+onActivated(() => {
+  // 每次激活时检查是否需要刷新数据
+  if (shouldRefresh()) {
+    fetchData()
+  }
+})
+</script>
+```
+
+## KeepAlive 配置
+
+```vue
+<!-- 只缓存指定组件 -->
+<KeepAlive include="ComponentA,ComponentB">
+  <component :is="currentTab" />
+</KeepAlive>
+
+<!-- 排除指定组件 -->
+<KeepAlive exclude="ComponentC">
+  <component :is="currentTab" />
+</KeepAlive>
+
+<!-- 最大缓存数量 -->
+<KeepAlive :max="10">
+  <component :is="currentTab" />
+</KeepAlive>
+```
+
+## 小结
+
+| 钩子        | 普通组件 | KeepAlive 缓存组件 |
+| ----------- | -------- | ------------------ |
+| mounted     | 每次挂载 | 仅首次             |
+| unmounted   | 每次卸载 | 不触发             |
+| activated   | 无       | 每次显示           |
+| deactivated | 无       | 每次隐藏           |
+
+**核心理解**：KeepAlive 组件不会被销毁，只是在"激活"和"失活"之间切换。
+
+下一篇我们来看 KeepAlive 的实现原理。

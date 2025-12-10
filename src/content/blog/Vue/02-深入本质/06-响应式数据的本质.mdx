@@ -1,0 +1,191 @@
+---
+title: '响应式数据的本质：ref 与 reactive'
+pubDate: 2024-01-15
+category: 'Vue'
+tags: ['Vue3', '原理', '响应式']
+description: '从源码角度理解 ref 和 reactive 的实现差异，学会判断哪些操作会触发拦截'
+---
+
+🙋 响应式数据的本质是什么？
+
+就是**被拦截的对象**。只有拦截了，才能在数据变化时做额外操作（通知视图更新）。
+
+## ref 和 reactive 的实现
+
+### reactive：纯 Proxy
+
+```ts
+// 简化版源码
+function reactive(target) {
+  return new Proxy(target, {
+    get(target, key) {
+      track(target, key) // 依赖收集
+      return target[key]
+    },
+    set(target, key, value) {
+      target[key] = value
+      trigger(target, key) // 派发更新
+      return true
+    },
+  })
+}
+```
+
+### ref：defineProperty + Proxy
+
+```ts
+// 简化版源码
+class RefImpl {
+  private _value
+
+  constructor(value) {
+    // 如果是对象，用 reactive 包装
+    this._value = isObject(value) ? reactive(value) : value
+  }
+
+  get value() {
+    track(this, 'value') // 依赖收集
+    return this._value
+  }
+
+  set value(newVal) {
+    this._value = isObject(newVal) ? reactive(newVal) : newVal
+    trigger(this, 'value') // 派发更新
+  }
+}
+```
+
+🎯 **关键理解**：
+
+- `ref` 通过 getter/setter 拦截 `.value` 的读写
+- `ref` 的值如果是对象，内部会用 `reactive` 包装
+
+## 判断是否会触发拦截
+
+这是理解响应式的**核心能力**。
+
+### 拦截条件
+
+| API      | 会被拦截的操作         |
+| -------- | ---------------------- |
+| ref      | 读写 `.value`          |
+| reactive | 读写代理对象的任意成员 |
+
+### 练习 1：ref 基础类型
+
+```ts
+let state = ref(1)
+
+state // ❌ 不拦截（没有访问 .value）
+console.log(state) // ❌ 不拦截
+console.log(state.value) // ✅ 拦截（访问 .value）
+state.value = 2 // ✅ 拦截（设置 .value）
+state = 3 // ❌ 不拦截（重新赋值变量，不是操作 ref）
+```
+
+### 练习 2：ref 对象类型
+
+```ts
+let state = ref({ a: 1 })
+
+state.value // ✅ 拦截 value 的 get
+state.value.a // ✅ 拦截 value 的 get + a 的 get
+state.value.a = 2 // ✅ 拦截 value 的 get + a 的 set
+state.value = {} // ✅ 拦截 value 的 set
+state.a // ❌ 不拦截（ref 对象本身没有 a 属性）
+```
+
+### 练习 3：reactive
+
+```ts
+let state = reactive({ a: 1 })
+
+state // ❌ 不拦截（没有操作成员）
+state.a // ✅ 拦截 a 的 get
+state.a = 2 // ✅ 拦截 a 的 set
+state.b = 3 // ✅ 拦截 b 的 set（新增属性也能拦截）
+delete state.a // ✅ 拦截 delete 操作
+```
+
+### 练习 4：嵌套对象
+
+```ts
+const state = reactive({
+  user: { name: 'Tom' },
+})
+
+state.user // ✅ 拦截 user 的 get
+state.user.name // ✅ 拦截 user 的 get + name 的 get
+state.user.name = 'Jerry' // ✅ 拦截 user 的 get + name 的 set
+```
+
+### 练习 5：解构陷阱
+
+```ts
+const state = ref({ a: 1 })
+const obj = state.value // ✅ 拦截 value 的 get
+
+// 此时 obj 是一个 Proxy 对象
+obj.a // ✅ 拦截（操作的是 Proxy）
+obj.a = 2 // ✅ 拦截
+```
+
+```ts
+const state = reactive({ a: 1 })
+const { a } = state // ✅ 拦截 a 的 get
+
+// 此时 a 是普通值 1
+a // ❌ 不拦截（a 不是响应式的）
+```
+
+### 练习 6：数组
+
+```ts
+const arr = reactive([1, 2, 3])
+
+arr // ❌ 不拦截
+arr.length // ✅ 拦截 length 的 get
+arr[0] // ✅ 拦截索引 0 的 get
+arr[0] = 10 // ✅ 拦截索引 0 的 set
+arr.push(4) // ✅ 拦截（push 内部会读写多个属性）
+```
+
+## 常见误区
+
+### 误区 1：以为赋值变量会触发响应式
+
+```ts
+let state = ref(1)
+state = ref(2) // ❌ 这不会触发任何响应式更新！
+// 只是把 state 指向了新的 ref，原来的 ref 没人用了
+```
+
+### 误区 2：解构后失去响应式
+
+```ts
+const state = reactive({ count: 0 })
+let { count } = state // count 是普通值 0
+
+count++ // ❌ 不会触发更新，因为 count 不是响应式的
+```
+
+解决：用 `toRefs`
+
+```ts
+const { count } = toRefs(state)
+count.value++ // ✅ 会触发更新
+```
+
+## 小结
+
+| 情况                  | 是否拦截 |
+| --------------------- | -------- |
+| `ref.value`           | ✅       |
+| `ref.xxx`（非 value） | ❌       |
+| `reactive.xxx`        | ✅       |
+| 变量重新赋值          | ❌       |
+| 解构出的原始值        | ❌       |
+
+🎯 **核心原则**：只有操作**被代理的对象的成员**才会触发拦截。
+
+下一篇我们来看响应式系统如何实现依赖收集和派发更新。

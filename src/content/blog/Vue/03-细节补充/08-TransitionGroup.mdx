@@ -1,0 +1,196 @@
+---
+title: 'TransitionGroup 列表过渡'
+pubDate: 2024-01-15
+category: 'Vue'
+tags: ['Vue3', '进阶', '动画']
+description: '使用 TransitionGroup 为列表中多个元素的增删添加过渡动画'
+---
+
+## 为什么需要 TransitionGroup
+
+Transition 只能包裹**单个元素**，对于列表（多个元素）需要使用 TransitionGroup。
+
+```vue
+<!-- ❌ 错误：Transition 不能包裹多个元素 -->
+<Transition>
+  <li v-for="item in list" :key="item">{{ item }}</li>
+</Transition>
+
+<!-- ✅ 正确：使用 TransitionGroup -->
+<TransitionGroup name="list" tag="ul">
+  <li v-for="item in list" :key="item">{{ item }}</li>
+</TransitionGroup>
+```
+
+## 基本用法
+
+```vue
+<template>
+  <button @click="addItem">添加</button>
+  <button @click="removeItem">移除</button>
+
+  <TransitionGroup name="list" tag="ul">
+    <li v-for="item in items" :key="item">{{ item }}</li>
+  </TransitionGroup>
+</template>
+
+<script setup>
+import { ref } from 'vue'
+
+const items = ref([1, 2, 3])
+const addItem = () => items.value.push(items.value.length + 1)
+const removeItem = () => items.value.pop()
+</script>
+
+<style>
+.list-enter-active,
+.list-leave-active {
+  transition: all 0.5s;
+}
+.list-enter-from,
+.list-leave-to {
+  opacity: 0;
+  transform: translateX(30px);
+}
+</style>
+```
+
+## 与 Transition 的区别
+
+| 特性           | Transition | TransitionGroup |
+| -------------- | ---------- | --------------- |
+| 元素数量       | 单个       | 多个            |
+| tag 属性       | 不渲染容器 | 可指定容器元素  |
+| mode 属性      | 支持       | 不支持          |
+| key 要求       | 可选       | 必须            |
+| 样式类应用位置 | 容器元素   | 列表项元素      |
+
+## 移动动画
+
+当元素位置改变时（如排序），可以使用 `*-move` 类：
+
+```vue
+<TransitionGroup name="flip" tag="ul">
+  <li v-for="item in items" :key="item.id">{{ item.name }}</li>
+</TransitionGroup>
+
+<style>
+.flip-move {
+  transition: transform 0.5s;
+}
+
+/* 离开时脱离文档流，让其他元素移动 */
+.flip-leave-active {
+  position: absolute;
+}
+</style>
+```
+
+## 交错过渡
+
+使用 JavaScript 钩子实现交错动画：
+
+```vue
+<template>
+  <TransitionGroup
+    tag="ul"
+    @before-enter="onBeforeEnter"
+    @enter="onEnter"
+    @leave="onLeave"
+  >
+    <li v-for="(item, index) in items" :key="item" :data-index="index">
+      {{ item }}
+    </li>
+  </TransitionGroup>
+</template>
+
+<script setup>
+import gsap from 'gsap'
+
+function onBeforeEnter(el) {
+  el.style.opacity = 0
+  el.style.transform = 'translateY(20px)'
+}
+
+function onEnter(el, done) {
+  gsap.to(el, {
+    opacity: 1,
+    y: 0,
+    delay: el.dataset.index * 0.1, // 交错延迟
+    onComplete: done,
+  })
+}
+
+function onLeave(el, done) {
+  gsap.to(el, {
+    opacity: 0,
+    y: 20,
+    delay: el.dataset.index * 0.1,
+    onComplete: done,
+  })
+}
+</script>
+```
+
+## 实战：待办事项列表
+
+```vue
+<template>
+  <div class="todo">
+    <input v-model="newTodo" @keyup.enter="addTodo" placeholder="添加待办" />
+
+    <TransitionGroup name="todo" tag="ul">
+      <li v-for="todo in todos" :key="todo.id">
+        <span>{{ todo.text }}</span>
+        <button @click="removeTodo(todo.id)">删除</button>
+      </li>
+    </TransitionGroup>
+  </div>
+</template>
+
+<script setup>
+import { ref } from 'vue'
+
+const newTodo = ref('')
+const todos = ref([])
+let id = 0
+
+const addTodo = () => {
+  if (newTodo.value.trim()) {
+    todos.value.push({ id: id++, text: newTodo.value })
+    newTodo.value = ''
+  }
+}
+
+const removeTodo = (id) => {
+  todos.value = todos.value.filter((t) => t.id !== id)
+}
+</script>
+
+<style>
+.todo-enter-active,
+.todo-leave-active {
+  transition: all 0.3s ease;
+}
+.todo-enter-from {
+  opacity: 0;
+  transform: translateX(-30px);
+}
+.todo-leave-to {
+  opacity: 0;
+  transform: translateX(30px);
+}
+.todo-move {
+  transition: transform 0.3s;
+}
+.todo-leave-active {
+  position: absolute;
+}
+</style>
+```
+
+## 注意事项
+
+1. **必须有 key**：每个子元素都需要唯一的 key
+2. **tag 属性**：默认不渲染容器，需要指定 tag 渲染包裹元素
+3. **leave-active 配合 absolute**：移除元素时使用绝对定位，让其他元素的移动动画生效

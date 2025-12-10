@@ -1,0 +1,203 @@
+---
+title: 'Vue3 KeepAlive 组件缓存'
+pubDate: 2024-01-15
+category: 'Vue'
+tags: ['Vue3', 'KeepAlive', '缓存']
+description: '使用 KeepAlive 缓存组件状态，避免重复渲染'
+---
+
+`<KeepAlive>` 是 Vue 内置组件，用于**缓存组件实例**，避免反复销毁和创建。
+
+## 问题场景
+
+```vue
+<template>
+  <button @click="tab = 'A'">Tab A</button>
+  <button @click="tab = 'B'">Tab B</button>
+
+  <ComponentA v-if="tab === 'A'" />
+  <ComponentB v-if="tab === 'B'" />
+</template>
+```
+
+切换 Tab 时，组件会被**销毁重建**，之前的状态（表单输入、滚动位置等）会丢失。
+
+## 基本用法
+
+用 `<KeepAlive>` 包裹动态组件：
+
+```vue
+<template>
+  <KeepAlive>
+    <component :is="currentTab" />
+  </KeepAlive>
+</template>
+```
+
+结合路由：
+
+```vue
+<router-view v-slot="{ Component }">
+  <KeepAlive>
+    <component :is="Component" />
+  </KeepAlive>
+</router-view>
+```
+
+现在切换时，组件状态会被保留。
+
+## include / exclude
+
+指定哪些组件需要缓存：
+
+```vue
+<!-- 只缓存 Counter 和 Timer -->
+<KeepAlive include="Counter,Timer">
+  <component :is="currentTab" />
+</KeepAlive>
+
+<!-- 缓存除 Settings 外的所有组件 -->
+<KeepAlive exclude="Settings">
+  <component :is="currentTab" />
+</KeepAlive>
+
+<!-- 正则匹配 -->
+<KeepAlive :include="/^Tab/">
+  <component :is="currentTab" />
+</KeepAlive>
+
+<!-- 数组形式 -->
+<KeepAlive :include="['Counter', 'Timer']">
+  <component :is="currentTab" />
+</KeepAlive>
+```
+
+🔶 **注意**：匹配的是组件的 `name` 选项。
+
+```vue
+<!-- Counter.vue -->
+<script>
+export default {
+  name: 'Counter', // 这个名字要和 include 匹配
+}
+</script>
+
+<!-- 或 setup 语法糖 -->
+<script setup>
+defineOptions({
+  name: 'Counter',
+})
+</script>
+```
+
+## max 限制缓存数量
+
+```vue
+<KeepAlive :max="5">
+  <component :is="currentTab" />
+</KeepAlive>
+```
+
+超过 5 个时，**最久未访问**的组件会被销毁（LRU 策略）。
+
+## 生命周期钩子
+
+被缓存的组件有两个特殊的钩子：
+
+| 钩子            | 触发时机                   |
+| --------------- | -------------------------- |
+| `onActivated`   | 组件被激活（从缓存中取出） |
+| `onDeactivated` | 组件被停用（放入缓存）     |
+
+```vue
+<script setup>
+import { onActivated, onDeactivated } from 'vue'
+
+onActivated(() => {
+  console.log('组件被激活')
+  // 可以在这里刷新数据
+})
+
+onDeactivated(() => {
+  console.log('组件被缓存')
+  // 可以在这里暂停定时器等
+})
+</script>
+```
+
+## 实战：路由缓存
+
+```vue
+<!-- App.vue -->
+<script setup>
+import { ref } from 'vue'
+
+// 需要缓存的路由
+const cachedRoutes = ref(['Home', 'List'])
+</script>
+
+<template>
+  <router-view v-slot="{ Component, route }">
+    <KeepAlive :include="cachedRoutes">
+      <component :is="Component" :key="route.path" />
+    </KeepAlive>
+  </router-view>
+</template>
+```
+
+根据路由 meta 动态缓存：
+
+```ts
+// router/index.ts
+const routes = [
+  {
+    path: '/list',
+    component: List,
+    meta: { keepAlive: true }, // 标记需要缓存
+  },
+  {
+    path: '/detail',
+    component: Detail,
+    meta: { keepAlive: false },
+  },
+]
+```
+
+```vue
+<!-- App.vue -->
+<router-view v-slot="{ Component, route }">
+  <KeepAlive>
+    <component 
+      v-if="route.meta.keepAlive"
+      :is="Component" 
+      :key="route.path"
+    />
+  </KeepAlive>
+  <component 
+    v-if="!route.meta.keepAlive"
+    :is="Component" 
+    :key="route.path"
+  />
+</router-view>
+```
+
+## 小结
+
+| 属性      | 作用             |
+| --------- | ---------------- |
+| `include` | 指定要缓存的组件 |
+| `exclude` | 指定不缓存的组件 |
+| `max`     | 最大缓存数量     |
+
+| 钩子            | 用途                 |
+| --------------- | -------------------- |
+| `onActivated`   | 刷新数据、恢复状态   |
+| `onDeactivated` | 暂停定时器、保存状态 |
+
+🎯 **适用场景**：
+
+- Tab 切换保持状态
+- 列表页返回保持滚动位置
+- 表单页面保持填写内容
+
+下一篇我们来看状态管理库 Pinia。

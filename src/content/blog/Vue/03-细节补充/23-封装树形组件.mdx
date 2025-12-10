@@ -1,0 +1,187 @@
+---
+title: '封装树形组件'
+pubDate: 2024-01-15
+category: 'Vue'
+tags: ['Vue3', '组件封装']
+description: '实现支持复选框、展开收起、过渡动画的递归树形组件'
+---
+
+## 目标功能
+
+- 递归渲染树形结构
+- 展开/收起节点
+- 复选框选中
+- 父子节点联动
+- 过渡动画
+
+## 使用示例
+
+```vue
+<Tree
+  :data="treeData"
+  :show-checkbox="true"
+  :transition="true"
+  @update:checked="handleChecked"
+/>
+```
+
+```js
+const treeData = [
+  {
+    label: '水果',
+    checked: false,
+    children: [
+      { label: '苹果', checked: false },
+      { label: '香蕉', checked: false },
+    ],
+  },
+]
+```
+
+## 核心实现
+
+### TreeNode.vue（递归组件）
+
+```vue
+<template>
+  <div class="tree-node">
+    <div class="node-content" @click="toggleExpand">
+      <span v-if="hasChildren" class="expand-icon">
+        {{ expanded ? '▼' : '▶' }}
+      </span>
+      <input
+        v-if="showCheckbox"
+        type="checkbox"
+        :checked="node.checked"
+        @click.stop
+        @change="handleCheck"
+      />
+      <span>{{ node.label }}</span>
+    </div>
+
+    <Transition v-if="transition" name="tree">
+      <div v-show="expanded" class="children">
+        <TreeNode
+          v-for="child in node.children"
+          :key="child.label"
+          :node="child"
+          :show-checkbox="showCheckbox"
+          :transition="transition"
+          @update:checked="$emit('update:checked', $event)"
+        />
+      </div>
+    </Transition>
+    <div v-else v-show="expanded" class="children">
+      <TreeNode
+        v-for="child in node.children"
+        :key="child.label"
+        :node="child"
+        :show-checkbox="showCheckbox"
+        @update:checked="$emit('update:checked', $event)"
+      />
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, computed } from 'vue'
+
+const props = defineProps({
+  node: { type: Object, required: true },
+  showCheckbox: { type: Boolean, default: false },
+  transition: { type: Boolean, default: false },
+})
+
+const emit = defineEmits(['update:checked'])
+
+const expanded = ref(true)
+const hasChildren = computed(() => props.node.children?.length > 0)
+
+const toggleExpand = () => {
+  if (hasChildren.value) {
+    expanded.value = !expanded.value
+  }
+}
+
+const handleCheck = (e) => {
+  const checked = e.target.checked
+  // 更新当前节点
+  props.node.checked = checked
+  // 更新所有子节点
+  updateChildren(props.node, checked)
+  emit('update:checked', props.node)
+}
+
+const updateChildren = (node, checked) => {
+  if (node.children) {
+    node.children.forEach((child) => {
+      child.checked = checked
+      updateChildren(child, checked)
+    })
+  }
+}
+</script>
+```
+
+### Tree.vue（入口组件）
+
+```vue
+<template>
+  <div class="tree">
+    <TreeNode
+      v-for="node in data"
+      :key="node.label"
+      :node="node"
+      :show-checkbox="showCheckbox"
+      :transition="transition"
+      @update:checked="handleChecked"
+    />
+  </div>
+</template>
+
+<script setup>
+import TreeNode from './TreeNode.vue'
+
+defineProps({
+  data: { type: Array, required: true },
+  showCheckbox: { type: Boolean, default: false },
+  transition: { type: Boolean, default: false },
+})
+
+const emit = defineEmits(['update:checked'])
+
+const handleChecked = (node) => {
+  emit('update:checked', node)
+}
+</script>
+
+<style>
+.tree-node {
+  padding-left: 20px;
+}
+.node-content {
+  cursor: pointer;
+  padding: 4px 0;
+}
+.expand-icon {
+  margin-right: 4px;
+  font-size: 10px;
+}
+
+.tree-enter-active,
+.tree-leave-active {
+  transition: all 0.3s;
+}
+.tree-enter-from,
+.tree-leave-to {
+  opacity: 0;
+  transform: translateY(-10px);
+}
+</style>
+```
+
+## 关键点
+
+1. **递归组件**：组件内部使用自身
+2. **父子联动**：选中父节点时更新所有子节点
+3. **事件冒泡**：使用 `$emit` 将变化通知到根组件

@@ -1,0 +1,124 @@
+---
+title: 'vue3-lazyload 图片懒加载'
+pubDate: 2024-01-15
+category: 'Vue'
+tags: ['Vue3', '第三方库']
+description: '使用 vue3-lazyload 实现图片懒加载，提升页面加载性能'
+---
+
+## 简介
+
+vue3-lazyload 是专为 Vue3 设计的图片懒加载库，基于 IntersectionObserver 实现。
+
+## 安装
+
+```bash
+npm install vue3-lazyload
+```
+
+## 全局注册
+
+```js
+// main.js
+import { createApp } from 'vue'
+import VueLazyload from 'vue3-lazyload'
+
+const app = createApp(App)
+
+app.use(VueLazyload, {
+  loading: '/placeholder.png', // 加载中占位图
+  error: '/error.png', // 加载失败图
+  observerOptions: {
+    rootMargin: '0px',
+    threshold: 0.1,
+  },
+})
+```
+
+## 基本用法
+
+```vue
+<template>
+  <!-- 简单用法 -->
+  <img v-lazy="imageUrl" />
+
+  <!-- 对象形式（自定义占位图） -->
+  <img
+    v-lazy="{
+      src: imageUrl,
+      loading: '/custom-loading.png',
+      error: '/custom-error.png',
+    }"
+  />
+</template>
+```
+
+## 配置选项
+
+| 选项            | 说明                      |
+| --------------- | ------------------------- |
+| loading         | 加载中显示的图片          |
+| error           | 加载失败显示的图片        |
+| observerOptions | IntersectionObserver 配置 |
+| log             | 是否打印调试信息          |
+| delay           | 延迟加载时间（毫秒）      |
+
+## 生命周期钩子
+
+```js
+app.use(VueLazyload, {
+  lifecycle: {
+    loading: (el) => console.log('加载中', el),
+    loaded: (el) => console.log('加载完成', el),
+    error: (el) => console.log('加载失败', el),
+  },
+})
+```
+
+## CSS 状态样式
+
+```css
+/* 加载中 */
+img[lazy='loading'] {
+  opacity: 0.5;
+}
+
+/* 加载完成 */
+img[lazy='loaded'] {
+  opacity: 1;
+  transition: opacity 0.3s;
+}
+
+/* 加载失败 */
+img[lazy='error'] {
+  border: 1px solid red;
+}
+```
+
+## 局部使用
+
+```vue
+<script setup>
+import { ref } from 'vue'
+import { useLazyload } from 'vue3-lazyload'
+
+const src = ref('https://example.com/image.jpg')
+const lazyRef = useLazyload(src, {
+  lifecycle: {
+    loaded: () => console.log('图片加载完成'),
+  },
+})
+</script>
+
+<template>
+  <img ref="lazyRef" />
+</template>
+```
+
+## 懒加载 vs 虚拟列表
+
+| 场景                       | 推荐方案          |
+| -------------------------- | ----------------- |
+| 图片数量适中（几十到几百） | 懒加载            |
+| 列表数量巨大（几千到几万） | 虚拟列表          |
+| 图片列表数量巨大           | 虚拟列表 + 懒加载 |

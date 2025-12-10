@@ -1,0 +1,220 @@
+---
+title: '模板编译器原理（四）：完整实现'
+pubDate: 2024-01-15
+category: 'Vue'
+tags: ['Vue3', '面试']
+description: 'Vue 模板编译器完整实现：从模板到渲染函数'
+---
+
+## 编译流程回顾
+
+```
+模板字符串
+    │
+    ▼
+[解析器] tokenize → parse
+    │
+    ▼
+模板 AST
+    │
+    ▼
+[转换器] transform
+    │
+    ▼
+JS AST
+    │
+    ▼
+[生成器] generate
+    │
+    ▼
+渲染函数代码
+```
+
+## 完整编译函数
+
+```ts
+function compile(template) {
+  // 1. 解析：模板 → 模板 AST
+  const ast = parse(template)
+
+  // 2. 转换：模板 AST → JS AST
+  transform(ast)
+
+  // 3. 生成：JS AST → 代码
+  const code = generate(ast.jsNode)
+
+  return code
+}
+```
+
+## 解析器实现要点
+
+### tokenize：词法分析
+
+```ts
+function tokenize(str) {
+  let currentState = State.initial
+  const tokens = []
+  const chars = []
+
+  while (str.length) {
+    const char = str[0]
+
+    switch (currentState) {
+      case State.initial:
+        if (char === '<') {
+          currentState = State.tagOpen
+        } else if (isAlpha(char)) {
+          currentState = State.text
+          chars.push(char)
+        }
+        break
+      // ... 其他状态
+    }
+
+    str = str.slice(1)
+  }
+
+  return tokens
+}
+```
+
+### parse：语法分析
+
+```ts
+function parse(str) {
+  const tokens = tokenize(str)
+  const root = { type: 'Root', children: [] }
+  const elementStack = [root]
+
+  while (tokens.length) {
+    const parent = elementStack[elementStack.length - 1]
+    const t = tokens[0]
+
+    switch (t.type) {
+      case 'tag':
+        const elementNode = {
+          type: 'Element',
+          tag: t.name,
+          children: [],
+        }
+        parent.children.push(elementNode)
+        elementStack.push(elementNode)
+        break
+      case 'text':
+        parent.children.push({
+          type: 'Text',
+          content: t.content,
+        })
+        break
+      case 'tagEnd':
+        elementStack.pop()
+        break
+    }
+
+    tokens.shift()
+  }
+
+  return root
+}
+```
+
+## 转换器实现要点
+
+```ts
+function transform(ast) {
+  const context = {
+    currentNode: null,
+    parent: null,
+    nodeTransforms: [transformElement, transformText],
+  }
+
+  traverseNode(ast, context)
+
+  // 将 JS AST 挂载到根节点
+  ast.jsNode = ast.children[0].jsNode
+}
+
+function transformText(node) {
+  if (node.type !== 'Text') return
+
+  node.jsNode = {
+    type: 'StringLiteral',
+    value: node.content,
+  }
+}
+
+function transformElement(node) {
+  return () => {
+    if (node.type !== 'Element') return
+
+    const callExp = {
+      type: 'CallExpression',
+      callee: { type: 'Identifier', name: 'h' },
+      arguments: [{ type: 'StringLiteral', value: node.tag }],
+    }
+
+    // 添加子节点
+    if (node.children.length === 1) {
+      callExp.arguments.push(node.children[0].jsNode)
+    } else {
+      callExp.arguments.push({
+        type: 'ArrayExpression',
+        elements: node.children.map((c) => c.jsNode),
+      })
+    }
+
+    node.jsNode = callExp
+  }
+}
+```
+
+## 生成器实现要点
+
+```ts
+function generate(node) {
+  const context = {
+    code: '',
+    push(code) {
+      context.code += code
+    },
+  }
+
+  context.push('function render() { return ')
+  genNode(node, context)
+  context.push(' }')
+
+  return context.code
+}
+```
+
+## 编译结果示例
+
+输入：
+
+```html
+<div>
+  <p>hello</p>
+  <p>world</p>
+</div>
+```
+
+输出：
+
+```js
+function render() {
+  return h('div', [h('p', 'hello'), h('p', 'world')])
+}
+```
+
+## 参考答案
+
+Vue 编译器的实现原理分为三个阶段：
+
+1. **解析器**：通过有限状态机进行词法分析，将模板字符串转换为 tokens，再通过栈结构进行语法分析，构建模板 AST
+
+2. **转换器**：深度优先遍历模板 AST，通过转换函数将模板 AST 节点转换为 JS AST 节点
+
+3. **生成器**：递归遍历 JS AST，根据不同节点类型生成对应的代码字符串，最终拼接成完整的渲染函数
+
+Vue3 的编译器还会在转换阶段进行大量优化，如静态提升、预字符串化、事件缓存、Block Tree、PatchFlag 等，以提升运行时性能。

@@ -1,0 +1,247 @@
+---
+title: '图解 effect 执行过程'
+pubDate: 2024-01-15
+category: 'Vue'
+tags: ['Vue3', '原理', 'effect']
+description: '详细图解 effect 的依赖收集过程，解决分支切换和嵌套问题'
+---
+
+effect 的作用：**将函数和数据关联起来**。
+
+## 基础实现回顾
+
+```ts
+let activeEffect = null
+const depsMap = new Map()
+
+function effect(fn) {
+  activeEffect = fn
+  fn() // 执行时触发 get，收集依赖
+  activeEffect = null
+}
+
+function track(target, key) {
+  if (activeEffect) {
+    let deps = depsMap.get(key)
+    if (!deps) {
+      deps = new Set()
+      depsMap.set(key, deps)
+    }
+    deps.add(activeEffect)
+  }
+}
+```
+
+## 问题 1：重新执行时依赖不更新
+
+```ts
+effect(() => {
+  if (state.a === 1) {
+    state.b // 第一次：依赖 a、b
+  } else {
+    state.c // 第二次：应该依赖 a、c
+  }
+})
+
+state.a = 2 // 修改后重新执行，但依赖没有更新
+```
+
+**原因**：重新执行 fn 时，`activeEffect` 是 null，不会重新收集。
+
+**解决**：把 `activeEffect = fn` 放到包装函数里：
+
+```ts
+function effect(fn) {
+  const effectFn = () => {
+    activeEffect = effectFn // 每次执行都设置
+    fn()
+    activeEffect = null
+  }
+  effectFn()
+}
+```
+
+```
+┌──────────────────────────────────────┐
+│          effectFn 执行               │
+├──────────────────────────────────────┤
+│  1. activeEffect = effectFn          │
+│  2. fn() → 触发 get → track          │
+│  3. activeEffect = null              │
+└──────────────────────────────────────┘
+```
+
+## 问题 2：旧依赖没有清除
+
+```ts
+// 第一次执行：建立 a、b 的依赖
+// state.a = 2 后重新执行：应该只有 a、c 的依赖
+// 但 b 的依赖还在！
+```
+
+**解决**：执行前清除旧依赖
+
+```ts
+function effect(fn) {
+  const effectFn = () => {
+    activeEffect = effectFn
+    cleanup(effectFn) // 清除旧依赖
+    fn()
+    activeEffect = null
+  }
+  effectFn.deps = [] // 记录自己被哪些 Set 收集了
+  effectFn()
+}
+
+function cleanup(effectFn) {
+  effectFn.deps.forEach((dep) => {
+    dep.delete(effectFn) // 从每个依赖集合中删除自己
+  })
+  effectFn.deps.length = 0
+}
+
+function track(target, key) {
+  if (activeEffect) {
+    let deps = depsMap.get(key)
+    if (!deps) {
+      deps = new Set()
+      depsMap.set(key, deps)
+    }
+    deps.add(activeEffect)
+    activeEffect.deps.push(deps) // 记录被收集到了哪里
+  }
+}
+```
+
+```
+┌─────────────────────────────────────────────────┐
+│  effectFn.deps = [Set(a的依赖), Set(b的依赖)]   │
+│                                                 │
+│  cleanup 时：                                   │
+│    Set(a的依赖).delete(effectFn)               │
+│    Set(b的依赖).delete(effectFn)               │
+│    effectFn.deps = []                          │
+│                                                 │
+│  重新执行后：                                   │
+│    effectFn.deps = [Set(a的依赖), Set(c的依赖)] │
+└─────────────────────────────────────────────────┘
+```
+
+## 问题 3：嵌套 effect
+
+```ts
+effect(() => {
+  effect(() => {
+    state.a
+    console.log('内层')
+  })
+  state.b
+  console.log('外层')
+})
+```
+
+**问题**：内层执行完后 `activeEffect = null`，外层的 b 没有收集到依赖。
+
+**解决**：用栈管理
+
+```ts
+const effectStack = []
+
+function effect(fn) {
+  const effectFn = () => {
+    activeEffect = effectFn
+    effectStack.push(effectFn)
+    cleanup(effectFn)
+    fn()
+    effectStack.pop()
+    activeEffect = effectStack[effectStack.length - 1]
+  }
+  effectFn.deps = []
+  effectFn()
+}
+```
+
+```
+执行过程：
+  外层 effect 开始
+    activeEffect = 外层 effectFn
+    effectStack = [外层]
+
+    内层 effect 开始
+      activeEffect = 内层 effectFn
+      effectStack = [外层, 内层]
+      state.a → track(内层)
+
+    内层 effect 结束
+      effectStack.pop() → [外层]
+      activeEffect = 外层 effectFn ← 关键！
+
+    state.b → track(外层) ← 现在能正确收集了
+
+  外层 effect 结束
+```
+
+## 问题 4：无限循环
+
+```ts
+effect(() => {
+  state.a++ // 读取 + 写入，触发自己
+})
+```
+
+**解决**：trigger 时排除正在执行的 effect
+
+```ts
+function trigger(target, key) {
+  const deps = depsMap.get(key)
+  if (deps) {
+    const effectsToRun = new Set()
+    deps.forEach((effect) => {
+      if (effect !== activeEffect) {
+        // 排除当前正在执行的
+        effectsToRun.add(effect)
+      }
+    })
+    effectsToRun.forEach((effect) => effect())
+  }
+}
+```
+
+## 完整代码
+
+```ts
+let activeEffect = null
+const effectStack = []
+const targetMap = new WeakMap()
+
+function effect(fn) {
+  const effectFn = () => {
+    activeEffect = effectFn
+    effectStack.push(effectFn)
+    cleanup(effectFn)
+    const result = fn()
+    effectStack.pop()
+    activeEffect = effectStack[effectStack.length - 1]
+    return result
+  }
+  effectFn.deps = []
+  effectFn()
+  return effectFn
+}
+
+function cleanup(effectFn) {
+  effectFn.deps.forEach((dep) => dep.delete(effectFn))
+  effectFn.deps.length = 0
+}
+```
+
+## 小结
+
+| 问题           | 解决方案                       |
+| -------------- | ------------------------------ |
+| 重新执行不收集 | effectFn 内部设置 activeEffect |
+| 旧依赖残留     | cleanup 清除后重新收集         |
+| 嵌套 effect    | 用栈管理 activeEffect          |
+| 无限循环       | trigger 时排除当前 effect      |
+
+下一篇我们来看完整的依赖收集数据结构。

@@ -1,0 +1,207 @@
+---
+title: 'Vue3 响应式数据：ref 与 reactive'
+pubDate: 2024-01-15
+category: 'Vue'
+tags: ['Vue3', '响应式', 'ref', 'reactive']
+description: '深入理解 Vue3 响应式系统，掌握 ref 和 reactive 的使用场景和区别'
+---
+
+🙋 什么是响应式？
+
+简单说：**数据变了，视图自动更新**。这是 Vue 最核心的能力。
+
+Vue3 提供了两个创建响应式数据的 API：`ref` 和 `reactive`。这篇文章带你彻底搞懂它们。
+
+## ref：通用的响应式方案
+
+`ref` 可以包装任意类型的值，是最常用的响应式 API：
+
+```vue
+<script setup>
+import { ref } from 'vue'
+
+const count = ref(0)
+
+// 在 JS 中访问/修改需要用 .value
+console.log(count.value) // 0
+count.value++
+</script>
+
+<template>
+  <!-- 模板中自动解包，不需要 .value -->
+  <button @click="count++">{{ count }}</button>
+</template>
+```
+
+🔶 **核心要点**：`ref` 返回的是一个对象，真正的值在 `.value` 里。模板中会自动解包，JS 中必须用 `.value`。
+
+### ref 可以包装任意类型
+
+```ts
+// 基本类型
+const name = ref('Vue')
+const isLoading = ref(false)
+
+// 对象
+const user = ref({
+  name: 'Tom',
+  age: 18,
+})
+
+// 数组
+const list = ref([1, 2, 3])
+
+// 修改方式
+name.value = 'Vue3'
+user.value.age = 20
+list.value.push(4)
+```
+
+### 深层响应式
+
+`ref` 默认是**深层响应式**的，嵌套对象的属性变化也能触发更新：
+
+```vue
+<script setup>
+import { ref } from 'vue'
+
+const state = ref({
+  user: {
+    profile: {
+      name: 'Tom',
+    },
+  },
+})
+
+// 深层属性变化也会触发视图更新
+state.value.user.profile.name = 'Jerry'
+</script>
+```
+
+🤔 不想要深层响应式？
+
+用 `shallowRef`，只有 `.value` 整体替换时才触发更新：
+
+```ts
+import { shallowRef } from 'vue'
+
+const state = shallowRef({ count: 1 })
+
+// ❌ 不会触发更新
+state.value.count = 2
+
+// ✅ 会触发更新
+state.value = { count: 2 }
+```
+
+## reactive：对象专用
+
+`reactive` 只能用于对象类型（对象、数组、Map、Set），不能用于基本类型：
+
+```vue
+<script setup>
+import { reactive } from 'vue'
+
+const state = reactive({
+  count: 0,
+  user: { name: 'Tom' },
+})
+
+// 直接访问，不需要 .value
+state.count++
+state.user.name = 'Jerry'
+</script>
+
+<template>
+  <div>{{ state.count }}</div>
+  <div>{{ state.user.name }}</div>
+</template>
+```
+
+看起来比 `ref` 简洁？别急，它有坑。
+
+### reactive 的局限性
+
+🔶 **问题 1：不能替换整个对象**
+
+```ts
+let state = reactive({ count: 0 })
+
+// ❌ 响应式丢失！state 变成了普通对象
+state = { count: 1 }
+
+// ✅ 正确做法：逐个属性赋值
+state.count = 1
+```
+
+🔶 **问题 2：解构会丢失响应式**
+
+```ts
+const state = reactive({ count: 0, name: 'Vue' })
+
+// ❌ 解构后的变量不是响应式的
+const { count, name } = state
+
+// ✅ 用 toRefs 保持响应式
+import { toRefs } from 'vue'
+const { count, name } = toRefs(state)
+```
+
+🔶 **问题 3：传递给函数会丢失响应式**
+
+```ts
+const state = reactive({ count: 0 })
+
+// ❌ 传递属性值会丢失响应式
+callSomeFunction(state.count)
+
+// ✅ 传递整个对象，或者用 ref
+callSomeFunction(state)
+```
+
+## ref vs reactive 怎么选？
+
+| 场景                           | 推荐            |
+| ------------------------------ | --------------- |
+| 基本类型（数字、字符串、布尔） | `ref`           |
+| 需要整体替换的对象             | `ref`           |
+| 需要解构的对象                 | `ref` + 解构    |
+| 不会整体替换的复杂对象         | `reactive` 也行 |
+
+🎯 **我的建议**：统一用 `ref`，虽然要写 `.value`，但心智负担最小，不容易踩坑。
+
+## DOM 更新是异步的
+
+响应式数据变化后，DOM 不会立即更新，而是在下一个"tick"批量更新：
+
+```ts
+import { ref, nextTick } from 'vue'
+
+const count = ref(0)
+
+count.value = 1
+console.log(document.querySelector('#count').textContent) // 还是 0！
+
+// 等待 DOM 更新
+await nextTick()
+console.log(document.querySelector('#count').textContent) // 现在是 1
+```
+
+🤔 为什么要异步更新？
+
+性能优化。如果你连续修改 100 次数据，同步更新意味着 DOM 要更新 100 次。异步批量更新只需要更新 1 次。
+
+## 小结
+
+| API          | 适用类型   | 访问方式 | 整体替换        |
+| ------------ | ---------- | -------- | --------------- |
+| `ref`        | 任意类型   | `.value` | ✅ 支持         |
+| `reactive`   | 仅对象类型 | 直接访问 | ❌ 会丢失响应式 |
+| `shallowRef` | 任意类型   | `.value` | 浅层响应式      |
+
+记住两个要点：
+
+1. **优先用 ref**，心智负担最小
+2. **DOM 更新是异步的**，需要最新 DOM 用 `nextTick`
+
+下一篇我们继续看 Vue3 响应式的进阶用法。

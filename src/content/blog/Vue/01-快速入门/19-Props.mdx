@@ -1,0 +1,229 @@
+---
+title: 'Vue3 Props 详解'
+pubDate: 2024-01-15
+category: 'Vue'
+tags: ['Vue3', 'Props', '组件通信']
+description: '掌握 Props 的声明方式、类型校验、单向数据流原则'
+---
+
+Props 是父组件向子组件传递数据的方式。
+
+## 基本用法
+
+子组件用 `defineProps` 声明要接收的 props：
+
+```vue
+<!-- UserCard.vue -->
+<script setup>
+const props = defineProps({
+  name: String,
+  age: Number,
+})
+</script>
+
+<template>
+  <div>{{ name }} - {{ age }}岁</div>
+</template>
+```
+
+父组件传递数据：
+
+```vue
+<script setup>
+import UserCard from './UserCard.vue'
+</script>
+
+<template>
+  <UserCard name="张三" :age="18" />
+</template>
+```
+
+🔶 **注意**：非字符串类型必须用 `v-bind`（`:age="18"`），否则会被当作字符串。
+
+## TypeScript 写法
+
+使用泛型更简洁：
+
+```vue
+<script setup lang="ts">
+interface Props {
+  name: string
+  age?: number // 可选
+  tags?: string[]
+}
+
+const props = defineProps<Props>()
+</script>
+```
+
+带默认值：
+
+```vue
+<script setup lang="ts">
+interface Props {
+  name: string
+  age?: number
+  tags?: string[]
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  age: 18,
+  tags: () => [], // 对象/数组默认值必须用工厂函数
+})
+</script>
+```
+
+## Props 校验
+
+```ts
+defineProps({
+  // 基础类型
+  title: String,
+
+  // 多种类型
+  id: [String, Number],
+
+  // 必填
+  name: {
+    type: String,
+    required: true,
+  },
+
+  // 带默认值
+  count: {
+    type: Number,
+    default: 0,
+  },
+
+  // 对象默认值（必须用工厂函数）
+  config: {
+    type: Object,
+    default: () => ({ theme: 'light' }),
+  },
+
+  // 自定义校验
+  status: {
+    type: String,
+    validator: (value) => ['pending', 'success', 'error'].includes(value),
+  },
+})
+```
+
+## 命名约定
+
+| 位置           | 命名风格   | 示例                       |
+| -------------- | ---------- | -------------------------- |
+| defineProps 中 | camelCase  | `userName`                 |
+| 模板中使用     | camelCase  | `{{ userName }}`           |
+| 父组件传递     | kebab-case | `<Comp user-name="..." />` |
+
+Vue 会自动转换 `user-name` → `userName`。
+
+## 单向数据流
+
+🔶 **核心原则**：Props 是只读的，子组件不能修改。
+
+```ts
+const props = defineProps(['count'])
+
+// ❌ 错误！会报警告
+props.count = 10
+```
+
+### 需要修改怎么办？
+
+**方案 1**：用本地变量
+
+```ts
+const props = defineProps(['initialCount'])
+const count = ref(props.initialCount) // 复制一份
+```
+
+**方案 2**：用计算属性
+
+```ts
+const props = defineProps(['size'])
+const normalizedSize = computed(() => props.size.toLowerCase())
+```
+
+**方案 3**：触发事件让父组件修改
+
+```ts
+const emit = defineEmits(['update:count'])
+const increment = () => emit('update:count', props.count + 1)
+```
+
+## 动态 Props
+
+绑定响应式数据：
+
+```vue
+<script setup>
+import { ref } from 'vue'
+const user = ref({ name: '张三', age: 18 })
+</script>
+
+<template>
+  <!-- 传递整个对象 -->
+  <UserCard :user="user" />
+
+  <!-- 传递对象的属性 -->
+  <UserCard :name="user.name" :age="user.age" />
+
+  <!-- 展开对象（等价于上面） -->
+  <UserCard v-bind="user" />
+</template>
+```
+
+## 实战示例
+
+```vue
+<!-- Button.vue -->
+<script setup lang="ts">
+interface Props {
+  type?: 'primary' | 'default' | 'danger'
+  size?: 'small' | 'medium' | 'large'
+  disabled?: boolean
+  loading?: boolean
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  type: 'default',
+  size: 'medium',
+  disabled: false,
+  loading: false,
+})
+</script>
+
+<template>
+  <button
+    :class="['btn', `btn--${type}`, `btn--${size}`]"
+    :disabled="disabled || loading"
+  >
+    <span v-if="loading">加载中...</span>
+    <slot v-else />
+  </button>
+</template>
+```
+
+使用：
+
+```vue
+<template>
+  <Button type="primary" size="large">提交</Button>
+  <Button type="danger" :disabled="true">删除</Button>
+  <Button :loading="isLoading">保存</Button>
+</template>
+```
+
+## 小结
+
+| 要点     | 说明                                |
+| -------- | ----------------------------------- |
+| 声明     | `defineProps` 或 `defineProps<T>()` |
+| 默认值   | `withDefaults` 或 `default` 配置    |
+| 命名     | JS 用 camelCase，HTML 用 kebab-case |
+| 修改     | 不能直接改，用本地变量或触发事件    |
+| 非字符串 | 必须用 `v-bind`（`:prop="value"`）  |
+
+下一篇我们来看自定义事件。

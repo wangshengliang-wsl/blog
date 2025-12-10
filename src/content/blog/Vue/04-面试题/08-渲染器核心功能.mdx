@@ -1,0 +1,104 @@
+---
+title: '渲染器核心功能'
+pubDate: 2024-01-15
+category: 'Vue'
+tags: ['Vue3', '面试']
+description: '面试题：说一说渲染器的核心功能是什么？'
+---
+
+## 面试题
+
+> 说一说渲染器的核心功能是什么？
+
+## 核心功能
+
+根据 vnode 进行节点的**挂载**与**更新**。
+
+## 挂载属性
+
+### HTML Attributes vs DOM Properties
+
+|      | HTML Attributes   | DOM Properties  |
+| ---- | ----------------- | --------------- |
+| 定义 | HTML 标签中的属性 | JS 对象上的属性 |
+| 时机 | 初始化时设置      | 运行时可变      |
+| 类型 | 只能是字符串      | 任意类型        |
+
+**两者并不总是对应**：
+
+- `class` → `el.className`
+- `aria-*` 只有 HTML Attributes
+- `el.textContent` 只有 DOM Properties
+
+### 设置策略
+
+Vue 不是单独使用某一种方式，而是**两者结合**：
+
+```js
+function patchProps(el, key, prevValue, nextValue) {
+  if (shouldSetAsProps(el, key, nextValue)) {
+    // 优先使用 DOM Properties
+    const type = typeof el[key]
+    if (type === 'boolean' && nextValue === '') {
+      el[key] = true // 处理 disabled="" 的情况
+    } else {
+      el[key] = nextValue
+    }
+  } else {
+    // 只读属性等特殊情况使用 setAttribute
+    el.setAttribute(key, nextValue)
+  }
+}
+```
+
+### class 处理
+
+Vue 中 class 支持多种写法，需要归一化：
+
+```js
+// 字符串
+class="foo bar"
+
+// 对象
+:class="{ foo: true, bar: false }"
+
+// 数组
+:class="['foo', { bar: true }]"
+```
+
+归一化后统一为字符串，使用 `el.className` 设置（性能最好）。
+
+## 子节点挂载
+
+```js
+function mountElement(vnode, container) {
+  const el = document.createElement(vnode.type)
+
+  if (typeof vnode.children === 'string') {
+    el.textContent = vnode.children
+  } else if (Array.isArray(vnode.children)) {
+    vnode.children.forEach((child) => {
+      patch(null, child, el) // 递归挂载
+    })
+  }
+
+  container.appendChild(el)
+}
+```
+
+## 参考答案
+
+渲染器核心功能是处理虚拟 DOM 到真实 DOM 的渲染：
+
+1. **挂载**：初次渲染，创建 DOM 并插入页面
+2. **更新**：计算新旧 vnode 差异，通过 Patch 最小化更新
+3. **卸载**：组件销毁时移除 DOM
+
+每个步骤都有大量细节，如属性挂载时需要考虑：
+
+- setAttribute 还是 DOM Properties
+- disabled 等特殊属性处理
+- class/style 的参数归一化
+- 只读属性的处理
+
+渲染器与响应式系统紧密结合，数据变化触发渲染函数重新执行，生成新 vnode，然后通过 diff 算法找出差异进行更新。

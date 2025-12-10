@@ -1,0 +1,186 @@
+---
+title: '手写响应式系统（中）：处理边界情况'
+pubDate: 2024-01-15
+category: 'Vue'
+tags: ['Vue3', '原理', '响应式']
+description: '处理数组操作、自定义依赖收集等边界情况'
+---
+
+上一篇实现了基础版响应式系统，这篇处理一些边界情况。
+
+## 问题 1：数组查找对象
+
+```ts
+const arr = reactive([{ id: 1 }])
+arr.includes({ id: 1 }) // false，因为比较的是代理对象
+```
+
+因为递归代理，数组元素也变成了 Proxy，和原始对象不相等。
+
+**解决方案**：重写数组查找方法
+
+```ts
+const arrayMethods = ['includes', 'indexOf', 'lastIndexOf']
+
+arrayMethods.forEach((method) => {
+  handlers[method] = function (...args) {
+    // 先在代理对象中找
+    let result = Array.prototype[method].apply(this, args)
+    if (result === false || result === -1) {
+      // 找不到，在原始对象中再找一次
+      result = Array.prototype[method].apply(toRaw(this), args)
+    }
+    return result
+  }
+})
+```
+
+## 问题 2：数组长度变化
+
+```ts
+const arr = reactive([1, 2, 3])
+
+effect(() => {
+  console.log(arr.length)
+})
+
+arr.push(4) // 隐式改变 length，需要触发更新
+arr.length = 2 // 显式改变，需要触发受影响元素的更新
+```
+
+**解决方案**：
+
+- `push` 等方法会读取和设置 length，需要特殊处理
+- 设置 length 时，需要触发索引 >= 新长度的元素的更新
+
+## 问题 3：push 等方法的依赖收集
+
+```ts
+const arr = reactive([])
+
+effect(() => {
+  arr.push(1) // 这里会读取 length，产生不必要的依赖
+})
+
+arr.push(2) // 触发更新，但其实不应该
+```
+
+**解决方案**：暂停依赖收集
+
+```ts
+let shouldTrack = true
+
+function pauseTracking() {
+  shouldTrack = false
+}
+
+function resumeTracking() {
+  shouldTrack = true
+}
+
+;['push', 'pop', 'shift', 'unshift', 'splice'].forEach((method) => {
+  const original = Array.prototype[method]
+  handlers[method] = function (...args) {
+    pauseTracking()
+    const result = original.apply(this, args)
+    resumeTracking()
+    return result
+  }
+})
+```
+
+## 完善的拦截处理
+
+| 操作        | 触发的 trap    | 处理                       |
+| ----------- | -------------- | -------------------------- |
+| 读取属性    | get            | track                      |
+| 设置属性    | set            | trigger                    |
+| 新增属性    | set            | trigger + 触发 length 相关 |
+| 删除属性    | deleteProperty | trigger                    |
+| `in` 操作符 | has            | track                      |
+| `for...in`  | ownKeys        | track（特殊 key）          |
+
+```ts
+const handlers = {
+  get(target, key, receiver) {
+    track(target, TrackTypes.GET, key)
+    return Reflect.get(target, key, receiver)
+  },
+
+  set(target, key, value, receiver) {
+    const hadKey = hasOwn(target, key)
+    const oldValue = target[key]
+    const result = Reflect.set(target, key, value, receiver)
+
+    if (!hadKey) {
+      // 新增属性
+      trigger(target, TriggerTypes.ADD, key)
+    } else if (hasChanged(value, oldValue)) {
+      // 修改属性
+      trigger(target, TriggerTypes.SET, key)
+    }
+    return result
+  },
+
+  deleteProperty(target, key) {
+    const hadKey = hasOwn(target, key)
+    const result = Reflect.deleteProperty(target, key)
+    if (hadKey && result) {
+      trigger(target, TriggerTypes.DELETE, key)
+    }
+    return result
+  },
+
+  has(target, key) {
+    track(target, TrackTypes.HAS, key)
+    return Reflect.has(target, key)
+  },
+
+  ownKeys(target) {
+    track(target, TrackTypes.ITERATE, ITERATE_KEY)
+    return Reflect.ownKeys(target)
+  },
+}
+```
+
+## trigger 需要知道操作类型
+
+不同的写入操作，需要触发不同类型的读取依赖：
+
+```ts
+const triggerTypeMap = {
+  SET: ['GET'],
+  ADD: ['GET', 'ITERATE', 'HAS'],
+  DELETE: ['GET', 'ITERATE', 'HAS'],
+}
+```
+
+- SET：只触发对应 key 的 GET 依赖
+- ADD/DELETE：还需要触发 ITERATE（for...in）和 HAS（in）依赖
+
+```ts
+function trigger(target, type, key) {
+  const depsMap = targetMap.get(target)
+  if (!depsMap) return
+
+  const effectsToRun = new Set()
+
+  // 根据操作类型，收集需要执行的 effect
+  triggerTypeMap[type].forEach((trackType) => {
+    const deps = depsMap.get(trackType === 'ITERATE' ? ITERATE_KEY : key)
+    deps?.forEach((effect) => effectsToRun.add(effect))
+  })
+
+  effectsToRun.forEach((effect) => effect())
+}
+```
+
+## 小结
+
+| 问题         | 解决方案                     |
+| ------------ | ---------------------------- |
+| 数组查找对象 | 重写查找方法，原始对象中再找 |
+| push 等方法  | 暂停依赖收集                 |
+| 操作类型     | trigger 根据类型触发对应依赖 |
+
+下一篇我们来图解 effect 的执行过程。

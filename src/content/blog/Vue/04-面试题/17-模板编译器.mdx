@@ -1,0 +1,191 @@
+---
+title: '模板编译器原理（三）：生成器'
+pubDate: 2024-01-15
+category: 'Vue'
+tags: ['Vue3', '面试']
+description: 'Vue 编译器生成器原理：将 JS AST 生成渲染函数代码'
+---
+
+## 生成器的作用
+
+将 JavaScript AST 转换为可执行的渲染函数代码字符串。
+
+```
+JS AST  →  [生成器]  →  渲染函数代码
+```
+
+## 生成上下文
+
+```ts
+interface GenerateContext {
+  code: string // 生成的代码
+  indentLevel: number // 缩进级别
+
+  push(code) // 添加代码
+  indent() // 增加缩进
+  deindent() // 减少缩进
+  newline() // 换行
+}
+
+function createGenerateContext() {
+  const context = {
+    code: '',
+    indentLevel: 0,
+    push(code) {
+      context.code += code
+    },
+    indent() {
+      context.indentLevel++
+      context.newline()
+    },
+    deindent() {
+      context.indentLevel--
+      context.newline()
+    },
+    newline() {
+      context.code += '\n' + '  '.repeat(context.indentLevel)
+    },
+  }
+  return context
+}
+```
+
+## generate 函数
+
+```ts
+function generate(node) {
+  const context = createGenerateContext()
+
+  // 生成函数声明
+  context.push('function render() {')
+  context.indent()
+  context.push('return ')
+
+  // 生成函数体
+  genNode(node, context)
+
+  context.deindent()
+  context.push('}')
+
+  return context.code
+}
+```
+
+## genNode 分发
+
+```ts
+function genNode(node, context) {
+  switch (node.type) {
+    case 'StringLiteral':
+      genStringLiteral(node, context)
+      break
+    case 'Identifier':
+      genIdentifier(node, context)
+      break
+    case 'ArrayExpression':
+      genArrayExpression(node, context)
+      break
+    case 'CallExpression':
+      genCallExpression(node, context)
+      break
+    case 'FunctionDeclaration':
+      genFunctionDeclaration(node, context)
+      break
+  }
+}
+```
+
+## 各类型生成函数
+
+### StringLiteral
+
+```ts
+function genStringLiteral(node, context) {
+  context.push(`'${node.value}'`)
+}
+```
+
+### Identifier
+
+```ts
+function genIdentifier(node, context) {
+  context.push(node.name)
+}
+```
+
+### ArrayExpression
+
+```ts
+function genArrayExpression(node, context) {
+  context.push('[')
+  genNodeList(node.elements, context)
+  context.push(']')
+}
+
+function genNodeList(nodes, context) {
+  for (let i = 0; i < nodes.length; i++) {
+    genNode(nodes[i], context)
+    if (i < nodes.length - 1) {
+      context.push(', ')
+    }
+  }
+}
+```
+
+### CallExpression
+
+```ts
+function genCallExpression(node, context) {
+  const { callee, arguments: args } = node
+  context.push(`${callee.name}(`)
+  genNodeList(args, context)
+  context.push(')')
+}
+```
+
+## 完整示例
+
+输入模板：
+
+```vue
+<div><p>Vue</p></div>
+```
+
+JS AST：
+
+```js
+{
+  type: 'CallExpression',
+  callee: { type: 'Identifier', name: 'h' },
+  arguments: [
+    { type: 'StringLiteral', value: 'div' },
+    {
+      type: 'ArrayExpression',
+      elements: [{
+        type: 'CallExpression',
+        callee: { type: 'Identifier', name: 'h' },
+        arguments: [
+          { type: 'StringLiteral', value: 'p' },
+          { type: 'StringLiteral', value: 'Vue' }
+        ]
+      }]
+    }
+  ]
+}
+```
+
+生成的代码：
+
+```js
+function render() {
+  return h('div', [h('p', 'Vue')])
+}
+```
+
+## 总结：编译三阶段
+
+| 阶段   | 输入       | 输出         | 作用                |
+| ------ | ---------- | ------------ | ------------------- |
+| 解析器 | 模板字符串 | 模板 AST     | 词法分析 + 语法分析 |
+| 转换器 | 模板 AST   | JS AST       | 语义转换 + 优化     |
+| 生成器 | JS AST     | 渲染函数代码 | 代码生成            |

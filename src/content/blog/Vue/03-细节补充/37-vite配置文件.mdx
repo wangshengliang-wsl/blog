@@ -1,0 +1,149 @@
+---
+title: 'Vite 配置文件详解'
+pubDate: 2024-01-15
+category: 'Vue'
+tags: ['Vue3', 'Vite']
+description: 'vite.config.js 常用配置项：路径别名、代理、CSS 预处理器等'
+---
+
+## 基本格式
+
+```js
+// vite.config.js
+import { defineConfig } from 'vite'
+
+export default defineConfig({
+  // 配置项
+})
+```
+
+## 常用配置
+
+### 路径别名
+
+```js
+import { resolve } from 'path'
+
+export default defineConfig({
+  resolve: {
+    alias: {
+      '@': resolve(__dirname, 'src'),
+      '@components': resolve(__dirname, 'src/components'),
+    },
+  },
+})
+```
+
+### 开发服务器
+
+```js
+export default defineConfig({
+  server: {
+    port: 3000, // 端口
+    open: true, // 自动打开浏览器
+    host: '0.0.0.0', // 监听所有地址
+
+    // 代理配置
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, ''),
+      },
+    },
+  },
+})
+```
+
+### CSS 预处理器
+
+```js
+export default defineConfig({
+  css: {
+    preprocessorOptions: {
+      scss: {
+        // 全局引入变量
+        additionalData: `@import "@/styles/variables.scss";`,
+      },
+      less: {
+        math: 'parens-division',
+      },
+    },
+    devSourcemap: true, // 开启 source map
+  },
+})
+```
+
+### 全局常量
+
+```js
+export default defineConfig({
+  define: {
+    __APP_VERSION__: JSON.stringify('1.0.0'),
+    __API_URL__: JSON.stringify('https://api.example.com'),
+  },
+})
+```
+
+### 构建配置
+
+```js
+export default defineConfig({
+  build: {
+    outDir: 'dist', // 输出目录
+    assetsDir: 'assets', // 静态资源目录
+    sourcemap: true, // 生成 source map
+    minify: 'terser', // 压缩方式
+
+    rollupOptions: {
+      output: {
+        // 分包策略
+        manualChunks: {
+          vue: ['vue', 'vue-router', 'pinia'],
+          lodash: ['lodash-es'],
+        },
+      },
+    },
+  },
+})
+```
+
+### 插件
+
+```js
+import vue from '@vitejs/plugin-vue'
+import AutoImport from 'unplugin-auto-import/vite'
+
+export default defineConfig({
+  plugins: [
+    vue(),
+    AutoImport({
+      imports: ['vue', 'vue-router'],
+    }),
+  ],
+})
+```
+
+## 配置分类
+
+| 分类       | 配置项                      |
+| ---------- | --------------------------- |
+| 基础       | root, base, define, resolve |
+| 开发服务器 | server                      |
+| 构建       | build                       |
+| CSS        | css                         |
+| 插件       | plugins                     |
+| 依赖优化   | optimizeDeps                |
+
+## 环境变量
+
+```js
+export default defineConfig(({ mode }) => {
+  // mode: 'development' | 'production'
+  return {
+    define: {
+      __DEV__: mode === 'development',
+    },
+  }
+})
+```

@@ -1,0 +1,218 @@
+---
+title: 'Vue3 响应式工具函数速查'
+pubDate: 2024-01-15
+category: 'Vue'
+tags: ['Vue3', '响应式', 'API']
+description: 'toRef、toRefs、readonly、isRef 等响应式工具函数的用法和使用场景'
+---
+
+Vue3 除了 `ref` 和 `reactive`，还提供了一系列工具函数来处理响应式数据。这篇文章带你快速掌握这些 API。
+
+## toRef 与 toRefs：解构不丢响应式
+
+🙋 还记得上篇说的 reactive 解构会丢失响应式吗？
+
+```ts
+const state = reactive({ count: 0, name: 'Vue' })
+const { count } = state // ❌ count 不是响应式的
+```
+
+`toRef` 和 `toRefs` 就是来解决这个问题的。
+
+### toRef：提取单个属性
+
+```ts
+import { reactive, toRef } from 'vue'
+
+const state = reactive({ count: 0, name: 'Vue' })
+
+// 把 state.count 转成 ref
+const countRef = toRef(state, 'count')
+
+countRef.value++
+console.log(state.count) // 1，同步变化
+```
+
+### toRefs：批量提取所有属性
+
+```ts
+import { reactive, toRefs } from 'vue'
+
+const state = reactive({ count: 0, name: 'Vue' })
+
+// 把所有属性都转成 ref
+const { count, name } = toRefs(state)
+
+count.value++
+console.log(state.count) // 1，同步变化
+```
+
+🎯 **典型场景**：在 Composable 函数中返回响应式数据
+
+```ts
+// useCounter.ts
+export function useCounter() {
+  const state = reactive({
+    count: 0,
+    doubleCount: computed(() => state.count * 2),
+  })
+
+  const increment = () => state.count++
+
+  // ✅ 用 toRefs 保证解构后仍然是响应式的
+  return {
+    ...toRefs(state),
+    increment,
+  }
+}
+
+// 使用
+const { count, doubleCount, increment } = useCounter()
+```
+
+## unref 与 toValue：统一处理值
+
+### unref：ref 就取 .value，否则原样返回
+
+```ts
+import { ref, unref } from 'vue'
+
+const countRef = ref(10)
+const normalValue = 20
+
+console.log(unref(countRef)) // 10
+console.log(unref(normalValue)) // 20
+```
+
+相当于：
+
+```ts
+val = isRef(val) ? val.value : val
+```
+
+### toValue（Vue 3.3+）：支持 getter 函数
+
+```ts
+import { ref, toValue } from 'vue'
+
+const countRef = ref(10)
+const getter = () => 30
+
+console.log(toValue(countRef)) // 10
+console.log(toValue(20)) // 20
+console.log(toValue(getter)) // 30，会执行函数
+```
+
+🎯 **典型场景**：Composable 函数参数可以是 ref、普通值或 getter
+
+```ts
+// 这个函数的参数可以是任意形式
+function useFetch(url: MaybeRefOrGetter<string>) {
+  watchEffect(() => {
+    // toValue 统一处理各种形式的参数
+    fetch(toValue(url))
+  })
+}
+
+// 以下调用都可以
+useFetch('/api/users')
+useFetch(ref('/api/users'))
+useFetch(() => `/api/users/${id.value}`)
+```
+
+## readonly：创建只读代理
+
+有时候我们希望数据只能读不能改：
+
+```ts
+import { ref, readonly } from 'vue'
+
+const count = ref(0)
+const readonlyCount = readonly(count)
+
+count.value++ // ✅ 可以
+readonlyCount.value++ // ❌ 警告：target is readonly
+```
+
+🎯 **典型场景**：暴露状态但禁止外部修改
+
+```ts
+// store.ts
+const state = reactive({ user: null, token: '' })
+
+export const store = {
+  // 外部只能读，不能直接改
+  state: readonly(state),
+
+  // 只能通过方法修改
+  setUser(user) {
+    state.user = user
+  },
+}
+```
+
+## 类型判断函数
+
+| 函数              | 作用                                |
+| ----------------- | ----------------------------------- |
+| `isRef(val)`      | 是否是 ref                          |
+| `isReactive(val)` | 是否是 reactive                     |
+| `isReadonly(val)` | 是否是 readonly                     |
+| `isProxy(val)`    | 是否是 reactive/readonly 创建的代理 |
+
+```ts
+import { ref, reactive, readonly, isRef, isReactive, isProxy } from 'vue'
+
+const a = ref(1)
+const b = reactive({ x: 1 })
+const c = readonly(b)
+
+console.log(isRef(a)) // true
+console.log(isReactive(b)) // true
+console.log(isReadonly(c)) // true
+console.log(isProxy(b)) // true
+console.log(isProxy(c)) // true
+```
+
+🔶 **注意**：`isReactive` 对深层嵌套对象也会返回 true
+
+```ts
+const state = reactive({
+  nested: { count: 0 },
+})
+
+console.log(isReactive(state.nested)) // true
+```
+
+但 `shallowReactive` 不会：
+
+```ts
+const state = shallowReactive({
+  nested: { count: 0 },
+})
+
+console.log(isReactive(state.nested)) // false
+```
+
+## API 速查表
+
+| API               | 用途               | 示例                    |
+| ----------------- | ------------------ | ----------------------- |
+| `toRef(obj, key)` | 把对象属性转成 ref | `toRef(state, 'count')` |
+| `toRefs(obj)`     | 把所有属性转成 ref | `toRefs(state)`         |
+| `unref(val)`      | ref 取值，否则原样 | `unref(maybeRef)`       |
+| `toValue(val)`    | 同上，支持 getter  | `toValue(maybeGetter)`  |
+| `readonly(obj)`   | 创建只读代理       | `readonly(state)`       |
+| `isRef(val)`      | 判断是否 ref       | `isRef(count)`          |
+| `isReactive(val)` | 判断是否 reactive  | `isReactive(state)`     |
+
+## 小结
+
+这些工具函数的核心用途：
+
+1. **toRef/toRefs**：解决 reactive 解构丢失响应式的问题
+2. **unref/toValue**：统一处理可能是 ref 也可能不是的值
+3. **readonly**：创建只读代理，防止意外修改
+4. **isXxx**：运行时判断数据类型
+
+下一篇我们来看 Vue3 的计算属性 `computed`。

@@ -1,0 +1,95 @@
+---
+title: 'Vue3 组件通信方式总结'
+pubDate: 2024-01-15
+category: 'Vue'
+tags: ['Vue3', '进阶']
+description: '父子组件通信和跨层级通信的完整方案对比'
+---
+
+## 父子组件通信
+
+| 方式       | 方向    | 说明                          |
+| ---------- | ------- | ----------------------------- |
+| Props      | 父 → 子 | 父组件传递数据给子组件        |
+| Emits      | 子 → 父 | 子组件触发事件通知父组件      |
+| v-model    | 双向    | Props + Emits 的语法糖        |
+| 属性透传   | 父 → 子 | 非 props/emits 的属性自动透传 |
+| ref 引用   | 父 → 子 | 父组件直接访问子组件实例      |
+| 作用域插槽 | 子 → 父 | 子组件通过插槽传递数据        |
+
+## 跨层级通信
+
+| 方式           | 说明                        |
+| -------------- | --------------------------- |
+| provide/inject | 祖先组件提供，后代组件注入  |
+| 事件总线       | 发布/订阅模式，任意组件通信 |
+| Pinia          | 全局状态管理                |
+
+## 事件总线实现
+
+```js
+class EventBus {
+  constructor() {
+    this.events = {}
+  }
+
+  // 订阅事件
+  on(event, callback) {
+    if (!this.events[event]) {
+      this.events[event] = []
+    }
+    this.events[event].push(callback)
+  }
+
+  // 发布事件
+  emit(event, data) {
+    this.events[event]?.forEach((callback) => callback(data))
+  }
+
+  // 取消订阅
+  off(event, callback) {
+    if (this.events[event]) {
+      this.events[event] = this.events[event].filter((cb) => cb !== callback)
+    }
+  }
+}
+
+export default new EventBus()
+```
+
+使用 mitt 库更简单：
+
+```js
+import mitt from 'mitt'
+export const eventBus = mitt()
+
+// 发布
+eventBus.emit('user-login', { id: 1, name: 'John' })
+
+// 订阅
+eventBus.on('user-login', (user) => console.log(user))
+
+// 取消
+eventBus.off('user-login', handler)
+```
+
+## 如何选择
+
+| 场景                 | 推荐方案       |
+| -------------------- | -------------- |
+| 父子组件简单数据传递 | Props + Emits  |
+| 父子组件双向绑定     | v-model        |
+| 父组件访问子组件     | ref            |
+| 深层嵌套组件         | provide/inject |
+| 全局状态             | Pinia          |
+| 兄弟组件（简单场景） | 事件总线       |
+| 兄弟组件（复杂场景） | Pinia          |
+
+## 通信方式对比
+
+```
+Props/Emits:     父 ←→ 子
+provide/inject:  祖先 → 后代
+事件总线:         任意 ←→ 任意
+Pinia:           任意 ←→ 任意（响应式）
+```

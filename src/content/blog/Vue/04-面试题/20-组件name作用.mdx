@@ -1,0 +1,103 @@
+---
+title: '组件 name 的作用'
+pubDate: 2024-01-15
+category: 'Vue'
+tags: ['Vue3', '面试']
+description: '面试题：组件 name 有什么用？可不可以不写？'
+---
+
+## 面试题
+
+> 组件 name 有什么用？可不可以不写 name？
+
+## 定义组件 name
+
+### Vue2 OptionsAPI
+
+```js
+export default {
+  name: 'MyComponent',
+}
+```
+
+### Vue3 CompositionAPI
+
+```vue
+<!-- 方式一：额外的 script 标签 -->
+<script setup>
+// 组件逻辑
+</script>
+<script>
+export default {
+  name: 'MyComponent',
+}
+</script>
+
+<!-- 方式二：defineOptions 宏 -->
+<script setup>
+defineOptions({
+  name: 'MyComponent',
+})
+</script>
+```
+
+## name 的作用
+
+### 1. 递归组件
+
+组件通过 name 引用自身：
+
+```vue
+<template>
+  <div>
+    {{ item.name }}
+    <TreeNode v-for="child in item.children" :item="child" />
+  </div>
+</template>
+
+<script>
+export default {
+  name: 'TreeNode',
+  props: ['item'],
+}
+</script>
+```
+
+### 2. keep-alive 缓存
+
+通过 name 指定要缓存的组件：
+
+```vue
+<keep-alive include="UserProfile,Settings">
+  <component :is="currentComponent" />
+</keep-alive>
+```
+
+### 3. 跨级组件通信
+
+在 `provide/inject` 中通过 name 查找组件。
+
+### 4. vue-devtools 调试
+
+DevTools 中显示的组件名称由 name 决定，便于调试。
+
+## 可以不写吗？
+
+可以，但建议写。
+
+不写 name 的影响：
+
+- 递归组件无法工作
+- keep-alive 无法按名称缓存
+- DevTools 中显示为 `<Anonymous>`
+
+## 参考答案
+
+组件 name 不是必须的，但有以下作用：
+
+1. **递归组件**：组件通过 name 引用自身
+2. **keep-alive**：通过 name 指定缓存组件
+3. **跨级通信**：查找特定组件
+4. **调试**：DevTools 中显示组件名称
+
+即使没有特殊需求，添加 name 也有助于提高代码可读性和调试体验。

@@ -1,0 +1,146 @@
+---
+title: '图解快速 diff 算法'
+pubDate: 2024-01-15
+category: 'Vue'
+tags: ['Vue3', '面试']
+description: '面试题：Vue3 的 diff 算法做了哪些改变？'
+---
+
+## 面试题
+
+> 讲一讲 Vue3 的 diff 算法做了哪些改变？
+
+## 双端 diff 的问题
+
+```
+旧: a b c d
+新: e b c d a m
+```
+
+双端 diff 会移动 b、c、d，但其实它们的相对顺序没变，只需要移动 a 即可。
+
+## 快速 diff 流程
+
+1. 头头对比
+2. 尾尾对比
+3. 非复杂情况处理
+4. 复杂情况处理（LIS 优化）
+
+### 步骤 1-3：与双端相同
+
+头头、尾尾对比后，如果一方结束：
+
+- 旧节点剩余：删除对应 DOM
+- 新节点剩余：创建对应 DOM
+
+### 步骤 4：复杂情况
+
+当双方都有剩余时，进入最长递增子序列优化。
+
+#### 4.1 建立 keyToNewIndexMap
+
+记录新节点的 key 到 index 的映射：
+
+```js
+const keyToNewIndexMap = new Map()
+for (let i = newStart; i <= newEnd; i++) {
+  keyToNewIndexMap.set(newChildren[i].key, i)
+}
+// { e: 0, b: 1, c: 2, d: 3, a: 4, m: 5 }
+```
+
+#### 4.2 初始化 newIndexToOldIndexMap
+
+记录新节点在旧节点中的位置（初始为 0 表示不存在）：
+
+```js
+const toBePatched = newEnd - newStart + 1
+const newIndexToOldIndexMap = new Array(toBePatched).fill(0)
+// [0, 0, 0, 0, 0, 0]
+```
+
+#### 4.3 遍历旧节点更新映射
+
+```js
+for (let i = oldStart; i <= oldEnd; i++) {
+  const oldNode = oldChildren[i]
+  const newIndex = keyToNewIndexMap.get(oldNode.key)
+
+  if (newIndex === undefined) {
+    // 旧节点在新列表中不存在，删除
+    unmount(oldNode)
+  } else {
+    // 记录位置（+1 避免和初始值 0 混淆）
+    newIndexToOldIndexMap[newIndex - newStart] = i + 1
+    patch(oldNode, newChildren[newIndex])
+  }
+}
+// 结果: [0, 2, 3, 4, 1, 0]
+// e 和 m 为 0，表示是新节点
+```
+
+#### 4.4 计算最长递增子序列
+
+```js
+const lis = getSequence(newIndexToOldIndexMap)
+// [0, 2, 3, 4, 1, 0] → LIS 索引: [1, 2, 3]
+// 对应 b, c, d 不需要移动
+```
+
+#### 4.5 倒序遍历移动和挂载
+
+```js
+let j = lis.length - 1
+
+for (let i = toBePatched - 1; i >= 0; i--) {
+  const newIndex = newStart + i
+  const anchor = newChildren[newIndex + 1]?.el
+
+  if (newIndexToOldIndexMap[i] === 0) {
+    // 新节点，创建
+    mount(newChildren[newIndex], anchor)
+  } else if (i !== lis[j]) {
+    // 不在 LIS 中，需要移动
+    move(newChildren[newIndex].el, anchor)
+  } else {
+    // 在 LIS 中，不需要移动
+    j--
+  }
+}
+```
+
+## 执行结果
+
+```
+旧: a b c d
+新: e b c d a m
+
+操作:
+1. e - 新建，插入到 b 前
+2. b - 在 LIS 中，不移动
+3. c - 在 LIS 中，不移动
+4. d - 在 LIS 中，不移动
+5. a - 不在 LIS 中，移动到 m 前
+6. m - 新建，插入到末尾
+
+总计: 1 次移动 + 2 次新建
+```
+
+## Vue2 vs Vue3 对比
+
+|            | Vue2 双端 diff      | Vue3 快速 diff |
+| ---------- | ------------------- | -------------- |
+| 策略       | 四次比较 + 暴力查找 | LIS 优化       |
+| DOM 操作   | 可能有多余移动      | 最小化移动     |
+| 时间复杂度 | O(n²)               | O(n log n)     |
+
+## 参考答案
+
+Vue2 使用双端 diff，Vue3 使用快速 diff。
+
+两者前面步骤相同（头头、尾尾对比），区别在于复杂情况的处理：
+
+- 双端 diff：旧头新尾、新头旧尾比较，最后暴力查找
+- 快速 diff：通过最长递增子序列确定不需要移动的节点
+
+快速 diff 的优势是最小化 DOM 操作次数，没有任何多余的移动操作，将性能优化到了极致。

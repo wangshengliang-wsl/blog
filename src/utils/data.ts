@@ -8,6 +8,263 @@ import type { GitHubView } from '~/types'
 
 const defaultCategory = '杂谈'
 
+/**
+ * Tree node for hierarchical category structure
+ */
+export interface CategoryTreeNode {
+  name: string
+  path: string
+  children: CategoryTreeNode[]
+  posts: CollectionEntry<'blog' | 'changelog'>[]
+}
+
+/**
+ * Extracts a number prefix from a path segment for sorting (e.g., "01-快速入门" -> 1)
+ */
+function extractPathNumber(segment: string): number {
+  const match = segment.match(/^(\d+)/)
+  return match ? parseInt(match[1], 10) : Infinity
+}
+
+/**
+ * Formats display name by removing number prefix (e.g., "01-快速入门" -> "快速入门")
+ */
+function formatDisplayName(segment: string): string {
+  return segment.replace(/^\d+-/, '')
+}
+
+/**
+ * Builds a hierarchical tree structure from posts based on their file paths.
+ */
+export function buildCategoryTree(
+  posts: CollectionEntryList<'blog' | 'changelog'>
+): CategoryTreeNode[] {
+  const root = new Map<string, CategoryTreeNode>()
+
+  posts.forEach((post) => {
+    const pathParts = post.id.split('/')
+    // Last part is the filename, everything before is the category path
+    const categoryParts = pathParts.slice(0, -1)
+
+    if (categoryParts.length === 0) {
+      // Post is at root level, use frontmatter category or default
+      const category = post.data.category || defaultCategory
+      if (!root.has(category)) {
+        root.set(category, {
+          name: category,
+          path: category,
+          children: [],
+          posts: [],
+        })
+      }
+      root.get(category)!.posts.push(post)
+      return
+    }
+
+    // Build nested structure
+    let currentLevel = root
+    let currentPath = ''
+
+    categoryParts.forEach((part, index) => {
+      currentPath = currentPath ? `${currentPath}/${part}` : part
+      const isLastPart = index === categoryParts.length - 1
+
+      if (!currentLevel.has(part)) {
+        const node: CategoryTreeNode = {
+          name: formatDisplayName(part),
+          path: currentPath,
+          children: [],
+          posts: [],
+        }
+        currentLevel.set(part, node)
+      }
+
+      const currentNode = currentLevel.get(part)!
+
+      if (isLastPart) {
+        currentNode.posts.push(post)
+      } else {
+        // Move to next level - convert children array to map for easier lookup
+        const childMap = new Map<string, CategoryTreeNode>()
+        currentNode.children.forEach((child) => {
+          const childKey = child.path.split('/').pop() || child.path
+          childMap.set(childKey, child)
+        })
+        currentLevel = childMap
+
+        // Sync back to children array after processing
+        if (index < categoryParts.length - 2) {
+          // Will continue to deeper level
+        }
+      }
+    })
+  })
+
+  // Convert root map to sorted array and recursively sort children
+  const sortAndConvert = (
+    nodeMap: Map<string, CategoryTreeNode>
+  ): CategoryTreeNode[] => {
+    const nodes = Array.from(nodeMap.values())
+
+    // Sort nodes: by number prefix first, then alphabetically
+    nodes.sort((a, b) => {
+      const numA = extractPathNumber(a.path.split('/').pop() || a.path)
+      const numB = extractPathNumber(b.path.split('/').pop() || b.path)
+      if (numA !== numB) return numA - numB
+      // Put default category last
+      if (a.name === defaultCategory) return 1
+      if (b.name === defaultCategory) return -1
+      return a.name.localeCompare(b.name, 'zh-CN')
+    })
+
+    // Sort posts within each node
+    nodes.forEach((node) => {
+      node.posts.sort((a, b) => {
+        const numA = extractFileNumber(a.id)
+        const numB = extractFileNumber(b.id)
+        return numA - numB
+      })
+    })
+
+    return nodes
+  }
+
+  return sortAndConvert(root)
+}
+
+/**
+ * Recursively builds category tree with proper nesting
+ */
+export function buildNestedCategoryTree(
+  posts: CollectionEntryList<'blog' | 'changelog'>
+): CategoryTreeNode[] {
+  const root: CategoryTreeNode = {
+    name: 'root',
+    path: '',
+    children: [],
+    posts: [],
+  }
+
+  // Helper to find or create a node at a given path
+  const findOrCreateNode = (
+    parent: CategoryTreeNode,
+    pathParts: string[],
+    fullPath: string
+  ): CategoryTreeNode => {
+    if (pathParts.length === 0) return parent
+
+    const [current, ...rest] = pathParts
+    let child = parent.children.find((c) => c.path.split('/').pop() === current)
+
+    if (!child) {
+      const childPath = parent.path ? `${parent.path}/${current}` : current
+      child = {
+        name: formatDisplayName(current),
+        path: childPath,
+        children: [],
+        posts: [],
+      }
+      parent.children.push(child)
+    }
+
+    if (rest.length === 0) return child
+    return findOrCreateNode(child, rest, fullPath)
+  }
+
+  // Process each post
+  posts.forEach((post) => {
+    const pathParts = post.id.split('/')
+    const categoryParts = pathParts.slice(0, -1)
+
+    if (categoryParts.length === 0) {
+      // Root level post - group by frontmatter category
+      const category = post.data.category || defaultCategory
+      let categoryNode = root.children.find((c) => c.name === category)
+      if (!categoryNode) {
+        categoryNode = {
+          name: category,
+          path: category,
+          children: [],
+          posts: [],
+        }
+        root.children.push(categoryNode)
+      }
+      categoryNode.posts.push(post)
+    } else {
+      const targetNode = findOrCreateNode(root, categoryParts, post.id)
+      targetNode.posts.push(post)
+    }
+  })
+
+  // Recursively sort the tree
+  const sortTree = (node: CategoryTreeNode): void => {
+    // Sort children by number prefix, then alphabetically
+    node.children.sort((a, b) => {
+      const segmentA = a.path.split('/').pop() || a.path
+      const segmentB = b.path.split('/').pop() || b.path
+      const numA = extractPathNumber(segmentA)
+      const numB = extractPathNumber(segmentB)
+      if (numA !== numB) return numA - numB
+      if (a.name === defaultCategory) return 1
+      if (b.name === defaultCategory) return -1
+      return a.name.localeCompare(b.name, 'zh-CN')
+    })
+
+    // Sort posts by filename number
+    node.posts.sort((a, b) => {
+      const numA = extractFileNumber(a.id)
+      const numB = extractFileNumber(b.id)
+      return numA - numB
+    })
+
+    // Recurse into children
+    node.children.forEach(sortTree)
+  }
+
+  sortTree(root)
+  return root.children
+}
+
+/**
+ * Flattens tree structure for display with indentation info
+ */
+export interface FlattenedCategory {
+  node: CategoryTreeNode
+  depth: number
+  hasChildren: boolean
+  totalPosts: number
+}
+
+function countTotalPosts(node: CategoryTreeNode): number {
+  let count = node.posts.length
+  node.children.forEach((child) => {
+    count += countTotalPosts(child)
+  })
+  return count
+}
+
+export function flattenCategoryTree(
+  nodes: CategoryTreeNode[],
+  depth = 0
+): FlattenedCategory[] {
+  const result: FlattenedCategory[] = []
+
+  nodes.forEach((node) => {
+    result.push({
+      node,
+      depth,
+      hasChildren: node.children.length > 0,
+      totalPosts: countTotalPosts(node),
+    })
+
+    if (node.children.length > 0) {
+      result.push(...flattenCategoryTree(node.children, depth + 1))
+    }
+  })
+
+  return result
+}
+
 type CollectionEntryList<K extends CollectionKey = CollectionKey> =
   CollectionEntry<K>[]
 

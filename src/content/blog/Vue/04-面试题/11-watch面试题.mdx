@@ -1,0 +1,113 @@
+---
+title: 'watch 面试题'
+pubDate: 2024-01-15
+category: 'Vue'
+tags: ['Vue3', '面试']
+description: '面试题：watch 和 computed 的区别是什么？各自的使用场景？'
+---
+
+## 面试题
+
+> watch 和 computed 的区别是什么？说一说各自的使用场景？
+
+## watch 用法
+
+```js
+// 监听 ref
+watch(count, (newVal, oldVal) => {
+  // ...
+})
+
+// 监听 getter
+watch(
+  () => state.a + state.b,
+  (newVal, oldVal) => {
+    // ...
+  }
+)
+
+// 配置项
+watch(source, callback, {
+  immediate: true, // 立即执行
+  deep: true, // 深度监听
+  flush: 'post', // 回调时机
+})
+```
+
+## 核心实现
+
+```js
+function watch(source, cb, options = {}) {
+  // 1. 参数归一化
+  const getter = typeof source === 'function' ? source : () => traverse(source)
+
+  // 2. 保存新旧值
+  let oldValue, newValue
+
+  const effectFn = effect(() => getter(), {
+    lazy: true,
+    scheduler: () => {
+      newValue = effectFn()
+      cb(newValue, oldValue)
+      oldValue = newValue
+    },
+  })
+
+  oldValue = effectFn()
+}
+```
+
+## computed vs watch 对比
+
+|        | computed         | watch                |
+| ------ | ---------------- | -------------------- |
+| 用途   | 计算派生数据     | 监听数据变化执行操作 |
+| 返回值 | 有，用于模板绑定 | 无                   |
+| 缓存   | 有               | 无                   |
+| 副作用 | 不应该有         | 可以有               |
+| 异步   | 不支持           | 支持                 |
+
+## 使用场景
+
+### computed
+
+```js
+// 用于模板中显示二次计算结果
+const fullName = computed(() => {
+  return firstName.value + ' ' + lastName.value
+})
+```
+
+- 基于数据做二次计算
+- 需要在模板中使用
+- 纯计算，无副作用
+
+### watch
+
+```js
+// 数据变化后发送请求
+watch(searchQuery, async (query) => {
+  const data = await fetchResults(query)
+  results.value = data
+})
+```
+
+- 数据变化后执行副作用
+- 需要访问新旧值
+- 需要异步操作
+
+## 参考答案
+
+**computed**：
+
+- 用于计算派生数据，有缓存机制
+- 纯计算，不应有副作用
+- 只支持同步
+- 结果用于模板绑定
+
+**watch**：
+
+- 用于监听数据变化后执行操作
+- 回调可以包含副作用（网络请求、DOM 操作等）
+- 无缓存
+- 支持异步

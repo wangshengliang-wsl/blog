@@ -1,0 +1,129 @@
+---
+title: 'vue-chartjs 图表库'
+pubDate: 2024-01-15
+category: 'Vue'
+tags: ['Vue3', '第三方库']
+description: '使用 vue-chartjs 在 Vue 中创建各种类型的图表'
+---
+
+## 简介
+
+vue-chartjs 是基于 Chart.js 的 Vue 封装，支持折线图、柱状图、饼图等多种图表。
+
+## 安装
+
+```bash
+npm install vue-chartjs chart.js
+```
+
+## 基本用法
+
+```vue
+<template>
+  <Bar :data="chartData" :options="chartOptions" />
+</template>
+
+<script setup>
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+} from 'chart.js'
+import { Bar } from 'vue-chartjs'
+
+// 注册组件
+ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
+
+const chartData = {
+  labels: ['1月', '2月', '3月', '4月', '5月'],
+  datasets: [
+    {
+      label: '销售额',
+      backgroundColor: '#42b983',
+      data: [40, 20, 30, 50, 45],
+    },
+  ],
+}
+
+const chartOptions = {
+  responsive: true,
+  plugins: {
+    title: { display: true, text: '月度销售' },
+  },
+}
+</script>
+```
+
+## 支持的图表类型
+
+| 组件      | 说明       |
+| --------- | ---------- |
+| Bar       | 柱状图     |
+| Line      | 折线图     |
+| Pie       | 饼图       |
+| Doughnut  | 圆环图     |
+| Radar     | 雷达图     |
+| Scatter   | 散点图     |
+| Bubble    | 气泡图     |
+| PolarArea | 极地区域图 |
+
+## 需要注册的组件
+
+根据使用的图表类型注册对应组件：
+
+```js
+// 柱状图
+import { BarElement } from 'chart.js'
+
+// 折线图
+import { LineElement, PointElement } from 'chart.js'
+
+// 饼图/圆环图
+import { ArcElement } from 'chart.js'
+
+// 通用
+import { CategoryScale, LinearScale, Title, Tooltip, Legend } from 'chart.js'
+```
+
+## 响应式数据
+
+```vue
+<script setup>
+import { ref, watch } from 'vue'
+
+const chartData = ref({
+  labels: ['A', 'B', 'C'],
+  datasets: [{ data: [10, 20, 30] }],
+})
+
+// 更新数据
+const updateData = () => {
+  chartData.value.datasets[0].data = [15, 25, 35]
+}
+</script>
+```
+
+## 配置选项
+
+```js
+const options = {
+  responsive: true, // 响应式
+  maintainAspectRatio: false, // 不保持宽高比
+  plugins: {
+    legend: { position: 'top' },
+    title: { display: true, text: '标题' },
+  },
+  scales: {
+    y: { beginAtZero: true },
+  },
+}
+```
+
+## 文档
+
+- [vue-chartjs](https://vue-chartjs.org/)
+- [Chart.js](https://www.chartjs.org/docs/)

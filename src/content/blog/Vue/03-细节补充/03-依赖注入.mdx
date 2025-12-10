@@ -1,0 +1,142 @@
+---
+title: '依赖注入（provide / inject）'
+pubDate: 2024-01-15
+category: 'Vue'
+tags: ['Vue3', '进阶']
+description: '使用 provide 和 inject 实现跨层级组件通信，避免 props 逐级传递'
+---
+
+## 问题：Props 逐级传递
+
+```
+App → A → B → C → D
+              ↑
+        需要 App 的数据
+```
+
+使用 props 需要 A、B、C 层层传递，即使它们不需要这些数据。
+
+## 解决方案：依赖注入
+
+```
+App (provide) ──────────────→ D (inject)
+```
+
+祖先组件 `provide` 数据，后代组件直接 `inject` 获取。
+
+## 基本用法
+
+**提供方（祖先组件）**
+
+```vue
+<script setup>
+import { provide, ref } from 'vue'
+
+const theme = ref('dark')
+provide('theme', theme)
+provide('appName', 'My App')
+</script>
+```
+
+**注入方（后代组件）**
+
+```vue
+<script setup>
+import { inject } from 'vue'
+
+const theme = inject('theme')
+const appName = inject('appName')
+</script>
+```
+
+## 全局提供
+
+在 `main.js` 中为整个应用提供数据：
+
+```js
+import { createApp } from 'vue'
+import App from './App.vue'
+
+const app = createApp(App)
+app.provide('globalConfig', { apiUrl: 'https://api.example.com' })
+app.mount('#app')
+```
+
+## 默认值
+
+```js
+// 如果没有提供 'theme'，使用 'light' 作为默认值
+const theme = inject('theme', 'light')
+
+// 工厂函数形式的默认值
+const data = inject('data', () => ({ list: [] }))
+```
+
+## 提供响应式数据
+
+```vue
+<script setup>
+import { provide, ref, readonly } from 'vue'
+
+const count = ref(0)
+const increment = () => count.value++
+
+// 推荐：提供数据和修改方法
+provide('counter', {
+  count: readonly(count), // 只读，防止注入方直接修改
+  increment, // 通过方法修改
+})
+</script>
+```
+
+```vue
+<script setup>
+import { inject } from 'vue'
+
+const { count, increment } = inject('counter')
+// count 是只读的，只能通过 increment 修改
+</script>
+```
+
+## 使用 Symbol 作为 key
+
+大型应用推荐使用 Symbol 避免命名冲突：
+
+```js
+// keys.js
+export const ThemeKey = Symbol('theme')
+export const UserKey = Symbol('user')
+```
+
+```vue
+<script setup>
+import { provide } from 'vue'
+import { ThemeKey } from './keys'
+
+provide(ThemeKey, 'dark')
+</script>
+```
+
+```vue
+<script setup>
+import { inject } from 'vue'
+import { ThemeKey } from './keys'
+
+const theme = inject(ThemeKey)
+</script>
+```
+
+## provide/inject vs Pinia
+
+| 场景               | 推荐方案       |
+| ------------------ | -------------- |
+| 组件树内的数据共享 | provide/inject |
+| 全局状态管理       | Pinia          |
+| 简单的主题/配置    | provide/inject |
+| 复杂的业务状态     | Pinia          |
+
+## 注意事项
+
+1. **必须同步调用**：在 setup 中同步调用，不能在异步回调中使用
+2. **响应式不丢失**：provide ref 时，inject 得到的仍是 ref
+3. **修改权限**：使用 readonly 控制注入方的修改权限
