@@ -9,49 +9,124 @@ interface Props {
   description?: string
   pubDate?: string
   lastModDate?: string
+  tags?: string[]
+  category?: string
+  ogImage?: string
 }
 
-const { title, description, pubDate, lastModDate } = Astro.props
+const { title, description, pubDate, lastModDate, tags, category, ogImage } =
+  Astro.props
 
 const siteName = new URL(SITE.website).hostname
 
-const pageTitle =
+// 优化标题长度，避免过长
+const rawTitle =
   title && title !== SITE.title ? `${title} - ${SITE.title}` : SITE.title
+const pageTitle = rawTitle.length > 60 ? title || SITE.title : rawTitle
 
 const pageDescription = description || SITE.description
 
 const canonicalURL = new URL(Astro.url.pathname, Astro.site)
 
-// 使用默认的 OG 图片
-const ogImageURL = new URL(withBasePath('og-images', 'og-image.png'), Astro.url)
-  .href
+// OG 图片 URL
+const ogImageURL = ogImage
+  ? new URL(withBasePath('og-images', ogImage), Astro.url).href
+  : new URL(withBasePath('og-images', 'og-image.png'), Astro.url).href
+
+// 生成面包屑结构化数据
+const pathSegments = Astro.url.pathname.split('/').filter(Boolean)
+const breadcrumbItems = pathSegments.map((segment, index) => ({
+  '@type': 'ListItem',
+  'position': index + 1,
+  'name': segment.charAt(0).toUpperCase() + segment.slice(1).replace(/-/g, ' '),
+  'item': new URL('/' + pathSegments.slice(0, index + 1).join('/'), Astro.site)
+    .href,
+}))
+
+const breadcrumbData = {
+  '@context': 'https://schema.org',
+  '@type': 'BreadcrumbList',
+  'itemListElement': [
+    {
+      '@type': 'ListItem',
+      'position': 0,
+      'name': 'Home',
+      'item': SITE.website,
+    },
+    ...breadcrumbItems,
+  ],
+}
 
 // https://jsonld.com/blog-post/
 const blogPostingData = {
   '@context': 'https://schema.org',
   '@type': 'BlogPosting',
-  'headline': pageTitle,
+  'headline': title || SITE.title,
   'image': ogImageURL,
-  'url': canonicalURL,
+  'url': canonicalURL.href,
   'datePublished': pubDate,
   ...(lastModDate && { dateModified: lastModDate }),
   ...(description && { description: description }),
+  ...(tags &&
+    tags.length > 0 && {
+      keywords: tags.join(', '),
+    }),
+  ...(category && {
+    articleSection: category,
+  }),
   'author': {
     '@type': 'Person',
     'name': SITE.author,
     'url': SITE.website,
+  },
+  'publisher': {
+    '@type': 'Organization',
+    'name': SITE.title,
+    'url': SITE.website,
+    'logo': {
+      '@type': 'ImageObject',
+      'url': new URL(withBasePath('/joruno.png'), Astro.site).href,
+    },
+  },
+  'mainEntityOfPage': {
+    '@type': 'WebPage',
+    '@id': canonicalURL.href,
   },
 }
 
 // https://jsonld.com/web-page/
 const webPageData = {
   '@context': 'https://schema.org',
-  '@type': 'webPage',
+  '@type': 'WebPage',
   'name': `${title || SITE.title}`,
+  'url': canonicalURL.href,
   ...(description && { description: description }),
   'publisher': {
-    '@type': 'ProfilePage',
-    'name': `${SITE.author}'s Personal Website`,
+    '@type': 'Organization',
+    'name': SITE.title,
+    'url': SITE.website,
+  },
+  'breadcrumb': breadcrumbData,
+}
+
+// 网站整体结构化数据
+const websiteData = {
+  '@context': 'https://schema.org',
+  '@type': 'WebSite',
+  'name': SITE.title,
+  'url': SITE.website,
+  'description': SITE.description,
+  'author': {
+    '@type': 'Person',
+    'name': SITE.author,
+  },
+  'potentialAction': {
+    '@type': 'SearchAction',
+    'target': {
+      '@type': 'EntryPoint',
+      'urlTemplate': `${SITE.website}blog/?q={search_term_string}`,
+    },
+    'query-input': 'required name=search_term_string',
   },
 }
 ---
@@ -67,17 +142,37 @@ const webPageData = {
 <meta name="title" content={pageTitle} />
 <meta name="description" content={pageDescription} />
 <meta name="author" content={SITE.author} />
+<meta name="robots" content="index, follow" />
+<meta
+  name="googlebot"
+  content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1"
+/>
+
+<!-- Keywords (if tags provided) -->
+{tags && tags.length > 0 && <meta name="keywords" content={tags.join(', ')} />}
 
 <!-- Color -->
-<meta name="theme-color" content="" />
+<meta
+  name="theme-color"
+  content="#050505"
+  media="(prefers-color-scheme: dark)"
+/>
+<meta
+  name="theme-color"
+  content="#ffffff"
+  media="(prefers-color-scheme: light)"
+/>
 <meta name="color-scheme" content="light dark" />
 
 <!-- Open Graph & Facebook -->
 <meta property="og:type" content={pubDate ? 'article' : 'website'} />
 <meta property="og:url" content={canonicalURL} />
-<meta property="og:title" content={pageTitle} />
+<meta property="og:title" content={title || SITE.title} />
 <meta property="og:description" content={pageDescription} />
 <meta property="og:image" content={ogImageURL} />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:image:alt" content={title || SITE.title} />
 <meta property="og:site_name" content={siteName} />
 <meta property="og:locale" content={SITE.ogLocale} />
 {
@@ -85,23 +180,27 @@ const webPageData = {
     <>
       <meta property="article:author" content={SITE.author} />
       <meta property="article:published_time" content={pubDate} />
-      <meta property="article:modified_time" content={lastModDate} />
+      {lastModDate && (
+        <meta property="article:modified_time" content={lastModDate} />
+      )}
+      {category && <meta property="article:section" content={category} />}
+      {tags && tags.map((tag) => <meta property="article:tag" content={tag} />)}
     </>
   )
 }
 
 <!-- Twitter -->
-<meta property="twitter:card" content="summary_large_image" />
-<meta property="twitter:url" content={canonicalURL} />
-<meta property="twitter:title" content={pageTitle} />
-<meta property="twitter:description" content={pageDescription} />
-<meta property="twitter:image" content={ogImageURL} />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:url" content={canonicalURL} />
+<meta name="twitter:title" content={title || SITE.title} />
+<meta name="twitter:description" content={pageDescription} />
+<meta name="twitter:image" content={ogImageURL} />
+<meta name="twitter:image:alt" content={title || SITE.title} />
 
 <!-- Canonical URL -->
 <link rel="canonical" href={canonicalURL} />
 
 <!-- Icon -->
-<!-- <link rel="icon" type="image/svg+xml" href={withBasePath('/joruno.svg')} /> -->
 <link rel="icon" sizes="32x32" href={withBasePath('/joruno.ico')} />
 <link rel="apple-touch-icon" href={withBasePath('/joruno.png')} />
 
@@ -115,18 +214,36 @@ const webPageData = {
 <link
   rel="alternate"
   type="application/rss+xml"
-  title={withBasePath('/rss.xml')}
-  href="/rss.xml"
+  title={`${SITE.title} RSS Feed`}
+  href={withBasePath('/rss.xml')}
 />
 
+<!-- Preconnect to external domains for performance -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="dns-prefetch" href="https://giscus.app" />
+
 <!-- Google JSON-LD Structured Data -->
+<script
+  is:inline
+  type="application/ld+json"
+  set:html={JSON.stringify(websiteData)}
+/>
+
 {
   pubDate ? (
-    <script
-      is:inline
-      type="application/ld+json"
-      set:html={JSON.stringify(blogPostingData)}
-    />
+    <>
+      <script
+        is:inline
+        type="application/ld+json"
+        set:html={JSON.stringify(blogPostingData)}
+      />
+      <script
+        is:inline
+        type="application/ld+json"
+        set:html={JSON.stringify(breadcrumbData)}
+      />
+    </>
   ) : (
     <script
       is:inline

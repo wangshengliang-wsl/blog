@@ -139,7 +139,14 @@ export const UI: Ui = {
  */
 export const FEATURES: Features = {
   slideEnterAnim: [true, { enterStep: 1 }],
-  ogImage: false,
+  ogImage: [
+    true,
+    {
+      authorOrBrand: 'wangshengliang',
+      fallbackTitle: '技术博客',
+      fallbackBgType: 'plum',
+    },
+  ],
   toc: [
     true,
     {

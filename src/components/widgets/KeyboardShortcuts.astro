@@ -1,0 +1,267 @@
+---
+/**
+ * 全局键盘快捷键支持
+ * - / 或 Cmd+K: 打开搜索
+ * - Escape: 关闭弹窗
+ * - G H: 回到首页
+ * - G B: 去博客列表
+ * - ?: 显示快捷键帮助
+ */
+---
+
+<!-- 快捷键帮助弹窗 -->
+<div
+  id="shortcuts-help"
+  class="hidden fixed inset-0 z-[400] items-center justify-center bg-black/50 backdrop-blur-sm"
+  role="dialog"
+  aria-modal="true"
+  aria-label="键盘快捷键"
+>
+  <div
+    class="bg-[var(--c-bg)] rounded-lg shadow-xl max-w-md w-full mx-4 p-6 animate-fade-in"
+  >
+    <div class="flex justify-between items-center mb-4">
+      <h2 class="text-lg font-semibold">键盘快捷键</h2>
+      <button
+        id="close-shortcuts-help"
+        class="p-2 op-50 hover:op-100 rounded-lg hover:bg-gray/10"
+        aria-label="关闭"
+      >
+        <span class="i-ri-close-line text-lg"></span>
+      </button>
+    </div>
+
+    <div class="space-y-3 text-sm">
+      <div class="grid grid-cols-2 gap-2">
+        <div class="font-medium op-70">搜索</div>
+        <div>
+          <kbd class="kbd">/</kbd> 或 <kbd class="kbd">⌘</kbd><kbd class="kbd"
+            >K</kbd
+          >
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        <div class="font-medium op-70">回到首页</div>
+        <div><kbd class="kbd">G</kbd> <kbd class="kbd">H</kbd></div>
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        <div class="font-medium op-70">博客列表</div>
+        <div><kbd class="kbd">G</kbd> <kbd class="kbd">B</kbd></div>
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        <div class="font-medium op-70">切换主题</div>
+        <div><kbd class="kbd">T</kbd></div>
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        <div class="font-medium op-70">关闭弹窗</div>
+        <div><kbd class="kbd">Esc</kbd></div>
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        <div class="font-medium op-70">显示帮助</div>
+        <div><kbd class="kbd">?</kbd></div>
+      </div>
+    </div>
+
+    <p class="mt-4 text-xs op-50 text-center">
+      按 <kbd class="kbd">Esc</kbd> 关闭此窗口
+    </p>
+  </div>
+</div>
+
+<style>
+  .kbd {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.5rem;
+    height: 1.5rem;
+    padding: 0 0.4rem;
+    border-radius: 4px;
+    border: 1px solid rgba(128, 128, 128, 0.3);
+    background: rgba(128, 128, 128, 0.1);
+    font-family: ui-monospace, monospace;
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+
+  .animate-fade-in {
+    animation: fade-in 0.2s ease-out;
+  }
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+</style>
+
+<script>
+  document.addEventListener('astro:page-load', () => {
+    const shortcutsHelp = document.getElementById('shortcuts-help')
+    const closeBtn = document.getElementById('close-shortcuts-help')
+    if (!shortcutsHelp || !closeBtn) return
+
+    // 防止重复绑定
+    if (shortcutsHelp.dataset.bound === 'true') return
+    shortcutsHelp.dataset.bound = 'true'
+
+    let isOpen = false
+    let pendingKey: string | null = null
+    let pendingTimeout: ReturnType<typeof setTimeout> | null = null
+
+    // 检查是否在输入框中
+    const isInputActive = () => {
+      const active = document.activeElement
+      if (!active) return false
+      const tagName = active.tagName.toLowerCase()
+      return (
+        tagName === 'input' ||
+        tagName === 'textarea' ||
+        active.getAttribute('contenteditable') === 'true'
+      )
+    }
+
+    // 打开搜索面板
+    const openSearch = () => {
+      const searchBtn =
+        document.getElementById('search-switch') ||
+        document.getElementById('search-btn')
+      searchBtn?.click()
+    }
+
+    // 切换主题
+    const toggleTheme = () => {
+      const themeBtn =
+        document.getElementById('theme-switch') ||
+        document.getElementById('theme-btn')
+      themeBtn?.click()
+    }
+
+    // 显示/隐藏快捷键帮助
+    const openShortcutsHelp = () => {
+      if (isOpen) return
+      isOpen = true
+      shortcutsHelp.classList.remove('hidden')
+      shortcutsHelp.classList.add('flex')
+      closeBtn.focus()
+    }
+
+    const closeShortcutsHelp = () => {
+      if (!isOpen) return
+      isOpen = false
+      shortcutsHelp.classList.add('hidden')
+      shortcutsHelp.classList.remove('flex')
+    }
+
+    // 关闭所有弹窗
+    const closeAllPanels = () => {
+      // 关闭快捷键帮助
+      closeShortcutsHelp()
+      // 关闭搜索面板
+      const searchPanel = document.getElementById('search-panel')
+      if (searchPanel && !searchPanel.classList.contains('hidden')) {
+        const closeSearchBtn = document.getElementById('close-search-btn')
+        closeSearchBtn?.click()
+      }
+      // 关闭导航面板
+      const navPanel = document.getElementById('nav-panel')
+      if (navPanel && !navPanel.classList.contains('hidden!')) {
+        const backdrop = document.getElementById('backdrop')
+        backdrop?.click()
+      }
+    }
+
+    // 清除待处理的按键
+    const clearPendingKey = () => {
+      pendingKey = null
+      if (pendingTimeout) {
+        clearTimeout(pendingTimeout)
+        pendingTimeout = null
+      }
+    }
+
+    // 键盘事件处理
+    const handleKeydown = (e: KeyboardEvent) => {
+      // 忽略输入框中的按键
+      if (isInputActive()) return
+
+      const key = e.key.toLowerCase()
+      const isMeta = e.metaKey || e.ctrlKey
+
+      // 如果帮助弹窗已显示，仅允许 ESC 关闭
+      if (isOpen) {
+        if (key === 'escape') {
+          e.preventDefault()
+          closeAllPanels()
+        }
+        return
+      }
+
+      // Cmd/Ctrl + K: 打开搜索
+      if (isMeta && key === 'k') {
+        e.preventDefault()
+        openSearch()
+        return
+      }
+
+      // /: 打开搜索
+      if (key === '/' && !isMeta) {
+        e.preventDefault()
+        openSearch()
+        return
+      }
+
+      // Escape: 关闭弹窗
+      if (key === 'escape') {
+        closeAllPanels()
+        return
+      }
+
+      // ?: 显示快捷键帮助
+      if (e.shiftKey && key === '/') {
+        e.preventDefault()
+        openShortcutsHelp()
+        return
+      }
+
+      // T: 切换主题
+      if (key === 't' && !isMeta && !e.shiftKey) {
+        e.preventDefault()
+        toggleTheme()
+        return
+      }
+
+      // 双键组合: G + H/B
+      if (key === 'g' && !isMeta) {
+        pendingKey = 'g'
+        pendingTimeout = setTimeout(clearPendingKey, 500)
+        return
+      }
+
+      if (pendingKey === 'g') {
+        clearPendingKey()
+        if (key === 'h') {
+          e.preventDefault()
+          window.location.href = '/'
+        } else if (key === 'b') {
+          e.preventDefault()
+          window.location.href = '/blog'
+        }
+      }
+    }
+
+    // 绑定事件
+    document.addEventListener('keydown', handleKeydown)
+    closeBtn.addEventListener('click', () => closeShortcutsHelp())
+    shortcutsHelp.addEventListener('click', (e) => {
+      if (e.target === shortcutsHelp) {
+        closeShortcutsHelp()
+      }
+    })
+  })
+</script>

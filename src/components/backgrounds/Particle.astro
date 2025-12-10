@@ -8,7 +8,6 @@
 </bg-particle>
 
 <script>
-  import p5 from 'p5'
   import type { default as P5Instance } from 'p5'
 
   interface Particle {
@@ -22,13 +21,46 @@
 
   class BgParticleElement extends HTMLElement {
     p5Instance: P5Instance | null = null
+    idleCallbackId: number | null = null
 
     connectedCallback() {
+      // 检查用户是否偏好减少动画
+      const prefersReducedMotion = window.matchMedia(
+        '(prefers-reduced-motion: reduce)'
+      ).matches
+
+      // 移动端或偏好减少动画时不初始化（p5.js 较大且消耗性能）
+      if (prefersReducedMotion || window.innerWidth < 768) {
+        return
+      }
+
+      // 使用 requestIdleCallback 延迟加载 p5.js
+      const initAnimation = async () => {
+        // 动态导入 p5.js，减少首屏加载体积
+        const { default: p5 } = await import('p5')
+        this.startAnimation(p5)
+      }
+
+      if ('requestIdleCallback' in window) {
+        this.idleCallbackId = requestIdleCallback(
+          () => {
+            initAnimation()
+          },
+          { timeout: 3000 }
+        )
+      } else {
+        // 降级方案：使用 setTimeout
+        setTimeout(initAnimation, 500)
+      }
+    }
+
+    startAnimation(p5: typeof import('p5')) {
       const sketch = (p: P5Instance) => {
         const COLOR = '#88888825'
         const VELOCITY = 0.8
-        const DENSITY = 6000
-        const DISTANCE = 120
+        // 根据屏幕大小动态调整粒子密度
+        const DENSITY = window.innerWidth < 1024 ? 8000 : 6000
+        const DISTANCE = window.innerWidth < 1024 ? 100 : 120
         const INTERACTIVE = false
 
         const width = window.innerWidth
@@ -125,6 +157,10 @@
       if (this.p5Instance) {
         this.p5Instance.remove()
         this.p5Instance = null
+      }
+      if (this.idleCallbackId && 'cancelIdleCallback' in window) {
+        cancelIdleCallback(this.idleCallbackId)
+        this.idleCallbackId = null
       }
     }
   }

@@ -26,5 +26,8 @@ pnpm-debug.log*
 # eslint cache
 .eslintcache
 
+# build cache
+.cache/
+
 # local archive
 .local

@@ -1,0 +1,73 @@
+---
+/**
+ * 阅读进度指示器
+ * 在页面顶部显示当前文章的阅读进度
+ */
+---
+
+<div
+  id="reading-progress"
+  class="fixed top-0 left-0 z-[100] h-[3px] bg-gradient-to-r from-rose-400 to-orange-400 dark:from-rose-500 dark:to-orange-500 origin-left scale-x-0 transition-transform duration-100 ease-out print:hidden"
+  role="progressbar"
+  aria-label="阅读进度"
+  aria-valuenow="0"
+  aria-valuemin="0"
+  aria-valuemax="100"
+>
+</div>
+
+<script>
+  document.addEventListener('astro:page-load', () => {
+    const progressBar = document.getElementById('reading-progress')
+    const article =
+      document.querySelector('article') || document.querySelector('.prose')
+
+    if (!progressBar || !article) return
+
+    // 计算阅读进度
+    const calculateProgress = () => {
+      const articleRect = article.getBoundingClientRect()
+      const articleTop = articleRect.top + window.scrollY
+      const articleHeight = articleRect.height
+      const windowHeight = window.innerHeight
+      const scrollY = window.scrollY
+
+      // 计算进度：从文章开始到文章结束
+      const start = articleTop
+      const end = articleTop + articleHeight - windowHeight
+      const current = scrollY
+
+      if (current <= start) {
+        return 0
+      } else if (current >= end) {
+        return 100
+      } else {
+        return ((current - start) / (end - start)) * 100
+      }
+    }
+
+    // 更新进度条
+    const updateProgress = () => {
+      const progress = calculateProgress()
+      progressBar.style.transform = `scaleX(${progress / 100})`
+      progressBar.setAttribute('aria-valuenow', String(Math.round(progress)))
+    }
+
+    // 使用 requestAnimationFrame 优化性能
+    let ticking = false
+    const onScroll = () => {
+      if (!ticking) {
+        requestAnimationFrame(() => {
+          updateProgress()
+          ticking = false
+        })
+        ticking = true
+      }
+    }
+
+    // 初始化
+    updateProgress()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    window.addEventListener('resize', updateProgress, { passive: true })
+  })
+</script>

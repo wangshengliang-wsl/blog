@@ -44,8 +44,35 @@
 
   class BgPlumElement extends HTMLElement {
     rafId: number | null = null
+    idleCallbackId: number | null = null
 
     connectedCallback() {
+      // 检查用户是否偏好减少动画
+      const prefersReducedMotion = window.matchMedia(
+        '(prefers-reduced-motion: reduce)'
+      ).matches
+
+      // 移动端或偏好减少动画时不初始化
+      if (prefersReducedMotion || window.innerWidth < 640) {
+        return
+      }
+
+      // 使用 requestIdleCallback 延迟初始化，不阻塞主线程
+      const initAnimation = () => {
+        this.startAnimation()
+      }
+
+      if ('requestIdleCallback' in window) {
+        this.idleCallbackId = requestIdleCallback(initAnimation, {
+          timeout: 2000,
+        })
+      } else {
+        // 降级方案：使用 setTimeout
+        setTimeout(initAnimation, 100)
+      }
+    }
+
+    startAnimation() {
       /* Canvas drawing logic (recursively draw each branch) */
       const step = (
         x: number,
@@ -66,7 +93,7 @@
         if (nx < -100 || nx > width + 100 || ny < -100 || ny > height + 100)
           return
 
-        // otherwise continue drawring
+        // otherwise continue drawing
         const rad1 = rad + random() * R15
         const rad2 = rad - random() * R15
         const rate = counter.value <= THRESHOLD ? 0.8 : 0.5
@@ -122,7 +149,8 @@
           () => step(-5, randomMiddle() * height, 0),
           () => step(width + 5, randomMiddle() * height, R180),
         ]
-        if (width < 640) pendingSteps = pendingSteps.slice(0, 2)
+        // 平板设备减少分支数量
+        if (width < 1024) pendingSteps = pendingSteps.slice(0, 2)
 
         startFrame()
       }
@@ -156,6 +184,10 @@
       if (this.rafId) {
         cancelAnimationFrame(this.rafId)
         this.rafId = null
+      }
+      if (this.idleCallbackId && 'cancelIdleCallback' in window) {
+        cancelIdleCallback(this.idleCallbackId)
+        this.idleCallbackId = null
       }
     }
   }

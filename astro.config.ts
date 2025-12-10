@@ -32,6 +32,11 @@ export default defineConfig({
     layout: 'constrained',
     responsiveStyles: true,
   },
+  // 优化预加载策略
+  prefetch: {
+    prefetchAll: false,
+    defaultStrategy: 'viewport',
+  },
   vite: {
     server: {
       allowedHosts: ['blog.local', '.localcan.dev'],
@@ -44,10 +49,23 @@ export default defineConfig({
         usePolling: false,
       },
     },
-    build: { chunkSizeWarningLimit: 1200 },
+    build: {
+      chunkSizeWarningLimit: 1200,
+      // 优化代码分割
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            // 将大型第三方库分离
+            'vendor-three': ['three'],
+            'vendor-katex': ['katex'],
+          },
+        },
+      },
+    },
     // Optimize MDX processing
     optimizeDeps: {
-      include: [],
+      include: ['nprogress'],
+      exclude: ['@astrojs/mdx'],
     },
   },
   // https://docs.astro.build/en/reference/experimental-flags/

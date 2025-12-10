@@ -4,6 +4,7 @@ import '~/styles/main.css'
 import '~/styles/prose.css'
 import '~/styles/markdown.css'
 import '~/styles/page.css'
+import '~/styles/mobile.css'
 
 import Head from '~/components/base/Head.astro'
 import Background from '~/components/backgrounds/Background.astro'
@@ -14,6 +15,8 @@ import Footer from '~/components/base/Footer.astro'
 import ToTopButton from '~/components/widgets/ToTopButton.astro'
 import Backdrop from '~/components/base/Backdrop.astro'
 import GlobalMusicPlayer from '~/components/music/GlobalMusicPlayer.astro'
+import ReadingProgress from '~/components/widgets/ReadingProgress.astro'
+import KeyboardShortcuts from '~/components/widgets/KeyboardShortcuts.astro'
 
 import { SITE, UI, FEATURES } from '~/config'
 import { withBasePath } from '~/utils/path'
@@ -98,6 +101,12 @@ if (hasCustomCursor) style['--external-link-cursor'] = cursorType
 
     <!-- Global Music Player -->
     <GlobalMusicPlayer />
+
+    <!-- Reading Progress Indicator -->
+    <ReadingProgress />
+
+    <!-- Keyboard Shortcuts -->
+    <KeyboardShortcuts />
 
     <!-- Progress Bar -->
     <script>

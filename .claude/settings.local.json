@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(for dir in /Users/wangshengliang/Desktop/i/blog/src/content/blog/*/)",
+      "Bash(done)",
+      "Bash(sort:*)",
+      "Bash(xargs:*)",
+      "Bash(find:*)"
+    ]
+  }
+}

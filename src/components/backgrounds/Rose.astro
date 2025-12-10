@@ -90,6 +90,16 @@ const roses = [
     }
 
     connectedCallback() {
+      // 检查用户是否偏好减少动画
+      const prefersReducedMotion = window.matchMedia(
+        '(prefers-reduced-motion: reduce)'
+      ).matches
+
+      if (prefersReducedMotion) {
+        // 静态显示，不执行动画
+        return
+      }
+
       // ensure CSS transitions trigger properly on client-side navigation
       requestAnimationFrame(() => {
         this.#animate()

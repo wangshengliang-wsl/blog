@@ -283,3 +283,302 @@
   transform: rotate(180deg);
 }
 
+/* ========== 全局音乐播放器 ========== */
+
+#global-music-player {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  pointer-events: none;
+  background: transparent;
+}
+
+.music-page-wrapper {
+  position: fixed;
+  inset: 0;
+  top: 4rem;
+  background: transparent;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  pointer-events: auto;
+  transition:
+    transform 0.3s ease,
+    opacity 0.3s ease;
+}
+
+.music-page-wrapper.hidden {
+  transform: translateY(100%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.music-player-container {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  position: relative;
+  overflow: hidden;
+  background: transparent;
+}
+
+/* 侧边栏包裹器 */
+.sidebar-wrapper {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  height: 100%;
+  z-index: 50;
+  transition: transform 0.3s ease;
+}
+
+.sidebar-wrapper.left {
+  left: 0;
+  width: 260px;
+}
+
+.sidebar-wrapper.right {
+  right: 0;
+  width: 260px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.sidebar-wrapper.left.collapsed {
+  transform: translateX(-260px);
+}
+
+.sidebar-wrapper.right.collapsed {
+  transform: translateX(260px);
+}
+
+/* 侧边栏折叠按钮 */
+.sidebar-toggle {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 48px;
+  background: rgba(128, 128, 128, 0.08);
+  border: 1px solid rgba(128, 128, 128, 0.15);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  z-index: 10;
+}
+
+.sidebar-toggle:hover {
+  background: rgba(139, 69, 19, 0.1);
+  border-color: rgba(139, 69, 19, 0.3);
+}
+
+.sidebar-toggle span {
+  font-size: 1rem;
+  opacity: 0.6;
+  transition: transform 0.3s ease;
+}
+
+.sidebar-toggle:hover span {
+  opacity: 1;
+  color: #8b4513;
+}
+
+.left-toggle {
+  right: -20px;
+  border-radius: 0 6px 6px 0;
+  border-left: none;
+}
+
+.right-toggle {
+  left: -20px;
+  border-radius: 6px 0 0 6px;
+  border-right: none;
+}
+
+.sidebar-wrapper.left.collapsed .left-toggle span {
+  transform: rotate(180deg);
+}
+
+.sidebar-wrapper.right.collapsed .right-toggle span {
+  transform: rotate(180deg);
+}
+
+.gramophone-section {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  padding: 0.5rem;
+  background: transparent;
+}
+
+/* 移动端控制栏 */
+.mobile-controls {
+  display: none;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--c-bg);
+  border-top: 1px solid rgba(128, 128, 128, 0.2);
+  padding: 0.75rem 1rem;
+  padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+  justify-content: center;
+  gap: 3rem;
+  z-index: 200;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.mobile-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: rgba(139, 69, 19, 0.1);
+  border: 2px solid rgba(139, 69, 19, 0.2);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.mobile-btn:hover,
+.mobile-btn:active {
+  background: rgba(139, 69, 19, 0.2);
+  border-color: rgba(139, 69, 19, 0.4);
+  transform: scale(1.05);
+}
+
+.mobile-btn span {
+  font-size: 1.5rem;
+  opacity: 0.8;
+  color: #8b4513;
+}
+
+/* 浮动按钮 */
+.music-floating-btn {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: var(--c-bg);
+  border: 1px solid rgba(128, 128, 128, 0.2);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  pointer-events: auto;
+  z-index: 101;
+  transition: all 0.3s ease;
+  opacity: 0;
+  transform: scale(0.8);
+  pointer-events: none;
+}
+
+.music-floating-btn.visible {
+  opacity: 1;
+  transform: scale(1);
+  pointer-events: auto;
+}
+
+.spin-animation {
+  animation: spin 3s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 平板适配 */
+@media (max-width: 1024px) {
+  .sidebar-wrapper.left {
+    width: 200px;
+  }
+
+  .sidebar-wrapper.left.collapsed {
+    transform: translateX(-200px);
+  }
+
+  .sidebar-wrapper.right {
+    transform: translateX(260px);
+  }
+
+  .sidebar-toggle {
+    display: none;
+  }
+
+  .sidebar-wrapper.right.active {
+    transform: translateX(0);
+  }
+
+  .mobile-controls {
+    display: flex;
+  }
+}
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+  .music-page-wrapper {
+    bottom: 4.5rem;
+  }
+
+  .sidebar-wrapper.left {
+    width: 260px;
+    bottom: 4.5rem;
+    transform: translateX(-260px);
+    z-index: 150;
+  }
+
+  .sidebar-wrapper.right {
+    width: 260px;
+    bottom: 4.5rem;
+    transform: translateX(260px);
+    z-index: 150;
+  }
+
+  .sidebar-wrapper.left.active {
+    transform: translateX(0);
+  }
+
+  .sidebar-wrapper.right.active {
+    transform: translateX(0);
+  }
+
+  .gramophone-section {
+    padding: 0.25rem;
+  }
+
+  .mobile-controls {
+    padding: 0.6rem 1rem;
+    padding-bottom: calc(0.6rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .mobile-btn {
+    width: 48px;
+    height: 48px;
+  }
+}
+
+/* 小屏幕手机适配 */
+@media (max-width: 480px) {
+  .sidebar-wrapper.left,
+  .sidebar-wrapper.right {
+    width: 85%;
+    max-width: 280px;
+  }
+}
+

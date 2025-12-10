@@ -7,8 +7,7 @@ import {
   transformerDirectives,
   transformerVariantGroup,
 } from 'unocss'
-import { readFileSync, readdirSync, statSync } from 'node:fs'
-import { join } from 'node:path'
+import { readFileSync, existsSync } from 'node:fs'
 
 import { UI } from './src/config'
 import projecstData from './src/content/projects/data.json'
@@ -38,48 +37,20 @@ const socialIcons = socialLinks
 
 const projectIcons = projecstData.map((item) => item.icon)
 
-// Get blog post icons by reading files directly
+/**
+ * 从缓存文件加载博客图标
+ * 缓存由 scripts/extract-icons.js 在构建前生成
+ */
 function getBlogIcons(): string[] {
-  const icons: string[] = []
-  const blogDir = './src/content/blog'
-
-  function readDir(dir: string) {
-    try {
-      const files = readdirSync(dir)
-      for (const file of files) {
-        const fullPath = join(dir, file)
-        const stat = statSync(fullPath)
-
-        if (stat.isDirectory()) {
-          readDir(fullPath)
-        } else if (file.endsWith('.mdx') || file.endsWith('.md')) {
-          try {
-            const content = readFileSync(fullPath, 'utf-8')
-            const frontmatterMatch = content.match(/^---\n([\s\S]*?)\n---/)
-            if (frontmatterMatch) {
-              const frontmatter = frontmatterMatch[1]
-              const iconMatch = frontmatter.match(/titleIcon:\s*(.+)/)
-              if (iconMatch) {
-                const icon = iconMatch[1].trim()
-                // Skip URL format icons (only process UnoCSS icon format)
-                if (!/^https?:\/\//.test(icon)) {
-                  const finalIcon = icon.startsWith('i-') ? icon : `i-${icon}`
-                  icons.push(finalIcon)
-                }
-              }
-            }
-          } catch (_e) {
-            // Ignore file read errors
-          }
-        }
-      }
-    } catch (_e) {
-      // Ignore directory read errors
+  const cacheFile = './.cache/blog-icons.json'
+  try {
+    if (existsSync(cacheFile)) {
+      return JSON.parse(readFileSync(cacheFile, 'utf-8'))
     }
+  } catch (_e) {
+    console.warn('[unocss] Failed to load blog icons cache, using empty array')
   }
-
-  readDir(blogDir)
-  return icons
+  return []
 }
 
 const blogIcons = getBlogIcons()
@@ -211,6 +182,10 @@ export default defineConfig({
     /* Toc */
     'i-ri-menu-2-fill',
     'i-ri-menu-3-fill',
+
+    /* Nav Panel */
+    'i-ri-close-line',
+    'i-ri-menu-line',
 
     /* Music Player */
     'i-ri-disc-line',

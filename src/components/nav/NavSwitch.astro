@@ -4,26 +4,38 @@
 
 <button
   id="nav-open-button"
-  class="hidden lt-md:block op-60 hover:op-100 op-transition"
+  class="hidden lt-md:flex items-center justify-center min-w-11 min-h-11 op-60 hover:op-100 op-transition touch-target"
   title="Navigation"
-  aria-label="Navigation"
+  aria-label="打开导航菜单"
   aria-expanded="false"
   aria-controls="nav-panel"
 >
-  <div u-i-ri-menu-line></div>
+  <div u-i-ri-menu-line class="text-xl"></div>
 </button>
 
 <div
   id="nav-panel"
   class="hidden! z-200 fixed top-10% left-50% translate-x--50%
     overflow-y-auto flex flex-col gap-5
-    w-90% max-h-80vh py-4 px-6 rounded-lg
+    w-90% max-w-md max-h-80vh py-4 px-6 rounded-lg touch-scroll
   bg-[var(--c-bg)] shadow-custom_0_0_10_0 text-[var(--c-text)]"
+  role="dialog"
+  aria-modal="true"
+  aria-label="导航菜单"
 >
-  <ul>
+  <!-- 关闭按钮 -->
+  <button
+    id="nav-close-button"
+    class="absolute top-3 right-3 p-2 op-50 hover:op-100 op-transition rounded-full touch-target"
+    aria-label="关闭导航菜单"
+  >
+    <div u-i-ri-close-line class="text-lg"></div>
+  </button>
+
+  <ul class="mt-2">
     <slot name="text" />
   </ul>
-  <div class="flex justify-center items-center gap-4">
+  <div class="flex justify-center items-center gap-4 flex-wrap">
     <slot name="icon" />
   </div>
 </div>
@@ -32,13 +44,77 @@
   import { toggleFadeEffect } from '~/utils/misc'
 
   document.addEventListener('astro:page-load', () => {
-    /* Open nav panel when user click on button */
-    const handleBtnClickToOpen = () => {
+    const navPanel = document.getElementById('nav-panel')
+    const navOpenButton = document.getElementById('nav-open-button')
+    const navCloseButton = document.getElementById('nav-close-button')
+    const backdrop = document.getElementById('backdrop')
+
+    /* 打开导航面板 */
+    const openNavPanel = () => {
       toggleFadeEffect('backdrop', true, 'hidden')
       toggleFadeEffect('nav-panel', true, 'hidden!')
+      navPanel?.classList.add('visible')
+      navOpenButton?.setAttribute('aria-expanded', 'true')
+
+      // 聚焦到关闭按钮（无障碍）
+      navCloseButton?.focus()
     }
 
-    const navOpenButton = document.getElementById('nav-open-button')
-    navOpenButton?.addEventListener('click', handleBtnClickToOpen)
+    /* 关闭导航面板 */
+    const closeNavPanel = () => {
+      toggleFadeEffect('backdrop', false, 'hidden')
+      toggleFadeEffect('nav-panel', false, 'hidden!')
+      navPanel?.classList.remove('visible')
+      navOpenButton?.setAttribute('aria-expanded', 'false')
+
+      // 恢复焦点到打开按钮
+      navOpenButton?.focus()
+    }
+
+    /* 事件绑定 */
+    navOpenButton?.addEventListener('click', openNavPanel)
+    navCloseButton?.addEventListener('click', closeNavPanel)
+
+    /* 点击背景关闭 */
+    backdrop?.addEventListener('click', closeNavPanel)
+
+    /* ESC 键关闭 */
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !navPanel?.classList.contains('hidden!')) {
+        closeNavPanel()
+      }
+    })
+
+    /* 触摸滑动关闭手势 */
+    let touchStartY = 0
+    let touchEndY = 0
+    const SWIPE_THRESHOLD = 50
+
+    navPanel?.addEventListener(
+      'touchstart',
+      (e) => {
+        touchStartY = e.changedTouches[0].screenY
+      },
+      { passive: true }
+    )
+
+    navPanel?.addEventListener(
+      'touchend',
+      (e) => {
+        touchEndY = e.changedTouches[0].screenY
+        // 向上滑动关闭
+        if (touchStartY - touchEndY > SWIPE_THRESHOLD) {
+          closeNavPanel()
+        }
+      },
+      { passive: true }
+    )
+
+    /* 点击导航链接后自动关闭面板 */
+    navPanel?.querySelectorAll('a').forEach((link) => {
+      link.addEventListener('click', () => {
+        setTimeout(closeNavPanel, 100)
+      })
+    })
   })
 </script>
