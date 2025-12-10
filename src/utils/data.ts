@@ -9,6 +9,16 @@ import type { GitHubView } from '~/types'
 const defaultCategory = '杂谈'
 
 /**
+ * Extracts the last segment from a category path (e.g., "Vue/5-VueRouter" -> "VueRouter")
+ */
+export function getLastCategorySegment(category: string): string {
+  const segments = category.split('/')
+  const lastSegment = segments[segments.length - 1] || category
+  // Remove number prefix like "5-" from "5-VueRouter"
+  return lastSegment.replace(/^\d+-/, '')
+}
+
+/**
  * Tree node for hierarchical category structure
  */
 export interface CategoryTreeNode {

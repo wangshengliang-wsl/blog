@@ -53,12 +53,18 @@ html {
   transition:
     transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
     opacity 0.3s ease;
-  transform: translateX(-50%) translateY(-10px);
+  /* 确保居中：left: 50% 配合 translateX(-50%) */
+  left: 50% !important;
+  transform: translateX(-50%) translateY(-10px) !important;
   touch-action: pan-y;
+  /* 确保可以接收点击事件 */
+  pointer-events: auto !important;
+  /* 确保层级高于音乐播放器和 canvas (最高层) */
+  z-index: 9999 !important;
 }
 
 #nav-panel.visible {
-  transform: translateX(-50%) translateY(0);
+  transform: translateX(-50%) translateY(0) !important;
 }
 
 /* 导航面板内的列表项 */

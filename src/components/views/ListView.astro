@@ -8,7 +8,11 @@ import Warning from '~/components/base/Warning.astro'
 
 import { FEATURES } from '~/config'
 import { isSameYear, getYear } from '~/utils/datetime'
-import { getFilteredPosts, getPostsByCategory } from '~/utils/data'
+import {
+  getFilteredPosts,
+  getPostsByCategory,
+  getLastCategorySegment,
+} from '~/utils/data'
 
 import type { CollectionEntry, CollectionKey } from 'astro:content'
 import type { StreamSchema } from '~/content/schema'
@@ -42,7 +46,9 @@ if (collectionType === 'blog' || collectionType === 'changelog') {
   sortedBlogItems = categorizedBlogItems.flatMap(([_, posts]) => posts)
 
   if (tocEnabled) {
-    categories = categorizedBlogItems.map(([category]) => category)
+    categories = categorizedBlogItems.map(([category]) =>
+      getLastCategorySegment(category)
+    )
   }
 }
 
@@ -139,7 +145,7 @@ if ((collectionType as string) === 'feeds') {
                   <Categorizer
                     idx={globalIdx}
                     needId={tocEnabled}
-                    text={category}
+                    text={getLastCategorySegment(category)}
                   />
                 )}
                 <ListItem

@@ -13,13 +13,29 @@
   import { toggleFadeEffect } from '~/utils/misc'
 
   const PANELS = [
-    { id: 'nav-panel', button: 'nav-open-button', hiddenClass: 'hidden!' },
     { id: 'search-panel', button: 'search-switch', hiddenClass: 'hidden' },
+    // nav-panel 只能通过关闭按钮关闭，不响应 backdrop 点击
   ]
 
   /* Close panel when user click on backdrop */
   document.addEventListener('astro:page-load', () => {
-    const handleClick = () => {
+    const handleClick = (e: MouseEvent) => {
+      const target = e.target as Node
+
+      // 检查是否点击了 nav-panel（不在 PANELS 中，但需要排除）
+      const navPanel = document.getElementById('nav-panel')
+      if (navPanel && navPanel.contains(target)) {
+        return // 点击 nav-panel 内部，不处理
+      }
+
+      // 如果点击目标在面板内部，不关闭
+      for (const { id } of PANELS) {
+        const panel = document.getElementById(id)
+        if (panel && panel.contains(target)) {
+          return
+        }
+      }
+      // 只处理 search-panel，nav-panel 不响应 backdrop 点击
       for (const { id, hiddenClass } of PANELS) {
         const panel = document.getElementById(id)
         if (panel && !panel.classList.contains(hiddenClass)) {
@@ -39,6 +55,7 @@
     if (event.key !== 'Tab' && event.key !== 'Escape') return
 
     const focusEl = document.activeElement
+    // 只处理 search-panel，nav-panel 只能通过关闭按钮关闭
     PANELS.forEach(({ id, button, hiddenClass }) => {
       const panel = document.getElementById(id)
       const isFocusOutside = !panel?.contains(focusEl) && focusEl?.id !== button

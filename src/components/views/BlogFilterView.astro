@@ -68,11 +68,50 @@ function collectPostsWithCategory(
 
 const postsInDisplayOrder = collectPostsWithCategory(categoryTree)
 
-const postsWithReadTime: PostWithReadTime[] = await Promise.all(
-  postsInDisplayOrder.map(async ({ post, categoryPath }, globalIdx) => {
-    const { remarkPluginFrontmatter } = await render(post)
-    const minutesRead =
-      post.data.minutesRead || remarkPluginFrontmatter.minutesRead || 0
+/**
+ * Process posts in batches to avoid overwhelming the system
+ */
+async function processPostsInBatches<T, R>(
+  items: T[],
+  batchSize: number,
+  processor: (item: T, index: number) => Promise<R>
+): Promise<R[]> {
+  const results: R[] = []
+  for (let i = 0; i < items.length; i += batchSize) {
+    const batch = items.slice(i, i + batchSize)
+    const batchResults = await Promise.all(
+      batch.map((item, batchIdx) => processor(item, i + batchIdx))
+    )
+    results.push(...batchResults)
+  }
+  return results
+}
+
+const postsWithReadTime: PostWithReadTime[] = await processPostsInBatches(
+  postsInDisplayOrder,
+  10, // Process 10 posts at a time
+  async ({ post, categoryPath }, globalIdx) => {
+    let minutesRead = post.data.minutesRead || 0
+
+    try {
+      // Add timeout wrapper to prevent hanging
+      const renderResult = await Promise.race([
+        render(post),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Render timeout')), 15000)
+        ),
+      ])
+
+      minutesRead =
+        post.data.minutesRead ||
+        renderResult.remarkPluginFrontmatter.minutesRead ||
+        0
+    } catch (error) {
+      // Log error but don't fail the entire page
+      console.error(`Failed to render post ${post.id}:`, error)
+      // Use default value
+      minutesRead = post.data.minutesRead || 0
+    }
 
     return {
       post,
@@ -80,7 +119,7 @@ const postsWithReadTime: PostWithReadTime[] = await Promise.all(
       categoryPath,
       globalIdx,
     }
-  })
+  }
 )
 
 // 生成树形结构的 JSON 供 JS 使用

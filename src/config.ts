@@ -16,20 +16,20 @@ export const UI: Ui = {
     {
       path: '/',
       title: 'Home',
-      displayMode: 'alwaysText',
-      text: 'Home',
+      displayMode: 'alwaysIcon',
+      icon: 'i-ri-home-4-line',
     },
     {
       path: '/blog',
       title: 'Blog',
-      displayMode: 'alwaysText',
-      text: 'Blog',
+      displayMode: 'alwaysIcon',
+      icon: 'i-ri-article-line',
     },
     {
       path: '/projects',
       title: 'Projects',
-      displayMode: 'alwaysText',
-      text: 'Projects',
+      displayMode: 'alwaysIcon',
+      icon: 'i-ri-code-box-line',
     },
     // {
     //   path: '/highlights',
@@ -48,15 +48,13 @@ export const UI: Ui = {
     {
       path: '/shorts',
       title: 'Shorts',
-      displayMode: 'iconToTextOnMobile',
-      text: 'Shorts',
+      displayMode: 'alwaysIcon',
       icon: 'i-meteor-icons-grid',
     },
     {
       path: '/music',
       title: 'Music Player',
-      displayMode: 'iconToTextOnMobile',
-      text: 'Music',
+      displayMode: 'alwaysIcon',
       icon: 'i-ri-disc-line',
     },
     // {
@@ -97,7 +95,7 @@ export const UI: Ui = {
       'themeButton',
       'rssLink',
     ],
-    mergeOnMobile: true,
+    mergeOnMobile: false,
   },
   tabbedLayoutTabs: [
     { title: 'Changelog', path: '/changelog' },

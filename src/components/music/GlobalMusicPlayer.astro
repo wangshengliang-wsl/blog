@@ -2,8 +2,12 @@
 import VinylSidebar from '~/components/music/VinylSidebar.astro'
 import Gramophone from '~/components/music/Gramophone.astro'
 import SongList from '~/components/music/SongList.astro'
+import { UI } from '~/config'
+import { resolvePath } from '~/utils/path'
 
 import albumsData from '~/content/music/data.json'
+
+const { internalNavs, socialLinks } = UI
 ---
 
 <div id="global-music-player" transition:persist="music-player">
@@ -41,16 +45,45 @@ import albumsData from '~/content/music/data.json'
 
     <!-- 移动端底部控制栏 -->
     <div class="mobile-controls">
-      <button
-        id="mobile-sidebar-toggle"
-        class="mobile-btn"
-        aria-label="唱片列表"
-      >
-        <span class="i-ri-album-line"></span>
-      </button>
-      <button id="mobile-songs-toggle" class="mobile-btn" aria-label="歌曲列表">
-        <span class="i-ri-list-unordered"></span>
-      </button>
+      <!-- 导航链接行（只在移动端显示） -->
+      <div class="mobile-nav-row" id="mobile-nav-row">
+        {
+          internalNavs.map((item) => (
+            <a href={resolvePath(item.path)} class="mobile-nav-link">
+              {item.text}
+            </a>
+          ))
+        }
+        {
+          socialLinks.map((item) => (
+            <a
+              href={item.link}
+              class="mobile-nav-link"
+              rel="me"
+              target="_blank"
+            >
+              <span class={item.icon} />
+            </a>
+          ))
+        }
+      </div>
+      <!-- 控制按钮行 -->
+      <div class="mobile-btn-row">
+        <button
+          id="mobile-sidebar-toggle"
+          class="mobile-btn"
+          aria-label="唱片列表"
+        >
+          <span class="i-ri-album-line"></span>
+        </button>
+        <button
+          id="mobile-songs-toggle"
+          class="mobile-btn"
+          aria-label="歌曲列表"
+        >
+          <span class="i-ri-list-unordered"></span>
+        </button>
+      </div>
     </div>
   </div>
 
@@ -218,18 +251,55 @@ import albumsData from '~/content/music/data.json'
 
   .mobile-controls {
     display: none;
-    position: absolute; /* Changed from fixed to absolute */
+    flex-direction: column;
+    position: absolute;
     bottom: 0;
     left: 0;
     right: 0;
     background: var(--c-bg);
     border-top: 1px solid rgba(128, 128, 128, 0.2);
-    padding: 0.75rem 1rem;
-    padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
-    justify-content: center;
-    gap: 3rem;
+    padding: 0.5rem 1rem;
+    padding-bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px));
+    gap: 0.5rem;
     z-index: 200;
     box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.1);
+  }
+
+  /* 导航链接行 */
+  .mobile-nav-row {
+    display: none;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    gap: 1.5rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid rgba(128, 128, 128, 0.1);
+  }
+
+  .mobile-nav-link {
+    font-size: 0.875rem;
+    color: inherit;
+    opacity: 0.7;
+    text-decoration: none;
+    transition: opacity 0.2s ease;
+    white-space: nowrap;
+  }
+
+  .mobile-nav-link:hover {
+    opacity: 1;
+  }
+
+  .mobile-nav-link span {
+    font-size: 1.1rem;
+  }
+
+  /* 控制按钮行 */
+  .mobile-btn-row {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    gap: 3rem;
   }
 
   .mobile-btn {
@@ -302,16 +372,25 @@ import albumsData from '~/content/music/data.json'
 
   /* 平板适配 */
   @media (max-width: 1024px) {
+    /* 默认隐藏侧边栏 */
     .sidebar-wrapper.left {
       width: 200px;
+      transform: translateX(-200px);
+      z-index: 150;
     }
 
-    .sidebar-wrapper.left.collapsed {
-      transform: translateX(-200px);
+    .sidebar-wrapper.left.active {
+      transform: translateX(0);
     }
 
     .sidebar-wrapper.right {
+      width: 260px;
       transform: translateX(260px);
+      z-index: 150;
+    }
+
+    .sidebar-wrapper.right.active {
+      transform: translateX(0);
     }
 
     .sidebar-toggle {
@@ -320,21 +399,20 @@ import albumsData from '~/content/music/data.json'
 
     .music-player-container :global(.vinyl-sidebar) {
       width: 200px;
+      box-shadow: 4px 0 20px rgba(0, 0, 0, 0.1);
     }
 
     .music-player-container :global(.song-list-container) {
       width: 260px;
-    }
-
-    .music-player-container :global(.song-list-container.active) {
-      transform: translateX(0);
-    }
-
-    .sidebar-wrapper.right.active {
-      transform: translateX(0);
+      box-shadow: -4px 0 20px rgba(0, 0, 0, 0.1);
     }
 
     .mobile-controls {
+      display: flex;
+    }
+
+    /* 在平板端检测到汉堡菜单按钮时显示导航行 */
+    .mobile-nav-row.visible {
       display: flex;
     }
   }
@@ -452,6 +530,27 @@ import albumsData from '~/content/music/data.json'
     }
   }
 
+  // Check if hamburger menu button is visible and show/hide mobile nav row
+  function updateMobileNavVisibility() {
+    const navOpenButton = document.getElementById('nav-open-button')
+    const mobileNavRow = document.getElementById('mobile-nav-row')
+
+    if (!navOpenButton || !mobileNavRow) return
+
+    // Check if hamburger menu button is visible (display: flex on mobile)
+    const isHamburgerVisible =
+      window.getComputedStyle(navOpenButton).display !== 'none'
+
+    if (isHamburgerVisible) {
+      mobileNavRow.classList.add('visible')
+    } else {
+      mobileNavRow.classList.remove('visible')
+    }
+  }
+
+  // Update on resize
+  window.addEventListener('resize', updateMobileNavVisibility)
+
   // Listen for playback state changes to toggle floating button
   window.addEventListener('playback-state', ((e: CustomEvent) => {
     const { isPlaying } = e.detail
@@ -462,6 +561,7 @@ import albumsData from '~/content/music/data.json'
   // Setup event listeners on page load
   document.addEventListener('astro:page-load', () => {
     updatePlayerVisibility()
+    updateMobileNavVisibility()
 
     // Floating button is now an anchor tag, so no need for manual navigation logic
     // Astro's View Transitions will handle it automatically.
@@ -472,52 +572,59 @@ import albumsData from '~/content/music/data.json'
     // Actually, the script in index.astro (now here) handles sidebar toggles.
     // We need to include that logic here too, but ensure it doesn't duplicate.
 
-    // Sidebar logic
-    const sidebarToggle = document.getElementById('mobile-sidebar-toggle')
-    const songsToggle = document.getElementById('mobile-songs-toggle')
+    // Sidebar logic - use event delegation for reliable handling
     const leftSidebarToggle = document.getElementById('left-sidebar-toggle')
     const rightSidebarToggle = document.getElementById('right-sidebar-toggle')
-    const leftWrapper = document.querySelector('.sidebar-wrapper.left')
-    const rightWrapper = document.querySelector('.sidebar-wrapper.right')
 
-    // We can't easily check if listener exists on standard elements without a flag.
-    // But since the element is persisted, we can tag it.
-
+    // Desktop sidebar toggles
     if (leftSidebarToggle && !leftSidebarToggle.dataset.hasListener) {
       leftSidebarToggle.addEventListener('click', () => {
-        leftWrapper?.classList.toggle('collapsed')
+        document
+          .querySelector('.sidebar-wrapper.left')
+          ?.classList.toggle('collapsed')
       })
       leftSidebarToggle.dataset.hasListener = 'true'
     }
 
     if (rightSidebarToggle && !rightSidebarToggle.dataset.hasListener) {
       rightSidebarToggle.addEventListener('click', () => {
-        rightWrapper?.classList.toggle('collapsed')
+        document
+          .querySelector('.sidebar-wrapper.right')
+          ?.classList.toggle('collapsed')
       })
       rightSidebarToggle.dataset.hasListener = 'true'
     }
 
-    if (sidebarToggle && !sidebarToggle.dataset.hasListener) {
-      sidebarToggle.addEventListener('click', () => {
-        leftWrapper?.classList.toggle('active')
-        rightWrapper?.classList.remove('active')
-      })
-      sidebarToggle.dataset.hasListener = 'true'
-    }
+    // Mobile sidebar toggles - use event delegation on the container
+    const mobileControls = document.querySelector('.mobile-controls')
+    if (mobileControls && !mobileControls.dataset.hasListener) {
+      mobileControls.addEventListener('click', (e) => {
+        const target = e.target as HTMLElement
+        const button = target.closest('button')
+        if (!button) return
 
-    if (songsToggle && !songsToggle.dataset.hasListener) {
-      songsToggle.addEventListener('click', () => {
-        rightWrapper?.classList.toggle('active')
-        leftWrapper?.classList.remove('active')
+        e.stopPropagation()
+        const leftWrapper = document.querySelector('.sidebar-wrapper.left')
+        const rightWrapper = document.querySelector('.sidebar-wrapper.right')
+
+        if (
+          button.id === 'mobile-sidebar-toggle' ||
+          button.getAttribute('aria-label') === '唱片列表'
+        ) {
+          leftWrapper?.classList.toggle('active')
+          rightWrapper?.classList.remove('active')
+        } else if (
+          button.id === 'mobile-songs-toggle' ||
+          button.getAttribute('aria-label') === '歌曲列表'
+        ) {
+          rightWrapper?.classList.toggle('active')
+          leftWrapper?.classList.remove('active')
+        }
       })
-      songsToggle.dataset.hasListener = 'true'
+      mobileControls.dataset.hasListener = 'true'
     }
 
     // Click outside to close panels
-    // This one is on document, so it WILL be added every time.
-    // We need to be careful.
-    // We can use a named function and remove it first?
-    // Or just check a global flag.
     if (!window.MusicPlayerState.clickListenerAttached) {
       document.addEventListener('click', (e) => {
         const target = e.target as HTMLElement
@@ -525,8 +632,12 @@ import albumsData from '~/content/music/data.json'
           !target.closest('.sidebar-wrapper') &&
           !target.closest('.mobile-controls')
         ) {
-          leftWrapper?.classList.remove('active')
-          rightWrapper?.classList.remove('active')
+          document
+            .querySelector('.sidebar-wrapper.left')
+            ?.classList.remove('active')
+          document
+            .querySelector('.sidebar-wrapper.right')
+            ?.classList.remove('active')
         }
       })
       window.MusicPlayerState.clickListenerAttached = true

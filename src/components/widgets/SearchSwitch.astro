@@ -36,6 +36,7 @@ const maxItems = parseTuple(maxItemsPerPage, 'maxItemsPerPage')
     grid grid-rows-[auto_1fr_auto]
     w-42rem lt-lgp:(w-90%) max-h-70vh lt-lgp:(max-h-80vh) p-3 lt-lgp:(pb-1) rounded-lg
     text-[var(--c-text)] bg-[var(--c-bg)] shadow-custom_0_0_10_0`}
+  style="view-transition-name: none;"
   aria-modal="true"
   aria-labelledby="search-label"
   aria-keyshortcuts="ArrowUp,ArrowDown,Enter,Esc"
@@ -163,6 +164,19 @@ const maxItems = parseTuple(maxItemsPerPage, 'maxItemsPerPage')
   /* Handle click on search switch to open or close */
   document.addEventListener('astro:page-load', () => {
     const handleToggle = () => {
+      const panel = document.getElementById('search-panel')
+      const results = document.getElementById('search-results')
+
+      // Reset scroll position of search results before showing
+      if (results) results.scrollTop = 0
+
+      // Reset any residual styles that might affect positioning
+      if (panel) {
+        panel.style.removeProperty('top')
+        panel.style.removeProperty('left')
+        panel.style.removeProperty('transform')
+      }
+
       toggleFadeEffect('backdrop', true, 'hidden')
       toggleFadeEffect('search-panel', true, 'hidden')
 
@@ -376,6 +390,12 @@ const maxItems = parseTuple(maxItemsPerPage, 'maxItemsPerPage')
 
     #handleResultClick = (event: MouseEvent) => {
       if (!this.#getLink(event)) return
+
+      // Reset panel state before navigation
+      this.#resetView()
+
+      // Reset scroll position
+      if (this.#results) this.#results.scrollTop = 0
 
       if (!window.matchMedia('(prefers-reduced-motion)').matches)
         this.classList.remove('fade-in')

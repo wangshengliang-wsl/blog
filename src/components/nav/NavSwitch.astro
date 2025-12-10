@@ -15,10 +15,11 @@
 
 <div
   id="nav-panel"
-  class="hidden! z-200 fixed top-10% left-50% translate-x--50%
+  class="hidden! fixed top-16
     overflow-y-auto flex flex-col gap-5
-    w-90% max-w-md max-h-80vh py-4 px-6 rounded-lg touch-scroll
-  bg-[var(--c-bg)] shadow-custom_0_0_10_0 text-[var(--c-text)]"
+    w-[min(90vw,24rem)] max-h-[calc(100vh-5rem)] py-4 px-6 rounded-lg touch-scroll
+    bg-[var(--c-bg)] shadow-custom_0_0_10_0 text-[var(--c-text)]"
+  style="left: 50%; view-transition-name: none;"
   role="dialog"
   aria-modal="true"
   aria-label="导航菜单"
@@ -49,11 +50,48 @@
     const navCloseButton = document.getElementById('nav-close-button')
     const backdrop = document.getElementById('backdrop')
 
+    /* 重置面板状态 */
+    const resetNavPanel = () => {
+      if (navPanel) {
+        // Ensure left: 50% is set for centering
+        navPanel.style.left = '50%'
+        // Don't remove transform - let CSS handle it completely
+        // CSS will apply transform: translateX(-50%) for centering
+      }
+    }
+
+    /* 页面加载时重置面板状态 */
+    navPanel?.classList.remove('visible', 'fade-in', 'fade-out')
+    navPanel?.classList.add('hidden!')
+    backdrop?.classList.remove('fade-in', 'fade-out')
+    backdrop?.classList.add('hidden')
+    navOpenButton?.setAttribute('aria-expanded', 'false')
+    resetNavPanel()
+
+    /* 阻止点击事件冒泡到 backdrop */
+    const stopPropagation = (e: Event) => {
+      e.stopPropagation()
+    }
+
     /* 打开导航面板 */
     const openNavPanel = () => {
+      // Reset position before opening - ensure left: 50% for centering
+      if (navPanel) {
+        navPanel.style.left = '50%'
+        // Don't touch transform - CSS handles it with translateX(-50%)
+        // 阻止点击事件冒泡，确保可以直接点击面板内容
+        navPanel.addEventListener('click', stopPropagation, true)
+      }
+
       toggleFadeEffect('backdrop', true, 'hidden')
       toggleFadeEffect('nav-panel', true, 'hidden!')
-      navPanel?.classList.add('visible')
+
+      // Use double requestAnimationFrame to ensure CSS transition works
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          navPanel?.classList.add('visible')
+        })
+      })
       navOpenButton?.setAttribute('aria-expanded', 'true')
 
       // 聚焦到关闭按钮（无障碍）
@@ -62,10 +100,20 @@
 
     /* 关闭导航面板 */
     const closeNavPanel = () => {
+      // 移除事件监听器
+      if (navPanel) {
+        navPanel.removeEventListener('click', stopPropagation, true)
+      }
+
       toggleFadeEffect('backdrop', false, 'hidden')
       toggleFadeEffect('nav-panel', false, 'hidden!')
       navPanel?.classList.remove('visible')
       navOpenButton?.setAttribute('aria-expanded', 'false')
+
+      // Reset position after animation completes
+      setTimeout(() => {
+        resetNavPanel()
+      }, 300) // Match animation duration
 
       // 恢复焦点到打开按钮
       navOpenButton?.focus()
@@ -74,47 +122,5 @@
     /* 事件绑定 */
     navOpenButton?.addEventListener('click', openNavPanel)
     navCloseButton?.addEventListener('click', closeNavPanel)
-
-    /* 点击背景关闭 */
-    backdrop?.addEventListener('click', closeNavPanel)
-
-    /* ESC 键关闭 */
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && !navPanel?.classList.contains('hidden!')) {
-        closeNavPanel()
-      }
-    })
-
-    /* 触摸滑动关闭手势 */
-    let touchStartY = 0
-    let touchEndY = 0
-    const SWIPE_THRESHOLD = 50
-
-    navPanel?.addEventListener(
-      'touchstart',
-      (e) => {
-        touchStartY = e.changedTouches[0].screenY
-      },
-      { passive: true }
-    )
-
-    navPanel?.addEventListener(
-      'touchend',
-      (e) => {
-        touchEndY = e.changedTouches[0].screenY
-        // 向上滑动关闭
-        if (touchStartY - touchEndY > SWIPE_THRESHOLD) {
-          closeNavPanel()
-        }
-      },
-      { passive: true }
-    )
-
-    /* 点击导航链接后自动关闭面板 */
-    navPanel?.querySelectorAll('a').forEach((link) => {
-      link.addEventListener('click', () => {
-        setTimeout(closeNavPanel, 100)
-      })
-    })
   })
 </script>
