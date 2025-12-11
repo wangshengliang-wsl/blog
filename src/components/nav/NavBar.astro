@@ -22,11 +22,13 @@ for (const item of new Set(left)) {
 ---
 
 <header
-  class={`nav-header fixed top-0 left-0 right-0 z-50 flex items-center gap-6 p-[1rem_2rem_1rem] ${mergeOnMobile ? 'lt-md:px-7' : 'lt-md:(px-6 gap-3)'}`}
+  class={`nav-header fixed top-0 left-0 right-0 z-50 flex items-center p-[1rem_2rem_1rem] ${mergeOnMobile ? 'lt-md:px-7' : 'lt-md:px-6'}`}
 >
-  <LogoButton />
+  <div class="logo-wrapper mr-6 lt-md:mr-3">
+    <LogoButton />
+  </div>
   <nav
-    class={`flex items-center gap-4.8 w-full lt-md:justify-end
+    class={`main-nav flex items-center gap-4.8 w-full lt-md:justify-end
     ${left.length !== 0 ? (right.length !== 0 ? 'justify-between' : '') : 'justify-end'}`}
     aria-label="Main menu"
   >
@@ -135,3 +137,24 @@ for (const item of new Set(left)) {
     }
   </nav>
 </header>
+
+<style>
+  .logo-wrapper {
+    transition: all 0.5s ease-in-out;
+    width: auto;
+    opacity: 1;
+    overflow: hidden;
+  }
+
+  @media (max-width: 380px) {
+    .logo-wrapper {
+      width: 0;
+      opacity: 0;
+      margin-right: 0 !important; /* Override utility classes */
+    }
+
+    .main-nav {
+      justify-content: center !important;
+    }
+  }
+</style>
