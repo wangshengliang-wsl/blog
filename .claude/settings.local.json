@@ -18,7 +18,8 @@
       "Bash(kill:*)",
       "Bash(pnpm dev)",
       "Bash(python3:*)",
-      "Bash(pnpm preview:*)"
+      "Bash(pnpm preview:*)",
+      "WebFetch(domain:main.blog-cms-1j0.pages.dev)"
     ]
   }
 }
