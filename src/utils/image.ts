@@ -17,7 +17,7 @@ interface RemoteImageFail {
   height: null
 }
 
-const TIMEOUT_MS = 10_000
+const TIMEOUT_MS = 30_000
 const MAX_BYTES = 10_000_000
 
 /**

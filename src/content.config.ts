@@ -12,6 +12,11 @@ import {
   streamSchema,
   photoSchema,
 } from '~/content/schema'
+import { cmsLoader } from '~/loaders/cms'
+import { mediaLoader } from '~/loaders/cms/media'
+
+// CMS API base URL from environment variable
+const CMS_API_URL = import.meta.env.CMS_API_URL
 
 const pages = defineCollection({
   loader: glob({ base: './src/pages', pattern: '**/*.mdx' }),
@@ -22,8 +27,11 @@ const home = defineCollection({
   loader: glob({ base: './src/content/home', pattern: 'index.{md,mdx}' }),
 })
 
+// Use CMS loader if API URL is configured, otherwise use local files
 const blog = defineCollection({
-  loader: glob({ base: './src/content/blog', pattern: '**/[^_]*.{md,mdx}' }),
+  loader: CMS_API_URL
+    ? cmsLoader({ apiBaseUrl: CMS_API_URL })
+    : glob({ base: './src/content/blog', pattern: '**/[^_]*.{md,mdx}' }),
   schema: postSchema,
 })
 
@@ -57,8 +65,11 @@ const projects = defineCollection({
 //   }),
 // })
 
+// Use CMS media loader if API URL is configured, otherwise use local files
 const photos = defineCollection({
-  loader: file('src/content/photos/data.json'),
+  loader: CMS_API_URL
+    ? mediaLoader({ apiBaseUrl: CMS_API_URL })
+    : file('src/content/photos/data.json'),
   schema: photoSchema,
 })
 

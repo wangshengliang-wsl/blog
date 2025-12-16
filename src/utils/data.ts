@@ -155,6 +155,40 @@ export function buildNestedCategoryTree(
     posts: [],
   }
 
+  // Build a map from lowercase slug to correct case name
+  // This uses the frontmatter category field which now contains the full name path
+  // e.g., post.id = "frontend/react/post-slug", post.data.category = "Frontend/React"
+  const slugToNameMap = new Map<string, string>()
+  posts.forEach((post) => {
+    const category = post.data.category
+    if (category && typeof category === 'string') {
+      // Parse both the slug path (from id) and name path (from category)
+      const pathParts = post.id.split('/')
+      const slugParts = pathParts.slice(0, -1) // Remove filename
+      const nameParts = category.split('/')
+
+      // Map each slug to its corresponding name
+      // Handle case where lengths might differ (shouldn't happen, but be safe)
+      const minLen = Math.min(slugParts.length, nameParts.length)
+      for (let i = 0; i < minLen; i++) {
+        const slug = slugParts[i].toLowerCase()
+        const name = nameParts[i]
+        // Only set if not already set (use first occurrence)
+        if (!slugToNameMap.has(slug)) {
+          slugToNameMap.set(slug, name)
+        }
+      }
+    }
+  })
+
+  // Helper to get correct case name for a path segment (slug)
+  const getCorrectCaseName = (segment: string): string => {
+    const formatted = formatDisplayName(segment)
+    // Try to find the correct case from the map
+    const correctCase = slugToNameMap.get(formatted.toLowerCase())
+    return correctCase || formatted
+  }
+
   // Helper to find or create a node at a given path
   const findOrCreateNode = (
     parent: CategoryTreeNode,
@@ -169,7 +203,7 @@ export function buildNestedCategoryTree(
     if (!child) {
       const childPath = parent.path ? `${parent.path}/${current}` : current
       child = {
-        name: formatDisplayName(current),
+        name: getCorrectCaseName(current),
         path: childPath,
         children: [],
         posts: [],

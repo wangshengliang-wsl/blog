@@ -27,11 +27,38 @@ pnpm preview          # Preview production build
 - **UnoCSS** (Wind3 preset) for styling
 - **Expressive Code** for syntax highlighting
 
+### CMS Integration
+
+博客支持两种内容来源模式（通过环境变量 `CMS_API_URL` 切换）：
+
+| 模式 | 配置 | 内容来源 |
+|------|------|---------|
+| CMS模式 | `CMS_API_URL` 已设置 | 从 blog-cms API 获取 |
+| 本地模式 | `CMS_API_URL` 未设置 | 本地 `src/content/blog/` |
+
+#### CMS相关文件
+- `src/loaders/cms/` - CMS内容加载器
+- `src/utils/cms-api.ts` - CMS API客户端
+- `src/content.config.ts` - 内容集合配置（自动切换加载方式）
+
+#### CMS API端点
+```
+GET /api/public/posts         # 获取文章列表
+GET /api/public/posts/:slug   # 获取单篇文章
+GET /api/public/categories    # 获取分类列表
+GET /api/public/tags          # 获取标签列表
+```
+
+#### CMS项目
+- 路径: `/Users/wangshengliang/Desktop/i/blog-cms`
+- 技术栈: Next.js 15, Turso (SQLite), Drizzle ORM
+- 部署: Cloudflare Pages (`https://main.blog-cms-1j0.pages.dev`)
+
 ### Content Collections (`src/content/`)
 
 | Collection | Format | Purpose |
 |------------|--------|---------|
-| `blog/` | MDX in category folders | Blog posts |
+| `blog/` | MDX in category folders (or CMS) | Blog posts |
 | `changelog/` | MDX | Site updates |
 | `projects/` | JSON | Projects data |
 | `photos/` | JSON | Gallery data |

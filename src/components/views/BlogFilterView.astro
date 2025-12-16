@@ -345,11 +345,10 @@ const treeDataForJS = JSON.stringify(
               idx === 0 ||
               postsWithReadTime[idx - 1]?.categoryPath !== categoryPath
 
-            // 获取显示名称：去掉数字前缀
-            const displayCategory = categoryPath
-              .split('/')
-              .map((s) => s.replace(/^\d+-/, ''))
-              .join(' / ')
+            // 获取显示名称：只显示末级目录名称，去掉数字前缀
+            const segments = categoryPath.split('/')
+            const lastSegment = segments[segments.length - 1]
+            const displayCategory = lastSegment.replace(/^\d+-/, '')
 
             return (
               <div class="post-item" data-category={categoryPath}>

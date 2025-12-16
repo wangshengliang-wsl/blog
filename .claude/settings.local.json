@@ -5,7 +5,20 @@
       "Bash(done)",
       "Bash(sort:*)",
       "Bash(xargs:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(cat:*)",
+      "Bash(tree:*)",
+      "Bash(curl:*)",
+      "Bash(pnpm build:*)",
+      "Bash(pnpm check:*)",
+      "Bash(timeout 60 pnpm dev:*)",
+      "Bash(pkill:*)",
+      "Bash(lsof:*)",
+      "Bash(pnpm add:*)",
+      "Bash(kill:*)",
+      "Bash(pnpm dev)",
+      "Bash(python3:*)",
+      "Bash(pnpm preview:*)"
     ]
   }
 }

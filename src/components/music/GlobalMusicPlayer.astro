@@ -4,10 +4,39 @@ import Gramophone from '~/components/music/Gramophone.astro'
 import SongList from '~/components/music/SongList.astro'
 import { UI } from '~/config'
 import { resolvePath } from '~/utils/path'
+import { fetchMusic, isCMSEnabled, type CMSAlbum } from '~/utils/cms-api'
 
-import albumsData from '~/content/music/data.json'
+// Fallback to local data if CMS is not configured
+import localAlbumsData from '~/content/music/data.json'
 
 const { internalNavs, socialLinks } = UI
+
+// Fetch albums from CMS or use local data
+let albumsData = localAlbumsData
+if (isCMSEnabled()) {
+  try {
+    const cmsAlbums: CMSAlbum[] = await fetchMusic()
+    if (cmsAlbums && cmsAlbums.length > 0) {
+      // 映射 CMS 专辑为本地数据结构，填充必填字段默认值
+      albumsData = cmsAlbums.map((album) => ({
+        id: album.id,
+        name: album.name,
+        description: album.description ?? '',
+        artist: album.artist,
+        cover: album.cover ?? '',
+        color: album.color ?? '#1a1a2e',
+        songs: album.songs.map((song) => ({
+          id: song.id,
+          name: song.name,
+          duration: song.duration,
+          url: song.url,
+        })),
+      }))
+    }
+  } catch (error) {
+    console.warn('Failed to fetch music from CMS, using local data:', error)
+  }
+}
 ---
 
 <div id="global-music-player" transition:persist="music-player">

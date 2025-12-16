@@ -185,3 +185,52 @@ export function transformCMSPostToCollectionEntry(post: CMSPost) {
     }),
   }
 }
+
+/**
+ * Music API Types
+ */
+export interface CMSSong {
+  id: string
+  name: string
+  duration: string
+  url: string
+}
+
+export interface CMSAlbum {
+  id: string
+  name: string
+  description?: string
+  artist: string
+  cover?: string
+  color?: string
+  songs: CMSSong[]
+}
+
+export interface CMSMusicResponse {
+  albums: CMSAlbum[]
+  total: number
+}
+
+/**
+ * Fetch all published albums with songs from CMS
+ */
+export async function fetchMusic(): Promise<CMSAlbum[]> {
+  if (!CMS_API_URL) {
+    throw new Error('CMS_API_URL is not configured')
+  }
+
+  const url = `${CMS_API_URL}/api/public/music`
+
+  const response = await fetch(url, {
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  })
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch music: ${response.statusText}`)
+  }
+
+  const data: CMSMusicResponse = await response.json()
+  return data.albums
+}

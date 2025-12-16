@@ -38,13 +38,12 @@ export const UI: Ui = {
     //   text: 'Highlights',
     //   icon: 'i-ri-screenshot-line',
     // },
-    // {
-    //   path: '/photos',
-    //   title: 'Photos',
-    //   displayMode: 'iconToTextOnMobile',
-    //   text: 'Photos',
-    //   icon: 'i-ri-camera-ai-line',
-    // },
+    {
+      path: '/photos',
+      title: 'Photos',
+      displayMode: 'alwaysIcon',
+      icon: 'i-ri-camera-ai-line',
+    },
     {
       path: '/shorts',
       title: 'Shorts',
