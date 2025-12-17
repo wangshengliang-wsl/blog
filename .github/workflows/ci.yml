@@ -70,7 +70,7 @@ jobs:
       - name: 🚀 Build the project
         env:
           NODE_OPTIONS: --max-old-space-size=16384
-          CMS_API_URL: https://main.blog-cms-1j0.pages.dev
+          CMS_API_URL: https://www.wangshengliang.site
         run: pnpm build
 
       - name: ✅ Verify build output

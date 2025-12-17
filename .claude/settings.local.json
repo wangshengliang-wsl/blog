@@ -19,7 +19,12 @@
       "Bash(pnpm dev)",
       "Bash(python3:*)",
       "Bash(pnpm preview:*)",
-      "WebFetch(domain:main.blog-cms-1j0.pages.dev)"
+      "WebFetch(domain:main.blog-cms-1j0.pages.dev)",
+      "Bash(timeout 30 pnpm build:*)",
+      "Bash(rm:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ]
   }
 }
