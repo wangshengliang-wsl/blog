@@ -1,6 +1,8 @@
 name: CI
 
 on:
+  workflow_dispatch:  # 允许通过 GitHub API 手动触发
+
   push:
     branches:
       - main
@@ -84,7 +86,7 @@ jobs:
           fi
 
       - name: 🚀 Deploy to Cloudflare Pages
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
