@@ -64,7 +64,10 @@ export function cmsLoader(options: CMSLoaderOptions): Loader {
         // First, get total count
         const countUrl = `${apiBaseUrl}/api/public/posts?limit=1&offset=0`
         const countResponse = await fetchWithRetry(countUrl, {
-          headers: { Accept: 'application/json' },
+          headers: {
+            'Accept': 'application/json',
+            'User-Agent': 'AstroBlog/1.0 (Build Process)',
+          },
         })
 
         if (!countResponse.ok) {
@@ -107,8 +110,9 @@ export function cmsLoader(options: CMSLoaderOptions): Loader {
 
             const promise = fetchWithRetry(postsUrl, {
               headers: {
-                Accept: 'application/json',
-                Connection: 'keep-alive',
+                'Accept': 'application/json',
+                'Connection': 'keep-alive',
+                'User-Agent': 'AstroBlog/1.0 (Build Process)',
               },
             }).then(async (response) => {
               if (!response.ok) {

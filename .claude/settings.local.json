@@ -24,7 +24,10 @@
       "Bash(rm:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "WebFetch(domain:www.wangshengliang.site)",
+      "Bash(CMS_API_URL=https://main.blog-cms-1j0.pages.dev timeout 120 pnpm build:*)",
+      "Bash(CMS_API_URL=https://main.blog-cms-1j0.pages.dev pnpm build:*)"
     ]
   }
 }

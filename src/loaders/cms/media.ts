@@ -84,7 +84,8 @@ export function mediaLoader(options: MediaLoaderOptions): Loader {
         try {
           response = await fetchWithRetry(mediaUrl, {
             headers: {
-              Accept: 'application/json',
+              'Accept': 'application/json',
+              'User-Agent': 'AstroBlog/1.0 (Build Process)',
             },
           })
         } catch (fetchError) {
@@ -143,7 +144,10 @@ export function mediaLoader(options: MediaLoaderOptions): Loader {
           while (offset < data.total) {
             const nextUrl = `${apiBaseUrl}/api/public/media?limit=${batchSize}&offset=${offset}&type=image`
             const nextResponse = await fetchWithRetry(nextUrl, {
-              headers: { Accept: 'application/json' },
+              headers: {
+                'Accept': 'application/json',
+                'User-Agent': 'AstroBlog/1.0 (Build Process)',
+              },
             })
 
             if (nextResponse.ok) {
