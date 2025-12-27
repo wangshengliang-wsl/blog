@@ -80,6 +80,9 @@ export default defineConfig({
         ...theme.breakpoints,
         lgp: '1128px',
       },
+      fontFamily: {
+        sans: "'TX-02', sans-serif",
+      },
     }
   },
 

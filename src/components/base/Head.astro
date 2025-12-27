@@ -164,6 +164,22 @@ const websiteData = {
 />
 <meta name="color-scheme" content="light dark" />
 
+<!-- Custom Font -->
+<style is:inline>
+  @font-face {
+    font-family: 'TX-02';
+    src: url('/fonts/TX-02-Medium.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+  }
+
+  html,
+  body {
+    font-family: 'TX-02', sans-serif !important;
+  }
+</style>
+
 <!-- Open Graph & Facebook -->
 <meta property="og:type" content={pubDate ? 'article' : 'website'} />
 <meta property="og:url" content={canonicalURL} />

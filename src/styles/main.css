@@ -1,3 +1,11 @@
+@font-face {
+  font-family: 'TX-02';
+  src: url('/fonts/TX-02-Medium.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   --c-bg: #fff;
   --c-scrollbar: #ddd;
@@ -28,6 +36,7 @@ html {
   scroll-padding-top: 4.5rem;
 
   background-color: var(--c-bg);
+  font-family: 'TX-02', sans-serif !important;
 }
 
 html:has(#bg-rose) {
@@ -38,6 +47,7 @@ body {
   overflow-x: hidden;
   overflow-y: scroll;
   padding-top: 4rem;
+  font-family: 'TX-02', sans-serif !important;
 }
 
 ::selection {
