@@ -24,5 +24,5 @@
 
 如果你也对技术感兴趣，或者想聊点什么，随时欢迎来找我：
 
-- 邮箱：wsl1710642275@gmail.com
+- 邮箱：<a href="mailto:wsl1710642275@gmail.com">wsl1710642275@gmail.com</a>
 - GitHub：[wangshengliang-wsl](https://github.com/wangshengliang-wsl)
